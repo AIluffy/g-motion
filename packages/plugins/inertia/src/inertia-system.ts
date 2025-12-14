@@ -3,6 +3,31 @@ import { createDebugger } from '@g-motion/utils';
 
 const debug = createDebugger('InertiaSystem');
 
+interface MotionStateData {
+  status: MotionStatus;
+}
+
+interface InertiaData {
+  timeConstant: number;
+  min?: number;
+  max?: number;
+  bounds?: { min?: number; max?: number };
+  clamp?: boolean;
+  snap?: number | number[];
+  end?: (value: number) => void;
+  modifyTarget?: (target: number) => number;
+  bounceStiffness: number;
+  bounceDamping: number;
+  bounceMass: number;
+  bounce?: boolean;
+  handoff?: boolean;
+  restSpeed: number;
+  restDelta: number;
+  velocities?: Map<string, number>;
+  bounceVelocities?: Map<string, number>;
+  inBounce?: Map<string, boolean>;
+}
+
 /**
  * InertiaSystem implements momentum-based motion with exponential decay.
  * Supports optional boundary bounce using spring physics.
@@ -35,9 +60,9 @@ export const InertiaSystem: SystemDef = {
       if (!inertiaBuffer || !stateBuffer || !timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
-        const timeline = timelineBuffer[i];
-        const inertia = inertiaBuffer[i];
+        const state = stateBuffer[i] as MotionStateData;
+        const timeline = timelineBuffer[i] as any;
+        const inertia = inertiaBuffer[i] as InertiaData;
 
         // Only process running entities
         if (state.status !== MotionStatus.Running) continue;
@@ -88,14 +113,18 @@ export const InertiaSystem: SystemDef = {
 
           // Get current value from Transform or Render component
           let currentValue = 0;
-          if (transformBuffer && key in transformBuffer[i]) {
-            currentValue = transformBuffer[i][key];
-          } else if (renderBuffer?.[i]?.props) {
+          if (transformBuffer) {
+            const transform = transformBuffer[i] as any;
+            if (transform && key in transform) {
+              currentValue = transform[key];
+            }
+          } else if (renderBuffer) {
+            const render = renderBuffer[i] as any;
             // For primitive renderer, use __primitive key
-            if (key === '__primitive' && renderBuffer[i].props.__primitive !== undefined) {
-              currentValue = renderBuffer[i].props.__primitive;
-            } else if (renderBuffer[i].props[key] !== undefined) {
-              currentValue = renderBuffer[i].props[key];
+            if (key === '__primitive' && render?.props?.__primitive !== undefined) {
+              currentValue = render.props.__primitive;
+            } else if (render?.props?.[key] !== undefined) {
+              currentValue = render.props[key];
             }
           } else {
             // Fallback to startValue if no current value found

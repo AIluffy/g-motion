@@ -3,6 +3,32 @@ import { createDebugger } from '@g-motion/utils';
 
 const debug = createDebugger('SpringSystem');
 
+interface MotionStateData {
+  status: MotionStatus;
+  currentTime: number;
+}
+
+interface TimelineData {
+  tracks: Map<string, Array<{ endValue: number }>>;
+}
+
+interface SpringData {
+  stiffness: number;
+  damping: number;
+  mass: number;
+  restSpeed: number;
+  restDelta: number;
+  velocities?: Map<string, number>;
+}
+
+interface RenderData {
+  props?: Record<string, number>;
+}
+
+interface TransformData {
+  [key: string]: number;
+}
+
 /**
  * SpringSystem implements spring physics using semi-implicit Euler integration.
  * Runs before InterpolationSystem (order: 19) and takes over animation for entities with SpringComponent.
@@ -53,11 +79,11 @@ export const SpringSystem: SystemDef = {
       if (!springBuffer || !stateBuffer || !timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
-        const timeline = timelineBuffer[i];
-        const spring = springBuffer[i];
+        const state = stateBuffer[i] as MotionStateData;
+        const timeline = timelineBuffer[i] as TimelineData;
+        const spring = springBuffer[i] as SpringData;
         const inertia = inertiaBuffer ? inertiaBuffer[i] : undefined;
-        const transform = transformBuffer ? transformBuffer[i] : undefined;
+        const transform = transformBuffer ? (transformBuffer[i] as TransformData) : undefined;
 
         // Only process running entities
         if (state.status !== MotionStatus.Running) continue;
@@ -85,9 +111,12 @@ export const SpringSystem: SystemDef = {
             // Read from typed buffer if available (matches DOM renderer priority)
             currentValue = typedBuffers[key]![i];
           } else if (transform && key in transform) {
-            currentValue = (transform as any)[key];
-          } else if (renderBuffer?.[i]?.props?.[key] !== undefined) {
-            currentValue = renderBuffer[i].props[key];
+            currentValue = transform[key];
+          } else if (renderBuffer) {
+            const render = renderBuffer[i] as RenderData;
+            if (render?.props?.[key] !== undefined) {
+              currentValue = render.props[key];
+            }
           }
 
           // Initialize velocity for this track if not exists
@@ -119,7 +148,7 @@ export const SpringSystem: SystemDef = {
 
           if (transform && key in transform) {
             // Write to AoS Transform object
-            (transform as any)[key] = newValue;
+            transform[key] = newValue;
             // Also write to typed buffer for this key when available
             const tbuf = typedBuffers[key];
             if (tbuf) {
@@ -130,7 +159,7 @@ export const SpringSystem: SystemDef = {
 
           // Fallback to Render.props when Transform is absent
           if (!handled && renderBuffer) {
-            const render = renderBuffer[i];
+            const render = renderBuffer[i] as RenderData;
             if (!render.props) render.props = {};
             render.props[key] = newValue;
             // No Transform component: attempt to write to typed buffer anyway
@@ -147,14 +176,17 @@ export const SpringSystem: SystemDef = {
           } else {
             // Snap to target when at rest (both typed buffers and AoS)
             if (transform && key in transform) {
-              (transform as any)[key] = targetValue;
+              transform[key] = targetValue;
               // Also write to typed buffer
               const tbuf = typedBuffers[key];
               if (tbuf) {
                 tbuf[i] = targetValue;
               }
-            } else if (renderBuffer?.[i]?.props) {
-              renderBuffer[i].props[key] = targetValue;
+            } else if (renderBuffer) {
+              const render = renderBuffer[i] as RenderData;
+              if (render?.props) {
+                render.props[key] = targetValue;
+              }
               // Attempt typed buffer write
               const tbuf = typedBuffers[key];
               if (tbuf) {
@@ -169,10 +201,11 @@ export const SpringSystem: SystemDef = {
         if (allTracksAtRest && timeline.tracks.size > 0) {
           // If inertia is present, hand off velocities and let InertiaSystem continue
           if (inertia) {
-            if (!inertia.velocities || !(inertia.velocities instanceof Map)) {
-              inertia.velocities = new Map<string, number>();
+            const inertiaData = inertia as any;
+            if (!inertiaData.velocities || !(inertiaData.velocities instanceof Map)) {
+              inertiaData.velocities = new Map<string, number>();
             }
-            const inertiaVelocities = inertia.velocities as Map<string, number>;
+            const inertiaVelocities = inertiaData.velocities as Map<string, number>;
 
             // Transfer per-track velocity if available (carry-over)
             for (const [key, v] of velocities) {
