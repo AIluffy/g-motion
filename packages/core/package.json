@@ -1,0 +1,33 @@
+{
+  "name": "@g-motion/core",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@g-motion/utils": "workspace:*"
+  },
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "test": "vitest run",
+    "bench": "vitest bench --run"
+  },
+  "devDependencies": {
+    "@rslib/core": "workspace:*",
+    "@types/node": "workspace:*",
+    "@webgpu/types": "^0.1.67",
+    "typescript": "workspace:*",
+    "vitest": "workspace:*"
+  }
+}

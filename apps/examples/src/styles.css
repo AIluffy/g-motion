@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+body {
+  @apply m-0 bg-slate-950 text-slate-50;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+a {
+  @apply text-sky-300 hover:text-sky-200;
+}
+
+.page-shell {
+  @apply min-h-screen bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900;
+}
+
+.section-grid {
+  @apply grid gap-4 md:grid-cols-2;
+}

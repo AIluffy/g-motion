@@ -1,0 +1,35 @@
+{
+  "extends": [
+    "tsgolint"
+  ],
+  "rules": {
+    "import-cycle": "warn",
+    "no-mixed-requires": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-arrow-callback": "error",
+    "indent": ["error", 2],
+    "quotes": ["error", "single"],
+    "semi": ["error", "always"],
+    "no-unused-vars": "warn",
+    "no-console": "warn"
+    // Note: Watch for World.get() usage - prefer WorldProvider.useWorld() or DI
+    // Custom rule enforcement via code review until oxlint supports regex patterns
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    "build/",
+    "*.min.js",
+    "*.bundle.js"
+  ],
+  "parser": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2021": true
+  }
+}

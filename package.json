@@ -1,0 +1,47 @@
+{
+  "name": "motion-monorepo",
+  "version": "1.0.0",
+  "description": "Motion monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "build:packages": "turbo run build --filter='./packages/*'",
+    "build:apps": "turbo run build --filter='./apps/*'",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint -- --fix",
+    "format": "oxfmt --check .",
+    "format:fix": "oxfmt .",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "test:watch": "turbo run test -- --watch",
+    "clean": "turbo clean && rm -rf node_modules",
+    "prepare": "husky install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.24.0",
+  "pnpm": {
+    "overrides": {
+      "typescript": "^5.9.3",
+      "oxlint": "^1.31.0",
+      "@rslib/core": "^0.18.3",
+      "@types/node": "^24.10.1",
+      "vitest": "^4.0.14"
+    }
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "oxfmt": "^0.16.0",
+    "oxlint": "^1.31.0",
+    "oxlint-tsgolint": "^0.8.3",
+    "turbo": "^2.6.2",
+    "typescript": "^5.9.3",
+    "@rslib/core": "^0.18.3",
+    "@types/node": "^24.10.1",
+    "vitest": "^4.0.14"
+  }
+}

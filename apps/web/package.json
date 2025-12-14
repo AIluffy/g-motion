@@ -1,0 +1,22 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "description": "Web application for Motion",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint src",
+    "type-check": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@g-motion/core": "workspace:*",
+    "@g-motion/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "oxlint": "workspace:*",
+    "typescript": "workspace:*",
+    "vite": "^7.2.6"
+  }
+}

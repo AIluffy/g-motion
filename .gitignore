@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+pnpm-debug.log
+npm-debug.log
+yarn-error.log
+
+# Package manager lock files (if using npm or yarn, otherwise optional)
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+out/
+*.bundle.js
+*.bundle.css
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-workspace
+*.sublime-project
+.vim/
+
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Logs
+logs/
+*.log
+
+# Runtime
+.cache/
+tmp/
+temp/
+
+# Generated files
+*.d.ts
+.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional PNPM cache
+.pnpm-store/
+
+
+# Misc
+*.tgz
+.turbo/
+.next/
+dist/

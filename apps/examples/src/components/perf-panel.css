@@ -1,0 +1,61 @@
+/* Fixed Performance Panel on the Left Side */
+
+.perf-panel-fixed {
+  position: fixed;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9998;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 280px;
+  pointer-events: auto;
+}
+
+.perf-panel-card {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* Hide vertical scrollbar but keep functionality */
+.perf-panel-fixed::-webkit-scrollbar {
+  width: 4px;
+}
+
+.perf-panel-fixed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.perf-panel-fixed::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+}
+
+.perf-panel-fixed::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Firefox scrollbar */
+.perf-panel-fixed {
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  scrollbar-width: thin;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .perf-panel-fixed {
+    width: 240px;
+    left: 5px;
+    top: 10px;
+    transform: none;
+    max-height: calc(50vh - 10px);
+  }
+}
+
+@media (max-width: 480px) {
+  .perf-panel-fixed {
+    width: 200px;
+    font-size: 0.8rem;
+  }
+}

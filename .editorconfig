@@ -1,0 +1,31 @@
+# EditorConfig
+
+This file helps maintain consistent coding styles across different editors and IDEs.
+
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# JavaScript, TypeScript, JSON
+[*.{js,jsx,ts,tsx,json}]
+indent_style = space
+indent_size = 2
+
+# YAML
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# Package files
+[{package.json,pnpm-lock.yaml}]
+indent_style = space
+indent_size = 2

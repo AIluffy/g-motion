@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DOM Transform Test</title>
+  <style>
+    #box {
+      width: 64px;
+      height: 64px;
+      background: #34d399;
+      position: absolute;
+      left: 32px;
+      top: 32px;
+    }
+  </style>
+</head>
+<body>
+  <div id="box"></div>
+  <button id="start">Start Animation</button>
+
+  <script type="module">
+    // Enable debug logging
+    globalThis.__MOTION_DEBUG__ = true;
+
+    // Import from built packages
+    import { motion } from './packages/animation/dist/index.js';
+    import './packages/plugins/dom/dist/index.js';
+
+    document.getElementById('start').addEventListener('click', () => {
+      console.log('Starting animation...');
+      const control = motion('#box')
+        .mark({ to: { x: 180, y: 0, scaleX: 1.05, rotate: 8 }, duration: 600 })
+        .mark({ to: { x: 180, y: 24, scaleX: 1, scaleY: 1.02, rotate: -6 }, duration: 500 })
+        .mark({ to: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0 }, duration: 400 })
+        .animate({ repeat: 0 });
+      console.log('Animation control:', control);
+    });
+  </script>
+</body>
+</html>
