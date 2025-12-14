@@ -162,9 +162,10 @@ export const InertiaSystem: SystemDef = {
                 return Math.abs(val - modifiedEnd) < Math.abs(closest - modifiedEnd)
                   ? val
                   : closest;
-              }, snapInput[0]);
+              }, snapInput[0]) as number;
             } else if (typeof snapInput === 'function') {
-              snapTarget = snapInput(modifiedEnd);
+              const result = snapInput(modifiedEnd);
+              snapTarget = result as unknown as number;
             }
           }
 
@@ -186,9 +187,10 @@ export const InertiaSystem: SystemDef = {
             }
           }
 
+          const handoffData = handoff as any;
           const handoffTarget =
-            handoff?.type === 'spring'
-              ? (handoff.to ??
+            handoffData?.type === 'spring'
+              ? (handoffData.to ??
                 (toValue !== undefined ? toValue : velocity >= 0 ? effectiveMax : effectiveMin))
               : undefined;
 
@@ -282,13 +284,16 @@ export const InertiaSystem: SystemDef = {
 
           // Write new value to components
           let handled = false;
-          if (transformBuffer && key in transformBuffer[i]) {
-            transformBuffer[i][key] = newValue;
-            handled = true;
+          if (transformBuffer) {
+            const transform = transformBuffer[i] as any;
+            if (transform && key in transform) {
+              transform[key] = newValue;
+              handled = true;
+            }
           }
 
           if (!handled && renderBuffer) {
-            const render = renderBuffer[i];
+            const render = renderBuffer[i] as any;
             if (!render.props) render.props = {};
             // For primitive renderer, write to __primitive
             if (key === '__primitive') {

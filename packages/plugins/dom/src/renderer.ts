@@ -279,7 +279,7 @@ export const DOMRenderSystem: SystemDef = {
       if (!renderBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const render = renderBuffer[i];
+        const render = renderBuffer[i] as { rendererId: string; target: unknown };
         if (render.rendererId !== 'dom') continue;
 
         // Collect components
