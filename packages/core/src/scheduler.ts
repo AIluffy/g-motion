@@ -1,6 +1,6 @@
 import { SystemDef } from './plugin';
-
 import { WorldProvider } from './worldProvider';
+import { SCHEDULER_LIMITS } from './constants';
 
 export class SystemScheduler {
   private systems: SystemDef[] = [];
@@ -89,7 +89,7 @@ export class SystemScheduler {
     this.lastTime = time;
 
     // Safety cap for dt to prevent spiraling on lag spikes (e.g., tab background)
-    const safeDt = Math.min(dt, 100);
+    const safeDt = Math.min(dt, SCHEDULER_LIMITS.MAX_FRAME_TIME_MS);
 
     for (const system of this.systems) {
       try {

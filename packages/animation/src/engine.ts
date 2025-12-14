@@ -26,21 +26,11 @@ class EngineConfig {
     if (!Number.isFinite(speed) || speed <= 0) {
       throw new Error(`[Motion Engine] Speed must be a positive number, got: ${speed}`);
     }
-
-    const world = this.getWorld();
-    const config = world.config;
-
-    // Store speed multiplier in config for systems to use
-    (config as any).globalSpeed = speed;
+    this.getWorld().config.globalSpeed = speed;
   }
 
-  /**
-   * Get current global animation speed
-   * @returns Current speed multiplier
-   */
   getSpeed(): number {
-    const world = this.getWorld();
-    return (world.config as any).globalSpeed ?? 1;
+    return this.getWorld().config.globalSpeed ?? 1;
   }
 
   /**
@@ -54,22 +44,13 @@ class EngineConfig {
     if (!Number.isFinite(fps) || fps <= 0) {
       throw new Error(`[Motion Engine] FPS must be a positive number, got: ${fps}`);
     }
-
-    const world = this.getWorld();
-    const config = world.config;
-
-    // Store target FPS in config
-    (config as any).targetFps = fps;
-    (config as any).frameDuration = 1000 / fps;
+    const config = this.getWorld().config;
+    config.targetFps = fps;
+    config.frameDuration = 1000 / fps;
   }
 
-  /**
-   * Get target FPS setting
-   * @returns Target FPS (default: 60)
-   */
   getFps(): number {
-    const world = this.getWorld();
-    return (world.config as any).targetFps ?? 60;
+    return this.getWorld().config.targetFps ?? 60;
   }
 
   /**

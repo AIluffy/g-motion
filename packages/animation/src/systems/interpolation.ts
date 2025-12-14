@@ -1,4 +1,11 @@
-import { SystemDef, World, MotionStatus, findActiveKeyframe, resolveEasing } from '@g-motion/core';
+import {
+  SystemDef,
+  World,
+  MotionStatus,
+  findActiveKeyframe,
+  resolveEasing,
+  extractTransformTypedBuffers,
+} from '@g-motion/core';
 import { getProgress, resolveInterpMode } from '../api/timeline';
 import type {
   MotionStateComponentData,
@@ -23,26 +30,7 @@ export const InterpolationSystem: SystemDef = {
 
       // Pre-fetch typed buffers for Transform numeric fields (SoA) to avoid repeated lookups
       // Note: typed buffers exist only when Transform schema declares numeric types
-      const typedTransformBuffers: Record<
-        string,
-        Float32Array | Float64Array | Int32Array | undefined
-      > = {
-        x: archetype.getTypedBuffer('Transform', 'x'),
-        y: archetype.getTypedBuffer('Transform', 'y'),
-        translateX: archetype.getTypedBuffer('Transform', 'translateX'),
-        translateY: archetype.getTypedBuffer('Transform', 'translateY'),
-        translateZ: archetype.getTypedBuffer('Transform', 'translateZ'),
-        z: archetype.getTypedBuffer('Transform', 'z'),
-        rotate: archetype.getTypedBuffer('Transform', 'rotate'),
-        rotateX: archetype.getTypedBuffer('Transform', 'rotateX'),
-        rotateY: archetype.getTypedBuffer('Transform', 'rotateY'),
-        rotateZ: archetype.getTypedBuffer('Transform', 'rotateZ'),
-        scale: archetype.getTypedBuffer('Transform', 'scale'),
-        scaleX: archetype.getTypedBuffer('Transform', 'scaleX'),
-        scaleY: archetype.getTypedBuffer('Transform', 'scaleY'),
-        scaleZ: archetype.getTypedBuffer('Transform', 'scaleZ'),
-        perspective: archetype.getTypedBuffer('Transform', 'perspective'),
-      };
+      const typedTransformBuffers = extractTransformTypedBuffers(archetype);
 
       if (!stateBuffer || !timelineBuffer) continue;
 

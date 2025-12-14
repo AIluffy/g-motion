@@ -18,8 +18,8 @@ export {
 export { SyncManager, DataTransferOptimizer, ComputeOrchestrator } from './sync-manager';
 export type { SyncEvent, PerformanceMetrics } from './sync-manager';
 
-export { ComputeBenchmark, PerformanceProfiler, RegressionTestHarness } from './benchmark';
-export type { BenchmarkResult } from './benchmark';
+// Development tools (benchmark, profiler) are not exported for production use
+// Import directly from './benchmark' in benchmark files if needed
 
 export { INTERPOLATION_SHADER } from './shader';
 

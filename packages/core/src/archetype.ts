@@ -1,4 +1,5 @@
 import { ComponentDef, ComponentType } from './plugin';
+import { ARCHETYPE_DEFAULTS } from './constants';
 
 /**
  * Type for component data values
@@ -22,7 +23,7 @@ export interface ArchetypeInternal {
 export class Archetype implements ArchetypeInternal {
   private buffers = new Map<string, Array<ComponentValue>>();
   private typedBuffers = new Map<string, Float32Array | Float64Array | Int32Array>();
-  private capacity = 1024;
+  private capacity: number = ARCHETYPE_DEFAULTS.INITIAL_CAPACITY;
   private count = 0;
   private entityIndices = new Map<number, number>(); // Entity ID -> Index
   private indicesMap = new Map<number, number>(); // Index -> Entity ID (reverse lookup for O(1) access)
@@ -37,7 +38,7 @@ export class Archetype implements ArchetypeInternal {
 
   addEntity(entityId: number, data: Record<string, ComponentValue>): void {
     if (this.count >= this.capacity) {
-      this.resize(this.capacity * 2);
+      this.resize(this.capacity * ARCHETYPE_DEFAULTS.GROWTH_FACTOR);
     }
     const index = this.count++;
     this.entityIndices.set(entityId, index);

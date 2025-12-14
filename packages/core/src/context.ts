@@ -1,4 +1,5 @@
 import { ComputeBatchProcessor } from './systems/batch';
+import { BatchContext } from './types';
 
 /**
  * Application-level context for managing singleton services and shared state.
@@ -8,7 +9,7 @@ export class AppContext {
   private static instance: AppContext;
 
   private batchProcessor: ComputeBatchProcessor | null = null;
-  private batchContext: Record<string, any> = {};
+  private batchContext: BatchContext = {};
   private webgpuInitialized = false;
 
   private constructor() {}
@@ -45,14 +46,14 @@ export class AppContext {
   /**
    * Get the batch context (transient state)
    */
-  getBatchContext(): Record<string, any> {
+  getBatchContext(): BatchContext {
     return this.batchContext;
   }
 
   /**
-   * Update batch context
+   * Update batch context with type-safe partial updates
    */
-  updateBatchContext(updates: Record<string, any>): void {
+  updateBatchContext(updates: Partial<BatchContext>): void {
     Object.assign(this.batchContext, updates);
   }
 

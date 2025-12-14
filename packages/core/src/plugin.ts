@@ -39,6 +39,12 @@ export interface MotionAppConfig {
    */
   gpuCompute?: GPUComputeMode;
 
+  // Engine runtime configuration
+  globalSpeed?: number;
+  targetFps?: number;
+  frameDuration?: number;
+  gpuEasingEnabled?: boolean;
+
   /**
    * Whether to enable GPU-accelerated easing functions.
    * Default: true

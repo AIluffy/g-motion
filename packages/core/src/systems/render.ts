@@ -1,6 +1,7 @@
 import { SystemDef } from '../index';
 import { WorldProvider } from '../worldProvider';
 import { app } from '../app';
+import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
 
 const missingRendererWarned = new Set<string>();
 
@@ -47,26 +48,7 @@ export const RenderSystem: SystemDef = {
       }
 
       // Cache typed Transform buffers once per archetype (optional)
-      const transformTypedBuffers: Record<
-        string,
-        Float32Array | Float64Array | Int32Array | undefined
-      > = {
-        x: archetype.getTypedBuffer('Transform', 'x'),
-        y: archetype.getTypedBuffer('Transform', 'y'),
-        translateX: archetype.getTypedBuffer('Transform', 'translateX'),
-        translateY: archetype.getTypedBuffer('Transform', 'translateY'),
-        translateZ: archetype.getTypedBuffer('Transform', 'translateZ'),
-        z: archetype.getTypedBuffer('Transform', 'z'),
-        rotate: archetype.getTypedBuffer('Transform', 'rotate'),
-        rotateX: archetype.getTypedBuffer('Transform', 'rotateX'),
-        rotateY: archetype.getTypedBuffer('Transform', 'rotateY'),
-        rotateZ: archetype.getTypedBuffer('Transform', 'rotateZ'),
-        scale: archetype.getTypedBuffer('Transform', 'scale'),
-        scaleX: archetype.getTypedBuffer('Transform', 'scaleX'),
-        scaleY: archetype.getTypedBuffer('Transform', 'scaleY'),
-        scaleZ: archetype.getTypedBuffer('Transform', 'scaleZ'),
-        perspective: archetype.getTypedBuffer('Transform', 'perspective'),
-      };
+      const transformTypedBuffers = extractTransformTypedBuffers(archetype);
 
       for (let i = 0; i < archetype.entityCount; i++) {
         const render = renderBuffer[i] as { rendererId: string; target: unknown };

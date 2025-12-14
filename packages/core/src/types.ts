@@ -4,6 +4,16 @@
  */
 
 /**
+ * Batch context for tracking per-frame batch processing state
+ */
+export interface BatchContext {
+  lastBatchId?: string;
+  entityCount?: number;
+  archetypeBatchesReady?: boolean;
+  timestamp?: number;
+}
+
+/**
  * Built-in easing function names for type-safe string-based easing
  */
 export type EasingName =

@@ -74,48 +74,54 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   recordMetric(metric: GPUBatchMetric): void {
     this.metrics.push(metric);
 
-    // Incrementally update archetype timings if GPU timing data present
+    // Update archetype timings
     if (metric.gpuComputeTimeMs != null) {
-      const existing = this.archetypeTimings.get(metric.batchId);
-      if (!existing) {
-        this.archetypeTimings.set(metric.batchId, {
-          avgComputeMs: metric.gpuComputeTimeMs,
-          minComputeMs: metric.gpuComputeTimeMs,
-          maxComputeMs: metric.gpuComputeTimeMs,
-          dispatchCount: 1,
-          entityCount: metric.entityCount,
-        });
-      } else {
-        const newCount = existing.dispatchCount + 1;
-        const newAvg =
-          (existing.avgComputeMs * existing.dispatchCount + metric.gpuComputeTimeMs) / newCount;
-        this.archetypeTimings.set(metric.batchId, {
-          avgComputeMs: newAvg,
-          minComputeMs: Math.min(existing.minComputeMs, metric.gpuComputeTimeMs),
-          maxComputeMs: Math.max(existing.maxComputeMs, metric.gpuComputeTimeMs),
-          dispatchCount: newCount,
-          entityCount: metric.entityCount,
-        });
-      }
+      this.updateArchetypeTiming(metric);
     }
 
-    // Trim old metrics to maintain size limit
+    // Trim old metrics
     if (this.metrics.length > this.MAX_METRICS) {
       this.metrics.shift();
     }
 
-    // Sync to global array for UI components (PerfPanel)
-    if (typeof globalThis !== 'undefined') {
-      if (!Array.isArray((globalThis as any).__motionGPUMetrics)) {
-        (globalThis as any).__motionGPUMetrics = [];
-      }
-      const globalMetrics = (globalThis as any).__motionGPUMetrics;
-      globalMetrics.push(metric);
+    // Sync to global for UI
+    this.syncToGlobal(metric);
+  }
 
-      // Maintain size limit efficiently (batch trim to avoid frequent shifts)
-      if (globalMetrics.length > this.MAX_METRICS) {
-        globalMetrics.splice(0, globalMetrics.length - this.MAX_METRICS);
-      }
+  private updateArchetypeTiming(metric: GPUBatchMetric): void {
+    const existing = this.archetypeTimings.get(metric.batchId);
+    if (!existing) {
+      this.archetypeTimings.set(metric.batchId, {
+        avgComputeMs: metric.gpuComputeTimeMs!,
+        minComputeMs: metric.gpuComputeTimeMs!,
+        maxComputeMs: metric.gpuComputeTimeMs!,
+        dispatchCount: 1,
+        entityCount: metric.entityCount,
+      });
+    } else {
+      const count = existing.dispatchCount + 1;
+      this.archetypeTimings.set(metric.batchId, {
+        avgComputeMs:
+          (existing.avgComputeMs * existing.dispatchCount + metric.gpuComputeTimeMs!) / count,
+        minComputeMs: Math.min(existing.minComputeMs, metric.gpuComputeTimeMs!),
+        maxComputeMs: Math.max(existing.maxComputeMs, metric.gpuComputeTimeMs!),
+        dispatchCount: count,
+        entityCount: metric.entityCount,
+      });
+    }
+  }
+
+  private syncToGlobal(metric: GPUBatchMetric): void {
+    if (typeof globalThis === 'undefined') return;
+
+    const g = globalThis as any;
+    if (!Array.isArray(g.__motionGPUMetrics)) {
+      g.__motionGPUMetrics = [];
+    }
+    g.__motionGPUMetrics.push(metric);
+
+    if (g.__motionGPUMetrics.length > this.MAX_METRICS) {
+      g.__motionGPUMetrics.splice(0, g.__motionGPUMetrics.length - this.MAX_METRICS);
     }
   }
 
@@ -139,25 +145,17 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
 
     if (status) {
       this.status = {
+        ...this.status,
         enabled: status.enabled ?? status.gpuEnabled ?? this.status.enabled,
         activeEntityCount:
           status.activeEntityCount ?? status.activeCount ?? this.status.activeEntityCount,
         threshold: status.threshold ?? this.status.threshold,
-        webgpuAvailable: status.webgpuAvailable ?? this.status.webgpuAvailable,
-        gpuInitialized: status.gpuInitialized ?? this.status.gpuInitialized,
       };
     }
 
-    if (typeof gpuInitialized === 'boolean') {
-      this.status.gpuInitialized = gpuInitialized;
-    }
-    if (typeof webgpuAvailable === 'boolean') {
-      this.status.webgpuAvailable = webgpuAvailable;
-    }
-
-    if (Array.isArray(metrics)) {
-      this.metrics = [...metrics];
-    }
+    if (gpuInitialized !== undefined) this.status.gpuInitialized = gpuInitialized;
+    if (webgpuAvailable !== undefined) this.status.webgpuAvailable = webgpuAvailable;
+    if (metrics) this.metrics = [...metrics];
   }
 
   getArchetypeTimings(): Map<string, GPUArchetypeTiming> {
@@ -165,55 +163,29 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
     return new Map(this.archetypeTimings);
   }
 
-  /**
-   * Calculate dynamic GPU threshold based on frame budget and entity count
-   * @param baseThreshold - Base entity count threshold (default 1000)
-   * @param targetFrameTime - Target frame time in ms (default 16ms for 60fps)
-   * @returns Adjusted threshold
-   */
   calculateDynamicThreshold(baseThreshold: number = 1000, targetFrameTime: number = 16): number {
-    const currentFrameTime = this.status.frameTimeMs || 0;
-    if (currentFrameTime === 0) return baseThreshold;
+    const current = this.status.frameTimeMs || 0;
+    if (current === 0) return baseThreshold;
 
-    // If we're running slower than target, reduce threshold (offload more to GPU)
-    // If we're running faster, increase threshold (less GPU overhead)
-    const ratio = targetFrameTime / currentFrameTime;
+    const ratio = targetFrameTime / current;
     const adjusted = Math.floor(baseThreshold * ratio);
-
-    // Clamp between reasonable bounds (200 min, 5000 max)
     return Math.max(200, Math.min(5000, adjusted));
   }
 }
 
 let provider: GPUMetricsProvider | null = null;
-let legacyWarned = false;
-
-function isDev(): boolean {
-  const env = (globalThis as any)?.process?.env?.NODE_ENV;
-  return env !== 'production';
-}
 
 function seedFromLegacyIfPresent(target: GPUMetricsProvider): void {
-  const legacyStatus = (globalThis as any).__motionThresholdContext;
-  const legacyMetrics = (globalThis as any).__motionGPUMetrics;
-  const legacyInitialized = (globalThis as any).__webgpuInitialized;
-
-  if (!legacyStatus && !legacyMetrics && legacyInitialized === undefined) {
+  const g = globalThis as any;
+  if (!g.__motionThresholdContext && !g.__motionGPUMetrics && g.__webgpuInitialized === undefined) {
     return;
   }
 
   target.seedFromLegacy({
-    status: legacyStatus,
-    metrics: Array.isArray(legacyMetrics) ? legacyMetrics : undefined,
-    gpuInitialized: legacyInitialized,
+    status: g.__motionThresholdContext,
+    metrics: Array.isArray(g.__motionGPUMetrics) ? g.__motionGPUMetrics : undefined,
+    gpuInitialized: g.__webgpuInitialized,
   });
-
-  if (!legacyWarned && isDev()) {
-    console.warn(
-      '[Motion] Detected legacy GPU globals; seeded metrics provider. Please migrate to the provider API.',
-    );
-    legacyWarned = true;
-  }
 }
 
 export function getGPUMetricsProvider(): GPUMetricsProvider {
@@ -230,5 +202,4 @@ export function setGPUMetricsProvider(customProvider: GPUMetricsProvider): void 
 
 export function __resetGPUMetricsProviderForTests(): void {
   provider = null;
-  legacyWarned = false;
 }
