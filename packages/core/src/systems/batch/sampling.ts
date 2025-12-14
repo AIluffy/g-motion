@@ -79,9 +79,17 @@ export const BatchSamplingSystem: SystemDef = {
       const archKeyframes: BatchKeyframe[] = [];
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
-        const timeline = timelineBuffer[i];
-        const render = renderBuffer[i];
+        const state = stateBuffer[i] as {
+          status: MotionStatus;
+          startTime: number;
+          playbackRate: number;
+        };
+        const timeline = timelineBuffer[i] as {
+          tracks?: Map<string, unknown>;
+        };
+        const render = renderBuffer[i] as {
+          rendererId: string;
+        };
 
         // Skip callback renderers (custom onUpdate)
         if (render.rendererId === 'callback') {

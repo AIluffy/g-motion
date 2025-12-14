@@ -15,8 +15,16 @@ export const TimelineSystem: SystemDef = {
       if (!stateBuffer || !timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
-        const timeline = timelineBuffer[i];
+        const state = stateBuffer[i] as {
+          status: MotionStatus;
+          currentTime: number;
+          iteration?: number;
+        };
+        const timeline = timelineBuffer[i] as {
+          duration: number;
+          repeat?: number;
+          loop?: boolean;
+        };
 
         if (state.status === MotionStatus.Running) {
           activeCount++;

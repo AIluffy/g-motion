@@ -1,5 +1,11 @@
 import { SystemDef, World, MotionStatus, findActiveKeyframe, resolveEasing } from '@g-motion/core';
 import { getProgress, resolveInterpMode } from '../api/timeline';
+import type {
+  MotionStateComponentData,
+  TimelineComponentData,
+  TransformComponentData,
+  RenderComponentData,
+} from '../component-types';
 
 export const InterpolationSystem: SystemDef = {
   name: 'InterpolationSystem',
@@ -46,21 +52,23 @@ export const InterpolationSystem: SystemDef = {
           continue;
         }
 
-        const state = stateBuffer[i];
-        const timeline = timelineBuffer[i];
+        const state = stateBuffer[i] as MotionStateComponentData;
+        const timeline = timelineBuffer[i] as TimelineComponentData & {
+          tracks: Map<string, unknown>;
+        };
 
         // Honor start delay: skip interpolation until delay fully consumed
-        if ((state as any).delay && (state as any).delay > 0) continue;
+        if (state.delay && state.delay > 0) continue;
 
         if (state.status !== MotionStatus.Running && state.status !== MotionStatus.Finished)
           continue;
 
         // Pre-allocate render.props if needed (avoid allocation in hot loop)
-        if (renderBuffer && !renderBuffer[i]) {
-          renderBuffer[i] = { props: {} };
-        }
-        if (renderBuffer && renderBuffer[i] && !renderBuffer[i].props) {
-          renderBuffer[i].props = {};
+        if (renderBuffer) {
+          const renderData = renderBuffer[i] as RenderComponentData;
+          if (!renderData || !renderData.props) {
+            (renderBuffer[i] as RenderComponentData) = { ...renderData, props: {} };
+          }
         }
 
         const t = state.currentTime;
@@ -108,7 +116,7 @@ export const InterpolationSystem: SystemDef = {
             if (transformBuffer) {
               // Check if key exists in TransformComponent schema (x, y, scaleX, scaleY, rotate)
               // In SoA/AoS hybrid, transformBuffer[i] is the object
-              const transform = transformBuffer[i];
+              const transform = transformBuffer[i] as TransformComponentData;
 
               // Special handling for 'scale' - write to both scaleX and scaleY
               if (key === 'scale') {
@@ -123,7 +131,7 @@ export const InterpolationSystem: SystemDef = {
                 if (typedTransformBuffers.scaleZ) typedTransformBuffers.scaleZ[i] = val;
                 handled = true;
               } else if (key in transform) {
-                transform[key] = val;
+                (transform as Record<string, number>)[key] = val;
                 // Also write to typed buffer for this key when available
                 const tbuf = typedTransformBuffers[key];
                 if (tbuf) {
@@ -134,7 +142,8 @@ export const InterpolationSystem: SystemDef = {
             }
 
             if (!handled && renderBuffer) {
-              const render = renderBuffer[i];
+              const render = renderBuffer[i] as RenderComponentData;
+              if (!render.props) render.props = {};
               render.props[key] = val;
               // No Transform component present: attempt to map common keys to typed buffers
               const tbuf = typedTransformBuffers[key];

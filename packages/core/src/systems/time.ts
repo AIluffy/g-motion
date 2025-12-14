@@ -20,7 +20,12 @@ export const TimeSystem: SystemDef = {
       const typedDelay = archetype.getTypedBuffer('MotionState', 'delay');
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
+        const state = stateBuffer[i] as {
+          status: MotionStatus;
+          delay?: number;
+          currentTime: number;
+          playbackRate: number;
+        };
         if (state.status === MotionStatus.Running) {
           const remainingDelay = state.delay ?? 0;
 

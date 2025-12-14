@@ -1,8 +1,13 @@
 import { ComponentRegistry } from './registry';
 import { EntityManager } from './entity';
 import { SystemScheduler } from './scheduler';
-import { Archetype } from './archetype';
+import { Archetype, ArchetypeInternal } from './archetype';
 import { MotionAppConfig } from './plugin';
+
+/**
+ * Component data type
+ */
+type ComponentData = Record<string, unknown>;
 
 /**
  * Burst manager for high-performance batch entity creation/destruction
@@ -19,23 +24,24 @@ class BurstManager {
    * Reserve capacity in archetype for burst operations
    */
   reserveCapacity(archetype: Archetype, totalSize: number): void {
+    const internal = archetype as ArchetypeInternal;
     const current = archetype.entityCount;
     if (current >= totalSize) return;
 
-    let capacity = (archetype as any).capacity ?? 1024;
+    let capacity = internal.getInternalCapacity();
     while (capacity < totalSize) {
       capacity *= 2;
     }
 
-    if (capacity !== (archetype as any).capacity) {
-      (archetype as any).resize(capacity);
+    if (capacity !== internal.getInternalCapacity()) {
+      internal.resize(capacity);
     }
   }
 
   /**
    * Create multiple entities in one batch with pre-allocation
    */
-  createBatch(archetype: Archetype, dataArray: Record<string, any>[]): number[] {
+  createBatch(archetype: Archetype, dataArray: ComponentData[]): number[] {
     const count = dataArray.length;
     const createdIds: number[] = [];
 
@@ -45,7 +51,7 @@ class BurstManager {
     // Batch create all entities
     for (const data of dataArray) {
       const entityId = this.entityManager.create();
-      (archetype as any).addEntity(entityId, data);
+      archetype.addEntity(entityId, data);
       this.entityArchetypes.set(entityId, archetype);
       createdIds.push(entityId);
     }
@@ -80,9 +86,11 @@ class BurstManager {
 
     // Remove from each archetype (highest indices first to avoid index shifts)
     for (const [archetype, entityIds] of byArchetype) {
+      const internal = archetype as ArchetypeInternal;
+      const indices = internal.getInternalEntityIndices();
       entityIds.sort((a, b) => {
-        const indexA = (archetype as any).entityIndices.get(a) ?? -1;
-        const indexB = (archetype as any).entityIndices.get(b) ?? -1;
+        const indexA = indices.get(a) ?? -1;
+        const indexB = indices.get(b) ?? -1;
         return indexB - indexA;
       });
 
@@ -98,29 +106,31 @@ class BurstManager {
    * Remove entity using swap-delete for O(1) removal
    */
   private removeEntityFromArchetype(archetype: Archetype, entityId: number): void {
-    const indices = (archetype as any).entityIndices;
-    const reverse = (archetype as any).indicesMap;
-    const index = indices.get(entityId);
+    const internal = archetype as ArchetypeInternal;
+    const entityIndices = internal.getInternalEntityIndices();
+    const indicesMap = internal.getInternalIndicesMap();
+    const buffers = internal.getInternalBuffers();
 
+    const index = entityIndices.get(entityId);
     if (index === undefined) return;
 
-    const lastIndex = (archetype as any).count - 1;
+    const lastIndex = internal.getInternalCount() - 1;
 
     if (index !== lastIndex) {
-      const lastEntityId = reverse.get(lastIndex);
+      const lastEntityId = indicesMap.get(lastIndex);
       if (lastEntityId !== undefined) {
-        indices.set(lastEntityId, index);
-        reverse.set(index, lastEntityId);
+        entityIndices.set(lastEntityId, index);
+        indicesMap.set(index, lastEntityId);
 
-        for (const [_name, buffer] of (archetype as any).buffers) {
-          (buffer as any[])[index] = (buffer as any[])[lastIndex];
+        for (const [_name, buffer] of buffers) {
+          buffer[index] = buffer[lastIndex];
         }
       }
     }
 
-    indices.delete(entityId);
-    reverse.delete(lastIndex);
-    (archetype as any).count--;
+    entityIndices.delete(entityId);
+    indicesMap.delete(lastIndex);
+    internal.setInternalCount(lastIndex);
     this.entityArchetypes.delete(entityId);
   }
 
@@ -208,7 +218,7 @@ export class World {
     return this.archetypes.values();
   }
 
-  createEntity(components: Record<string, any>): number {
+  createEntity(components: ComponentData): number {
     const id = this.entityManager.create();
     const names = Object.keys(components);
     const archetype = this.getArchetype(names);
@@ -223,7 +233,7 @@ export class World {
    * @param dataArray Array of component data objects
    * @returns Array of created entity IDs
    */
-  createEntitiesBurst(componentNames: string[], dataArray: Record<string, any>[]): number[] {
+  createEntitiesBurst(componentNames: string[], dataArray: ComponentData[]): number[] {
     const archetype = this.getArchetype(componentNames);
     return this.burstManager.createBatch(archetype, dataArray);
   }

@@ -30,7 +30,7 @@ export const ThresholdMonitorSystem: SystemDef = {
       if (!stateBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
+        const state = stateBuffer[i] as { status: MotionStatus };
         if (state.status === MotionStatus.Running || state.status === MotionStatus.Paused) {
           activeCount++;
         }

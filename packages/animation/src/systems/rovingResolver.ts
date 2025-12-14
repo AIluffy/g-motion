@@ -1,4 +1,5 @@
 import { SystemDef, World } from '@g-motion/core';
+import type { TimelineComponentData } from '../component-types';
 
 type GaussianKernel = { weights: number[]; radius: number };
 
@@ -51,26 +52,34 @@ export const RovingResolverSystem: SystemDef = {
       if (!timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const timeline = timelineBuffer[i];
-        const tracks = timeline.tracks as Map<string, any[]>;
+        const timeline = timelineBuffer[i] as TimelineComponentData & {
+          tracks: Map<string, Array<Record<string, unknown>>>;
+          duration: number;
+        };
+        const tracks = timeline.tracks;
         let durationDirty = false;
 
         for (const [, track] of tracks) {
           if (!track || track.length === 0) continue;
 
-          const needsRoving = track.some((kf: any) => !Number.isFinite(kf.time));
+          const needsRoving = track.some(
+            (kf: Record<string, unknown>) => !Number.isFinite(kf.time as number),
+          );
           if (!needsRoving) continue;
 
           // Estimate per-segment length via absolute delta of values
           const lengths: number[] = [];
           for (let idx = 0; idx < track.length; idx++) {
-            const prevVal = idx === 0 ? (track[idx].startValue ?? 0) : track[idx - 1].endValue;
-            const curVal = track[idx].endValue;
+            const prevVal =
+              idx === 0
+                ? ((track[idx].startValue as number) ?? 0)
+                : (track[idx - 1].endValue as number);
+            const curVal = track[idx].endValue as number;
             lengths.push(Math.abs((curVal ?? 0) - (prevVal ?? 0)));
           }
 
           const smoothedLengths = smooth(lengths, DEFAULT_SMOOTH_KERNEL);
-          const totalDuration = timeline.duration || 0 || 1000;
+          const totalDuration = timeline.duration || 1000;
           const durations = distributeDurations(smoothedLengths, totalDuration);
 
           // Assign times cumulatively

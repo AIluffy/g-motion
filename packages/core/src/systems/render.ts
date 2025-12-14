@@ -4,6 +4,25 @@ import { app } from '../app';
 
 const missingRendererWarned = new Set<string>();
 
+/**
+ * Renderer interface with optional lifecycle hooks
+ */
+interface Renderer {
+  update(entityId: number, target: unknown, components: Record<string, unknown>): void;
+  preFrame?(): void;
+  postFrame?(): void;
+}
+
+/**
+ * Entity render data
+ */
+interface EntityRenderData {
+  entityId: number;
+  target: unknown;
+  components: Record<string, unknown>;
+  renderer: Renderer;
+}
+
 export const RenderSystem: SystemDef = {
   name: 'RenderSystem',
   order: 30,
@@ -11,15 +30,7 @@ export const RenderSystem: SystemDef = {
     const world = WorldProvider.useWorld();
 
     // Group entities by renderer for batch optimization
-    const rendererGroups = new Map<
-      string,
-      Array<{
-        entityId: number;
-        target: any;
-        components: Record<string, any>;
-        renderer: any;
-      }>
-    >();
+    const rendererGroups = new Map<string, EntityRenderData[]>();
 
     // First pass: collect entities by renderer
     for (const archetype of world.getArchetypes()) {
@@ -27,7 +38,7 @@ export const RenderSystem: SystemDef = {
       if (!renderBuffer) continue;
 
       // Cache buffer references to avoid repeated Map lookups per entity
-      const componentBuffers = new Map<string, any>();
+      const componentBuffers = new Map<string, Array<unknown>>();
       for (const name of archetype.componentNames) {
         const buffer = archetype.getBuffer(name);
         if (buffer) {
@@ -58,11 +69,11 @@ export const RenderSystem: SystemDef = {
       };
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const render = renderBuffer[i];
+        const render = renderBuffer[i] as { rendererId: string; target: unknown };
         const rendererId = render.rendererId;
 
         // Get renderer from app registry (includes built-in and plugin renderers)
-        const renderer = app.getRenderer(rendererId);
+        const renderer = app.getRenderer(rendererId) as Renderer | undefined;
 
         if (!renderer) {
           // Warn once per missing renderer id, then skip
@@ -76,7 +87,7 @@ export const RenderSystem: SystemDef = {
         }
 
         // Collect all components for this entity's archetype (use cached buffers)
-        const components: Record<string, any> = {};
+        const components: Record<string, unknown> = {};
         for (const [name, buffer] of componentBuffers) {
           components[name] = buffer[i];
         }
