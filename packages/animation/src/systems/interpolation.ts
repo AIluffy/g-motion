@@ -76,7 +76,7 @@ export const InterpolationSystem: SystemDef = {
         // timeline.tracks is a Map<string, Track>
         for (const [key, track] of timeline.tracks) {
           // Use binary search to find active keyframe (O(log n) instead of O(n))
-          const activeKf = findActiveKeyframe(track, t);
+          const activeKf = findActiveKeyframe(track as any, t);
 
           if (activeKf) {
             let val: number;

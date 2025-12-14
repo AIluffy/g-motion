@@ -101,7 +101,7 @@ export const RovingResolverSystem: SystemDef = {
           for (const [key, track] of tracks) {
             tracks.set(
               key,
-              [...track].sort((a, b) => a.time - b.time),
+              [...track].sort((a, b) => (a.time as number) - (b.time as number)),
             );
           }
         }

@@ -1,4 +1,5 @@
 import { World, MotionStatus, WorldProvider } from '@g-motion/core';
+import type { MotionStateComponentData, TimelineComponentData } from '../component-types';
 
 export class AnimationControl {
   private entityIds: number[];
@@ -47,7 +48,7 @@ export class AnimationControl {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
 
-      const state = archetype.getEntityData(entityId, 'MotionState');
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
       if (state) {
         state.status = MotionStatus.Finished;
       }
@@ -68,7 +69,9 @@ export class AnimationControl {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
 
-      const state = archetype.getEntityData(entityId, 'MotionState');
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData & {
+        pausedAt?: number;
+      };
       if (state && state.status === MotionStatus.Running) {
         state.status = MotionStatus.Paused;
         state.pausedAt = performance.now();
@@ -90,7 +93,9 @@ export class AnimationControl {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
 
-      const state = archetype.getEntityData(entityId, 'MotionState');
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData & {
+        pausedAt?: number;
+      };
       if (state) {
         if (state.status === MotionStatus.Paused && state.pausedAt) {
           // Shift startTime forward by the paused duration so GPU elapsed stays accurate.
@@ -118,8 +123,8 @@ export class AnimationControl {
     for (const entityId of this.entityIds) {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      const timeline = archetype.getEntityData(entityId, 'Timeline');
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
+      const timeline = archetype.getEntityData(entityId, 'Timeline') as TimelineComponentData;
       if (!state || !timeline) continue;
 
       // If playbackRate is positive, negate; if zero, set to -1
@@ -142,7 +147,9 @@ export class AnimationControl {
     const world = this.getWorld();
     const archetype = world.getEntityArchetype(this.entityId);
     if (!archetype) return false;
-    const state = archetype.getEntityData(this.entityId, 'MotionState');
+    const state = archetype.getEntityData(this.entityId, 'MotionState') as
+      | MotionStateComponentData
+      | undefined;
     const rate = state?.playbackRate ?? 1;
     return rate < 0;
   }
@@ -161,8 +168,8 @@ export class AnimationControl {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
 
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      const timeline = archetype.getEntityData(entityId, 'Timeline');
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
+      const timeline = archetype.getEntityData(entityId, 'Timeline') as TimelineComponentData;
       if (!state || !timeline) continue;
 
       const clamped = Math.max(0, Math.min(timeMs, timeline.duration ?? 0));
@@ -175,7 +182,9 @@ export class AnimationControl {
     const world = this.getWorld();
     const archetype = world.getEntityArchetype(this.entityId);
     if (!archetype) return 0;
-    const state = archetype.getEntityData(this.entityId, 'MotionState');
+    const state = archetype.getEntityData(this.entityId, 'MotionState') as
+      | MotionStateComponentData
+      | undefined;
     return state?.currentTime ?? 0;
   }
 
@@ -184,7 +193,9 @@ export class AnimationControl {
     const world = this.getWorld();
     const archetype = world.getEntityArchetype(this.entityId);
     if (!archetype) return 0;
-    const timeline = archetype.getEntityData(this.entityId, 'Timeline');
+    const timeline = archetype.getEntityData(this.entityId, 'Timeline') as
+      | TimelineComponentData
+      | undefined;
     return timeline?.duration ?? 0;
   }
 
@@ -201,7 +212,7 @@ export class AnimationControl {
     for (const entityId of this.entityIds) {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
-      const state = archetype.getEntityData(entityId, 'MotionState');
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
       if (state && Number.isFinite(rate) && rate > 0) {
         state.playbackRate = rate;
       }
@@ -213,7 +224,9 @@ export class AnimationControl {
     const world = this.getWorld();
     const archetype = world.getEntityArchetype(this.entityId);
     if (!archetype) return 1;
-    const state = archetype.getEntityData(this.entityId, 'MotionState');
+    const state = archetype.getEntityData(this.entityId, 'MotionState') as
+      | MotionStateComponentData
+      | undefined;
     return state?.playbackRate ?? 1;
   }
 
