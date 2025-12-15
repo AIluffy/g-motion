@@ -88,9 +88,7 @@ export class MotionBuilder {
       const dynamic: MarkOptions[] = [];
       for (const opt of optsArray) {
         const isTimeStatic =
-          typeof opt.time === 'number' ||
-          typeof opt.duration === 'number' ||
-          opt.time === undefined;
+          typeof opt.at === 'number' || typeof opt.duration === 'number' || opt.at === undefined;
         const isToStatic = typeof opt.to !== 'function';
         if (isTimeStatic && isToStatic) {
           const resolved = resolveMarkOptions(opt, this.target, this.currentTime, 0, 0);
@@ -254,7 +252,7 @@ export class MotionBuilder {
     validateMarkOptions(resolved);
 
     const targetType = getTargetType(this.target);
-    const easing = resolved.easing ?? resolved.ease;
+    const easing = resolved.ease;
     addKeyframesForTarget(this.tracks, this.target, targetType, resolved, easing);
 
     this.currentTime = resolved.time;
@@ -263,7 +261,7 @@ export class MotionBuilder {
   // Apply a pre-resolved mark without re-resolving per entity
   addResolvedMark(resolved: ResolvedMarkOptions): void {
     validateMarkOptions(resolved);
-    const easing = resolved.easing ?? resolved.ease;
+    const easing = resolved.ease;
     const targetType = getTargetType(this.target);
     addKeyframesForTarget(this.tracks, this.target, targetType, resolved, easing);
     this.currentTime = resolved.time;

@@ -15,15 +15,15 @@ import { motion } from '@g-motion/animation';
 
 // Old way: Manual absolute time calculation
 const oldWay = motion('#box')
-  .mark({ to: { x: 100 }, time: 0 })
-  .mark({ to: { y: 50 }, time: 500 }) // Must calculate: 0 + 500
-  .mark({ to: { opacity: 0 }, time: 800 }) // Must calculate: 500 + 300
+  .mark({ to: { x: 100 }, at: 0 })
+  .mark({ to: { y: 50 }, at: 500 }) // Must calculate: 0 + 500
+  .mark({ to: { opacity: 0 }, at: 800 }) // Must calculate: 500 + 300
   .animate();
 
 // New way: Relative duration and delay
 const newWay = motion('#box')
   .mark({ to: { x: 100 }, duration: 200 })
-  .mark({ to: { y: 50 }, delay: 100, duration: 200 }) // 100ms delay after previous, then 200ms duration
+  .mark({ to: { y: 50 }, duration: 200 }) // 100ms delay after previous, then 200ms duration
   .mark({ to: { opacity: 0 }, duration: 200 })
   .animate();
 
@@ -85,16 +85,16 @@ motion(particles)
 
 // Explicit absolute time (unchanged)
 const absoluteTime = motion('#box')
-  .mark({ to: { x: 100 }, time: 0 })
-  .mark({ to: { y: 50 }, time: 500 })
-  .mark({ to: { opacity: 0 }, time: 800 })
+  .mark({ to: { x: 100 }, at: 0 })
+  .mark({ to: { y: 50 }, at: 500 })
+  .mark({ to: { opacity: 0 }, at: 800 })
   .animate();
 
 // Mixed absolute + relative (absolute wins when both present)
 const mixed = motion('#box')
-  .mark({ to: { x: 100 }, time: 0 }) // Absolute
+  .mark({ to: { x: 100 }, at: 0 }) // Absolute
   .mark({ to: { y: 50 }, duration: 200 }) // Relative (from t=0 + 200 = 200ms)
-  .mark({ to: { opacity: 0 }, time: 800 }) // Absolute again
+  .mark({ to: { opacity: 0 }, at: 800 }) // Absolute again
   .animate();
 
 // ============================================================================
@@ -105,11 +105,11 @@ const complexSequence = motion('#hero')
   // Fade in (200ms)
   .mark({ to: { opacity: 1 }, duration: 200 })
   // Slide in after 50ms delay (300ms total)
-  .mark({ to: { x: 0, y: 0 }, delay: 50, duration: 300 })
+  .mark({ to: { x: 0, y: 0 }, duration: 300 })
   // Scale up after 100ms delay (400ms total)
-  .mark({ to: { scaleX: 1.2, scaleY: 1.2 }, delay: 100, duration: 400 })
+  .mark({ to: { scaleX: 1.2, scaleY: 1.2 }, duration: 400 })
   // Settle back after 50ms (200ms)
-  .mark({ to: { scaleX: 1, scaleY: 1 }, delay: 50, duration: 200 })
+  .mark({ to: { scaleX: 1, scaleY: 1 }, duration: 200 })
   .animate({ repeat: Infinity });
 
 // ============================================================================

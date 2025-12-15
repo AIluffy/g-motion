@@ -34,7 +34,7 @@ function DemoBox() {
             rotateX: 45,
             rotateY: 45,
           },
-          time: 1500,
+          at: 1500,
         },
         {
           to: {
@@ -43,7 +43,7 @@ function DemoBox() {
             rotateX: 0,
             rotateY: 0,
           },
-          time: 3000,
+          at: 3000,
         },
       ])
       .animate({

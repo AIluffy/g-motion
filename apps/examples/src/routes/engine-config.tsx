@@ -37,10 +37,10 @@ function EngineConfigDemo() {
 
     // Start animation - will respect global speed/fps settings
     const control = motion(`#${boxId}`)
-      .mark([{ to: { x: 200, y: 0 }, time: 1000 }])
-      .mark([{ to: { x: 200, y: 120 }, time: 2000 }])
-      .mark([{ to: { x: 0, y: 120 }, time: 3000 }])
-      .mark([{ to: { x: 0, y: 0 }, time: 4000 }])
+      .mark([{ to: { x: 200, y: 0 }, at: 1000 }])
+      .mark([{ to: { x: 200, y: 120 }, at: 2000 }])
+      .mark([{ to: { x: 0, y: 120 }, at: 3000 }])
+      .mark([{ to: { x: 0, y: 0 }, at: 4000 }])
       .animate({ repeat: -1 });
 
     controlRef.current = control;

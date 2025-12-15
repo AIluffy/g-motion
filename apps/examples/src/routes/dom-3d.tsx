@@ -37,7 +37,7 @@ function Cube3d() {
             rotateY: 360,
             x: 199,
           },
-          time: 4000,
+          at: 4000,
         },
         {
           to: {
@@ -45,7 +45,7 @@ function Cube3d() {
             rotateY: 0,
             x: 0,
           },
-          time: 8000,
+          at: 8000,
         },
       ])
       .animate({

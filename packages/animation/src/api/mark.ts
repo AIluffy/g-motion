@@ -2,10 +2,8 @@ import { TimelineData, Keyframe, SpringOptions, InertiaOptions, Easing } from '@
 
 export type MarkOptions = {
   to?: any | ((index: number, entityId: number, target?: any) => any);
-  time?: number | ((index: number, entityId: number) => number);
+  at?: number | ((index: number, entityId: number) => number);
   duration?: number; // Relative duration (used with previous mark's end time)
-  delay?: number; // Delay before this mark starts (relative)
-  easing?: Easing;
   ease?: Easing;
   interp?: 'linear' | 'bezier' | 'hold' | 'autoBezier';
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
@@ -31,16 +29,15 @@ export function resolveTimeValue(
   index: number,
   entityId: number,
 ): number {
-  if (typeof opts.time === 'function') {
-    return opts.time(index, entityId);
+  if (typeof opts.at === 'function') {
+    return opts.at(index, entityId);
   }
-  if (typeof opts.time === 'number') {
-    return opts.time;
+  if (typeof opts.at === 'number') {
+    return opts.at;
   }
 
   if (typeof opts.duration === 'number') {
-    const delay = opts.delay || 0;
-    return currentTime + delay + opts.duration;
+    return currentTime + opts.duration;
   }
 
   return currentTime + 1000;

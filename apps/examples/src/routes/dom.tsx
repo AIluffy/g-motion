@@ -46,9 +46,9 @@ function DomDemo() {
     timerRef.current = window.setTimeout(() => setIsRunning(false), totalDuration * (repeat + 1));
 
     const control = motion(`#${boxId}`)
-      .mark([{ to: { x: 180, y: 0, scaleX: 1.05, rotate: 8 }, time: 600 }])
-      .mark([{ to: { x: 180, y: 24, scaleX: 1, scaleY: 1.02, rotate: -6 }, time: 1100 }])
-      .mark([{ to: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0 }, time: 1500 }])
+      .mark([{ to: { x: 180, y: 0, scaleX: 1.05, rotate: 8 }, at: 600 }])
+      .mark([{ to: { x: 180, y: 24, scaleX: 1, scaleY: 1.02, rotate: -6 }, at: 1100 }])
+      .mark([{ to: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0 }, at: 1500 }])
       .animate({ repeat });
 
     controlRef.current = control;
@@ -71,8 +71,8 @@ function DomDemo() {
 
     // Fan-out selector animates all matched elements
     motion('.multi-box')
-      .mark([{ to: { x: 100, y: 0 }, time: 400 }])
-      .mark([{ to: { x: 0, y: 0 }, time: 800 }])
+      .mark([{ to: { x: 100, y: 0 }, at: 400 }])
+      .mark([{ to: { x: 0, y: 0 }, at: 800 }])
       .animate();
   };
 

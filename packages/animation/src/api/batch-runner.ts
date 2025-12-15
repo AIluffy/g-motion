@@ -22,8 +22,7 @@ function resolveMarkForEntity(
   const resolvedTo =
     typeof rawMark.to === 'function' ? rawMark.to(entityIndex, 0, target) : rawMark.to;
 
-  const resolvedTime =
-    typeof rawMark.time === 'function' ? rawMark.time(entityIndex, 0) : rawMark.time;
+  const resolvedTime = typeof rawMark.at === 'function' ? rawMark.at(entityIndex, 0) : rawMark.at;
 
   let stagger = 0;
   if (rawMark.stagger !== undefined) {
@@ -37,10 +36,8 @@ function resolveMarkForEntity(
   return {
     resolved: {
       to: resolvedTo,
-      time: resolvedTime,
+      at: resolvedTime,
       duration: rawMark.duration,
-      delay: rawMark.delay,
-      easing: rawMark.easing,
       ease: rawMark.ease,
       interp: rawMark.interp,
       bezier: rawMark.bezier,

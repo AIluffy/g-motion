@@ -113,8 +113,8 @@ function GPUConfigPage() {
           .mark([
             {
               to: { x: dx, y: dy, rotate },
-              time: duration,
-              easing,
+              at: duration,
+              ease: easing,
             },
           ])
           .animate({ repeat: 1 });
