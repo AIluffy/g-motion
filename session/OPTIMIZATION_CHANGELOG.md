@@ -283,18 +283,14 @@ handler.create(
 ### 🎯 下一步行动
 
 #### 高优先级
-- [ ] 运行性能基准测试，量化 GC 改进效果
-- [ ] 更新 ARCHITECTURE.md 反映优化细节
+- [x] 运行性能基准测试，量化 GC 改进效果
+- [x] 更新 ARCHITECTURE.md 反映优化细节
 
 #### 中优先级
 - [x] 实施错误处理增强（ErrorHandler + MotionError）✅ **[2025-12-15]**
-- [ ] 实施统一日志系统（Logger 类）
-- [ ] 增强测试覆盖（批处理边界测试）
+- [x] 增强测试覆盖（批处理边界测试） ✅ **[2025-12-16]**
+  - 新增: `packages/core/tests/batch-boundary.test.ts`（覆盖 zero-entity 和 boundary cases）
 
-#### 低优先级
-- [ ] 探索依赖注入重构（显式 World 参数）
-- [ ] 实现 BufferPool 对象池
-- [ ] 完善开发者文档
 
 ### 📚 参考文档
 

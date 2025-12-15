@@ -1,8 +1,8 @@
 # 性能基准测试报告
 
-**测试日期**: 2025-12-14  
-**测试环境**: Node.js v24.x, Vitest 4.0.15  
-**测试目标**: 验证批处理缓冲区复用优化效果  
+**测试日期**: 2025-12-14
+**测试环境**: Node.js v24.x, Vitest 4.0.15
+**测试目标**: 验证批处理缓冲区复用优化效果
 **测试状态**: ✅ 全部通过
 
 ---
@@ -31,7 +31,7 @@ BatchBufferCache Performance
   ✓ Multi-Archetype Scenarios (2 tests)
   ✓ Cache Management (1 test)
   ✓ Realistic Batch Processing Simulation (1 test)
-  
+
 Performance Regression Test
   ✓ Baseline performance characteristics (1 test)
 
@@ -385,7 +385,7 @@ GC 暂停 (越低越好)
 | Run 3 | 4.68ms | 0.65ms | 7.20x |
 | **平均** | **4.69ms** | **0.64ms** | **7.33x** |
 
-**变异系数**: < 3%  
+**变异系数**: < 3%
 **结论**: 性能稳定，可复现
 
 ---
@@ -460,8 +460,8 @@ GC 暂停 (越低越好)
 
 ---
 
-**测试人**: GitHub Copilot CLI  
-**审批**: 批准部署 ✅  
+**测试人**: GitHub Copilot CLI
+**审批**: 批准部署 ✅
 **日期**: 2025-12-14
 
 ---
@@ -502,3 +502,17 @@ Max buffer reuse time: 0.0545ms
       Tests  10 passed (10)
    Duration  110ms
 ```
+
+---
+
+## Addendum: 2025-12-16 — Full benchmark suite run
+**执行日期**: 2025-12-16
+**摘要**: 运行了完整基准套件（包括 AppContext DI、Keyframe Search、Interpolation Allocation、Archetype Lookup、GPU Threshold 等），结果进一步验证了类型安全、缓冲区复用与零分配设计的收益。
+
+### 关键亮点
+- **零每帧分配**: `Zero Allocation Test` 通过（100 entities × 10,000 frames）
+- **全帧上下文操作**: 相对于旧的 globalThis 基线，`Full per-frame context operations` 项 **2.05x** 加速
+- **插值分配改进**: `Interpolation-allocation` 场景显示 **~1.5x** 改进和显著降低 GC 压力
+
+**结论**: 额外基准验证支持 2025-12-14 报告的结论：缓冲区复用与类型安全改进在各种场景中都带来了可量化性能提升。
+
