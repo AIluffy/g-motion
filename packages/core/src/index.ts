@@ -6,6 +6,8 @@ export * from './plugin';
 export * from './world';
 export * from './context';
 export * from './types';
+export * from './errors';
+export * from './error-handler';
 export * from './constants';
 export * from './utils';
 export * from './components/state';

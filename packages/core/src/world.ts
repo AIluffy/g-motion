@@ -3,6 +3,7 @@ import { EntityManager } from './entity';
 import { SystemScheduler } from './scheduler';
 import { Archetype, ArchetypeInternal } from './archetype';
 import { MotionAppConfig } from './plugin';
+import { ErrorCode, ErrorSeverity, MotionError } from './errors';
 
 /**
  * Component data type
@@ -171,8 +172,11 @@ export class World {
       if (config) {
         // Validate gpuCompute mode if provided
         if (config.gpuCompute && !['auto', 'always', 'never'].includes(config.gpuCompute)) {
-          throw new Error(
+          throw new MotionError(
             `Invalid gpuCompute mode: ${config.gpuCompute}. Must be 'auto', 'always', or 'never'.`,
+            ErrorCode.INVALID_GPU_MODE,
+            ErrorSeverity.FATAL,
+            { providedMode: config.gpuCompute },
           );
         }
 
@@ -201,7 +205,14 @@ export class World {
       const defs = new Map();
       for (const name of componentNames) {
         const def = this.registry.get(name);
-        if (!def) throw new Error(`Component ${name} not registered`);
+        if (!def) {
+          throw new MotionError(
+            `Component ${name} not registered`,
+            ErrorCode.COMPONENT_NOT_REGISTERED,
+            ErrorSeverity.FATAL,
+            { componentName: name },
+          );
+        }
         defs.set(name, def);
       }
       arch = new Archetype(sorted, defs);

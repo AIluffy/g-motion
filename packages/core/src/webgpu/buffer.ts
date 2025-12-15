@@ -3,6 +3,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { getErrorHandler } from '../context';
+import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
+
 export interface ComputePipelineConfig {
   shaderCode: string;
   bindGroupLayoutEntries: any[];
@@ -59,7 +62,12 @@ export class WebGPUBufferManager {
 
     this.initPromise = (async () => {
       if (typeof navigator === 'undefined' || !(navigator as any).gpu) {
-        console.warn('[WebGPU] navigator.gpu not available; WebGPU disabled.');
+        const error = new MotionError(
+          'navigator.gpu not available; WebGPU disabled.',
+          ErrorCode.GPU_ADAPTER_UNAVAILABLE,
+          ErrorSeverity.WARNING,
+        );
+        getErrorHandler().handle(error);
         return false;
       }
 
@@ -70,7 +78,12 @@ export class WebGPUBufferManager {
           (await gpu.requestAdapter());
 
         if (!adapter) {
-          console.warn('[WebGPU] requestAdapter returned null; WebGPU disabled.');
+          const error = new MotionError(
+            'requestAdapter returned null; WebGPU disabled.',
+            ErrorCode.GPU_ADAPTER_UNAVAILABLE,
+            ErrorSeverity.WARNING,
+          );
+          getErrorHandler().handle(error);
           return false;
         }
 
@@ -81,14 +94,25 @@ export class WebGPUBufferManager {
         });
 
         if (!this.device) {
-          console.warn('[WebGPU] requestDevice returned null; WebGPU disabled.');
+          const error = new MotionError(
+            'requestDevice returned null; WebGPU disabled.',
+            ErrorCode.GPU_DEVICE_UNAVAILABLE,
+            ErrorSeverity.WARNING,
+          );
+          getErrorHandler().handle(error);
           return false;
         }
 
         this.queue = this.device.queue;
         return true;
       } catch (error) {
-        console.warn('[WebGPU] Failed to initialize WebGPU device:', error);
+        const motionError = new MotionError(
+          'Failed to initialize WebGPU device',
+          ErrorCode.GPU_INIT_FAILED,
+          ErrorSeverity.WARNING,
+          { originalError: error instanceof Error ? error.message : String(error) },
+        );
+        getErrorHandler().handle(motionError);
         this.device = null;
         this.queue = null;
         return false;
@@ -135,7 +159,13 @@ export class WebGPUBufferManager {
       this.queue.writeBuffer(buffer, offset, data);
       return true;
     } catch (error) {
-      console.error('[WebGPU] Buffer write failed:', error);
+      const motionError = new MotionError(
+        'Buffer write failed',
+        ErrorCode.GPU_BUFFER_WRITE_FAILED,
+        ErrorSeverity.ERROR,
+        { originalError: error instanceof Error ? error.message : String(error) },
+      );
+      getErrorHandler().handle(motionError);
       return false;
     }
   }
@@ -166,7 +196,13 @@ export class WebGPUBufferManager {
 
       return true;
     } catch (error) {
-      console.error('[WebGPU] Failed to initialize compute pipeline:', error);
+      const motionError = new MotionError(
+        'Failed to initialize compute pipeline',
+        ErrorCode.GPU_PIPELINE_FAILED,
+        ErrorSeverity.ERROR,
+        { originalError: error instanceof Error ? error.message : String(error) },
+      );
+      getErrorHandler().handle(motionError);
       return false;
     }
   }
@@ -216,7 +252,13 @@ export class WebGPUBufferManager {
 
       return true;
     } catch (error) {
-      console.error('[WebGPU] Compute dispatch failed:', error);
+      const motionError = new MotionError(
+        'Compute dispatch failed',
+        ErrorCode.GPU_PIPELINE_FAILED,
+        ErrorSeverity.ERROR,
+        { originalError: error instanceof Error ? error.message : String(error) },
+      );
+      getErrorHandler().handle(motionError);
       return false;
     }
   }

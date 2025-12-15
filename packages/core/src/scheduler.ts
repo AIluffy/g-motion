@@ -1,6 +1,8 @@
 import { SystemDef } from './plugin';
 import { WorldProvider } from './worldProvider';
 import { SCHEDULER_LIMITS } from './constants';
+import { getErrorHandler } from './context';
+import { ErrorCode, ErrorSeverity, MotionError } from './errors';
 
 export class SystemScheduler {
   private systems: SystemDef[] = [];
@@ -97,7 +99,17 @@ export class SystemScheduler {
         // This is more efficient than a separate query system for our archetype-based ECS
         system.update(safeDt);
       } catch (e) {
-        console.error(`[Motion] System '${system.name}' error:`, e);
+        // Handle system errors via ErrorHandler (non-fatal, log and continue)
+        const error = new MotionError(
+          `System '${system.name}' update failed`,
+          ErrorCode.SYSTEM_UPDATE_FAILED,
+          ErrorSeverity.WARNING,
+          {
+            systemName: system.name,
+            originalError: e instanceof Error ? e.message : String(e),
+          },
+        );
+        getErrorHandler().handle(error);
       }
     }
 

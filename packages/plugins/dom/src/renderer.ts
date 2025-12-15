@@ -1,4 +1,7 @@
 import { SystemDef, RendererDef, WorldProvider } from '@g-motion/core';
+import { createDebugger } from '@g-motion/utils';
+
+const debug = createDebugger('DOMRenderer');
 
 // Cache for DOM element lookups to avoid repeated querySelector calls
 const _elementCache = new WeakMap<object, HTMLElement>();
@@ -39,10 +42,7 @@ function resolveCachedElement(target: any): HTMLElement | null {
     // Query and cache
     const el = document.querySelector(target) as HTMLElement | null;
     // Debug: element resolution
-    if (typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
-      console.debug('[DOMRenderer] resolveCachedElement selector', target, '->', el);
-    }
+    debug('resolveCachedElement selector', target, '->', el);
     selectorCache.set(target, el);
     return el;
   }
@@ -122,7 +122,7 @@ function buildTransformString(
 }
 
 export function createDOMRenderer(): RendererDef {
-  console.debug('[DOMRenderer] created');
+  debug('created');
 
   // Batch accumulation for style updates
   const styleUpdates = new Map<HTMLElement, Record<string, string>>();

@@ -8,7 +8,8 @@ import { WebGPUBufferManager } from '../../webgpu/buffer';
 import { buildInterpolationShader } from '../../webgpu/shader';
 import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
 import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
-import { getAppContext } from '../../context';
+import { getAppContext, getErrorHandler } from '../../context';
+import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
 
 const bindGroupLayoutEntries = [
   {
@@ -34,13 +35,13 @@ export async function initWebGPUCompute(
   const initOk = await bufferManager.init();
   const device = bufferManager.getDevice();
   if (!initOk || !device) {
-    console.warn(
-      '[Motion] WebGPU not available; GPU batch processing disabled. CPU path will be used.',
+    const error = new MotionError(
+      'WebGPU not available; GPU batch processing disabled. CPU path will be used.',
+      ErrorCode.GPU_DEVICE_UNAVAILABLE,
+      ErrorSeverity.WARNING,
+      { initOk, hasDevice: !!device },
     );
-    getGPUMetricsProvider().updateStatus({
-      webgpuAvailable: false,
-      gpuInitialized: false,
-    });
+    getErrorHandler().handle(error);
     return { success: false, deviceAvailable: false, shaderVersion: -1 };
   }
 
@@ -59,13 +60,13 @@ export async function initWebGPUCompute(
       webgpuAvailable: true,
     });
   } else {
-    console.warn(
-      '[Motion] WebGPU compute pipeline initialization failed; GPU batch processing disabled.',
+    const error = new MotionError(
+      'WebGPU compute pipeline initialization failed; GPU batch processing disabled.',
+      ErrorCode.GPU_PIPELINE_FAILED,
+      ErrorSeverity.WARNING,
+      { shaderVersion },
     );
-    getGPUMetricsProvider().updateStatus({
-      gpuInitialized: false,
-      webgpuAvailable: false,
-    });
+    getErrorHandler().handle(error);
   }
 
   return { success, deviceAvailable: success, shaderVersion };

@@ -1,5 +1,6 @@
 import { ComputeBatchProcessor } from './systems/batch';
 import { BatchContext } from './types';
+import { ErrorHandler } from './error-handler.js';
 
 /**
  * Application-level context for managing singleton services and shared state.
@@ -11,6 +12,7 @@ export class AppContext {
   private batchProcessor: ComputeBatchProcessor | null = null;
   private batchContext: BatchContext = {};
   private webgpuInitialized = false;
+  private errorHandler: ErrorHandler | null = null;
 
   private constructor() {}
 
@@ -79,6 +81,23 @@ export class AppContext {
   }
 
   /**
+   * Get or create the error handler
+   */
+  getErrorHandler(): ErrorHandler {
+    if (!this.errorHandler) {
+      this.errorHandler = new ErrorHandler(this);
+    }
+    return this.errorHandler;
+  }
+
+  /**
+   * Set the error handler (useful for testing)
+   */
+  setErrorHandler(handler: ErrorHandler | null): void {
+    this.errorHandler = handler;
+  }
+
+  /**
    * Reset the singleton (useful for testing)
    */
   static reset(): void {
@@ -91,4 +110,11 @@ export class AppContext {
  */
 export function getAppContext(): AppContext {
   return AppContext.getInstance();
+}
+
+/**
+ * Get the global error handler
+ */
+export function getErrorHandler(): ErrorHandler {
+  return AppContext.getInstance().getErrorHandler();
 }

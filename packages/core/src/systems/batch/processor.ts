@@ -3,6 +3,7 @@
 import { ArchetypeBatchDescriptor } from '../../types';
 import { BatchEntity, BatchKeyframe, BatchResult, BatchMetadata, GPUBatchConfig } from './types';
 import { DEFAULT_MAX_BATCH_SIZE } from './config';
+import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
 
 /**
  * Compute Batch Processor
@@ -53,7 +54,12 @@ export class ComputeBatchProcessor {
    */
   createBatch(batchId: string, entities: BatchEntity[]): BatchMetadata {
     if (entities.length === 0) {
-      throw new Error('Cannot create batch with zero entities');
+      throw new MotionError(
+        'Cannot create batch with zero entities',
+        ErrorCode.BATCH_EMPTY,
+        ErrorSeverity.FATAL,
+        { batchId },
+      );
     }
 
     if (entities.length > this.maxBatchSize) {
@@ -84,7 +90,12 @@ export class ComputeBatchProcessor {
   ): ArchetypeBatchDescriptor {
     const entityCount = entityIds.length;
     if (entityCount === 0) {
-      throw new Error(`Cannot create batch for archetype ${archetypeId} with zero entities`);
+      throw new MotionError(
+        `Cannot create batch for archetype ${archetypeId} with zero entities`,
+        ErrorCode.BATCH_EMPTY,
+        ErrorSeverity.FATAL,
+        { archetypeId, entityCount },
+      );
     }
 
     // Select workgroup hint based on entity count

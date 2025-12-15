@@ -2,6 +2,8 @@ import { SystemDef } from '../index';
 import { WorldProvider } from '../worldProvider';
 import { app } from '../app';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
+import { getErrorHandler } from '../context';
+import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
 
 const missingRendererWarned = new Set<string>();
 
@@ -58,12 +60,16 @@ export const RenderSystem: SystemDef = {
         const renderer = app.getRenderer(rendererId) as Renderer | undefined;
 
         if (!renderer) {
-          // Warn once per missing renderer id, then skip
+          // Warn once per missing renderer id via ErrorHandler, then skip
           if (!missingRendererWarned.has(rendererId)) {
             missingRendererWarned.add(rendererId);
-            if (typeof console !== 'undefined') {
-              console.warn(`[Motion] Renderer '${rendererId}' not found; skipping updates.`);
-            }
+            const error = new MotionError(
+              `Renderer '${rendererId}' not found; skipping updates.`,
+              ErrorCode.RENDERER_NOT_FOUND,
+              ErrorSeverity.WARNING,
+              { rendererId, archetypeId: archetype.id },
+            );
+            getErrorHandler().handle(error);
           }
           continue;
         }
