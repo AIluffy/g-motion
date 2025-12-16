@@ -20,10 +20,10 @@ Basic usage:
 import { motion } from '@g-motion/animation';
 
 // Number tween
-motion(0).mark({ to: 100 }).animate();
+motion(0).mark({ to: 100 }, at: 10).animate();
 
 // DOM transform
-motion('#box').mark({ to: { x: 100 } }).animate();
+motion('#box').mark({ to: { x: 100 }, at: 1000 }).animate();
 ```
 
 ## Architecture Snapshot

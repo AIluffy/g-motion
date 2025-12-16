@@ -17,7 +17,7 @@ describe('Number Animation', () => {
     // .mark(...) -> adds keyframe
     // .animate(...) -> starts and returns control
     const control = motion(0)
-      .mark([{ to: 100, time: 50 }])
+      .mark([{ to: 100, at: 50 }])
       .animate({ onUpdate });
 
     // Sanity check immediate start

@@ -20,7 +20,7 @@ describe('Interpolation Modes', () => {
     const onUpdate = vi.fn();
 
     motion(0)
-      .mark([{ to: 50, time: 40, interp: 'hold' }])
+      .mark([{ to: 50, at: 40, interp: 'hold' }])
       .animate({ onUpdate });
 
     await wait(60);
@@ -36,7 +36,7 @@ describe('Interpolation Modes', () => {
       .mark([
         {
           to: 100,
-          time: 80,
+          at: 80,
           interp: 'bezier',
           bezier: { cx1: 0.42, cy1: 0, cx2: 0.58, cy2: 1 },
         },
@@ -53,7 +53,7 @@ describe('Interpolation Modes', () => {
     const onUpdate = vi.fn();
 
     motion(0)
-      .mark([{ to: 75, time: 60, interp: 'autoBezier' }])
+      .mark([{ to: 75, at: 60, interp: 'autoBezier' }])
       .animate({ onUpdate });
 
     await wait(100);

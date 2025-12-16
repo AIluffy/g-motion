@@ -56,6 +56,9 @@ function Hub() {
             <Link to="/particles-fps" className={linkButtonClass('ghost')}>
               Particle FPS control
             </Link>
+            <Link to="/benchmark" className={linkButtonClass('ghost')}>
+              Benchmark
+            </Link>
             <Link to="/gpu-delivery-demo" className={linkButtonClass('ghost')}>
               GPU Delivery (new)
             </Link>
@@ -202,6 +205,21 @@ function Hub() {
                 Demonstrates rebuilding timelines on-the-fly with slider-controlled pacing.
               </div>
               <Link to="/particles-fps" className={linkButtonClass('ghost')}>
+                View demo
+              </Link>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Animation speed benchmark</CardTitle>
+              <CardDescription>
+                Stress test DOM writes with layout properties vs transforms.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="justify-between">
+              <div className="text-sm text-slate-300">Includes overdue (&gt;150ms) tracking.</div>
+              <Link to="/benchmark" className={linkButtonClass('ghost')}>
                 View demo
               </Link>
             </CardFooter>

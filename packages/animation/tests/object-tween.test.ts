@@ -5,7 +5,7 @@ describe('Object Tween Tests', () => {
   it('should animate a number via onUpdate callback', async () => {
     const onUpdate = vi.fn();
     const control = motion(0)
-      .mark([{ to: 100, time: 50 }])
+      .mark([{ to: 100, at: 50 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();
@@ -20,7 +20,7 @@ describe('Object Tween Tests', () => {
     const onUpdate = vi.fn();
     // Direct number animation: motion(20).mark([{ to: 30 }])
     const control = motion(20)
-      .mark([{ to: 50, time: 50 }])
+      .mark([{ to: 50, at: 50 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();
@@ -36,7 +36,7 @@ describe('Object Tween Tests', () => {
     const target = { value: 0 };
 
     const control = motion(target)
-      .mark([{ to: { value: 100 }, time: 50 }])
+      .mark([{ to: { value: 100 }, at: 50 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();
@@ -53,7 +53,7 @@ describe('Object Tween Tests', () => {
     const target = { x: 0, y: 0 };
 
     const control = motion(target)
-      .mark([{ to: { x: 100, y: 50 }, time: 50 }])
+      .mark([{ to: { x: 100, y: 50 }, at: 50 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();
@@ -69,7 +69,7 @@ describe('Object Tween Tests', () => {
     const target = { value: 0 };
 
     const control = motion(target)
-      .mark([{ to: { value: 100 }, time: 50 }])
+      .mark([{ to: { value: 100 }, at: 50 }])
       .animate();
 
     expect(control).toBeDefined();
@@ -84,8 +84,8 @@ describe('Object Tween Tests', () => {
     const target = { count: 0 };
 
     const control = motion(target)
-      .mark([{ to: { count: 100 }, time: 50 }])
-      .mark([{ to: { count: 200 }, time: 100 }])
+      .mark([{ to: { count: 100 }, at: 50 }])
+      .mark([{ to: { count: 200 }, at: 100 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();
@@ -101,7 +101,7 @@ describe('Object Tween Tests', () => {
     const onUpdate = vi.fn();
 
     const control = motion(0)
-      .mark([{ to: 50, time: 50 }])
+      .mark([{ to: 50, at: 50 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();
@@ -116,8 +116,8 @@ describe('Object Tween Tests', () => {
     const onUpdate = vi.fn();
 
     const control = motion(0)
-      .mark([{ to: 100, time: 50 }])
-      .mark([{ to: 50, time: 100 }])
+      .mark([{ to: 100, at: 50 }])
+      .mark([{ to: 50, at: 100 }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();

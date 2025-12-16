@@ -11,7 +11,7 @@ describe('Mixed target arrays', () => {
     const targets = [42, obj, '.m'];
 
     const control = motion(targets)
-      .mark([{ time: 100, to: { value: 10 } }])
+      .mark([{ at: 100, to: { value: 10 } }])
       .animate();
 
     // Expect batch control with count equal or greater than number of inputs (selector expands)

@@ -9,7 +9,7 @@ describe.skip('gpu fusion smoke (browser-only)', () => {
 
     for (let i = 0; i < 5; i++) {
       motion(i)
-        .mark([{ to: i + 1, time: 10 }])
+        .mark([{ to: i + 1, at: 10 }])
         .animate();
     }
 

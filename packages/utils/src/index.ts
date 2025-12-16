@@ -10,6 +10,21 @@ const isProd = (): boolean => {
   return false;
 };
 
+/**
+ * Development environment utilities
+ */
+
+/**
+ * Checks if the current environment is development mode
+ * @returns boolean - true if in development mode
+ */
+export function isDev(): boolean {
+  if (typeof process !== 'undefined' && typeof process.env !== 'undefined') {
+    return process.env.NODE_ENV === 'development';
+  }
+  return false;
+}
+
 const getGlobalDebugFlag = (): boolean => {
   if (typeof globalThis === 'undefined') return false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

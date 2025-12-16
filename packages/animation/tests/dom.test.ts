@@ -10,7 +10,7 @@ describe('DOM targets', () => {
     (global as any).document.querySelectorAll = (sel: string) => (sel === '.box' ? [{}, {}] : []);
 
     const control = motion('.box')
-      .mark([{ time: 100, to: { x: 10 } }])
+      .mark([{ at: 100, to: { x: 10 } }])
       .animate();
 
     // motion('.box') returns a BatchAnimationControl when multiple matches
@@ -40,7 +40,7 @@ describe('DOM targets', () => {
 
   it.skip('animates DOM element transform (pending real DOM renderer wiring)', async () => {
     motion('#box')
-      .mark([{ to: { x: 100 }, time: 100 }])
+      .mark([{ to: { x: 100 }, at: 100 }])
       .animate();
 
     await new Promise((resolve) => setTimeout(resolve, 200));

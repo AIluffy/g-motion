@@ -36,7 +36,17 @@ function resolveCachedElement(target: any): HTMLElement | null {
 
     // Check selector cache
     if (selectorCache.has(target)) {
-      return selectorCache.get(target) ?? null;
+      const cached = selectorCache.get(target) ?? null;
+      if (cached) {
+        const isConnected = (cached as any).isConnected;
+        if (typeof isConnected === 'boolean') {
+          if (isConnected) return cached;
+        } else if (document.contains(cached)) {
+          return cached;
+        }
+      } else {
+        return null;
+      }
     }
 
     // Query and cache

@@ -59,6 +59,11 @@ function addPrimitiveKeyframe(
   const { startValue, prevTime } = getTrackContext(track, target);
 
   if (typeof resolved.to !== 'number' || !Number.isFinite(resolved.to)) {
+    if (resolved.inertia) {
+      const kf = createKeyframe(prevTime, resolved.time, startValue, startValue, easing, resolved);
+      track.push(kf);
+      return;
+    }
     if (typeof console !== 'undefined') {
       console.warn('[Motion] Skipping primitive keyframe: invalid end value', resolved.to);
     }

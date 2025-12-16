@@ -10,7 +10,16 @@ export const InertiaPlugin: MotionPlugin = {
   version: '0.0.0',
   setup(appInstance: MotionApp) {
     // Register Inertia component
-    appInstance.registerComponent('Inertia', InertiaComponent);
+    try {
+      appInstance.registerComponent('Inertia', InertiaComponent);
+    } catch (err) {
+      if (
+        !(err instanceof Error) ||
+        !err.message.includes("Component 'Inertia' is already registered")
+      ) {
+        throw err;
+      }
+    }
     debugLog('Inertia component registered');
 
     // Register Inertia system (runs before InterpolationSystem)

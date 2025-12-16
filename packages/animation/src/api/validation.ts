@@ -20,6 +20,34 @@ export interface MarkValidationOptions {
 }
 
 export function validateMarkOptions(options: MarkValidationOptions): void {
+  if (options.spring && options.inertia) {
+    throw new MotionError(
+      'Invalid mark options: cannot use both spring and inertia',
+      ErrorCode.INVALID_MARK_OPTIONS,
+      ErrorSeverity.FATAL,
+      { hasSpring: true, hasInertia: true },
+    );
+  }
+
+  if (options.stagger !== undefined) {
+    if (typeof options.stagger !== 'number' && typeof options.stagger !== 'function') {
+      throw new MotionError(
+        `Stagger must be a number or function, got: ${typeof options.stagger}`,
+        ErrorCode.INVALID_MARK_OPTIONS,
+        ErrorSeverity.FATAL,
+        { providedType: typeof options.stagger },
+      );
+    }
+    if (typeof options.stagger === 'number' && options.stagger < 0) {
+      throw new MotionError(
+        `Stagger must be non-negative, got: ${options.stagger}ms`,
+        ErrorCode.INVALID_MARK_OPTIONS,
+        ErrorSeverity.FATAL,
+        { providedValue: options.stagger },
+      );
+    }
+  }
+
   // Validate duration
   if (options.duration !== undefined) {
     if (typeof options.duration !== 'number') {
@@ -58,8 +86,13 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
     }
   }
 
-  // Validate time and duration at least one is present
-  if (options.time === undefined && options.duration === undefined) {
+  // Validate time and duration at least one is present (non-physics marks)
+  if (
+    !options.spring &&
+    !options.inertia &&
+    options.time === undefined &&
+    options.duration === undefined
+  ) {
     throw new MotionError(
       `Mark must have either 'time' (absolute) or 'duration' (relative)`,
       ErrorCode.INVALID_MARK_OPTIONS,
@@ -123,26 +156,6 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
         ErrorCode.INVALID_BEZIER_POINTS,
         ErrorSeverity.FATAL,
         { cx1, cx2 },
-      );
-    }
-  }
-
-  // Validate stagger
-  if (options.stagger !== undefined) {
-    if (typeof options.stagger !== 'number' && typeof options.stagger !== 'function') {
-      throw new MotionError(
-        `Stagger must be a number or function, got: ${typeof options.stagger}`,
-        ErrorCode.INVALID_MARK_OPTIONS,
-        ErrorSeverity.FATAL,
-        { providedType: typeof options.stagger },
-      );
-    }
-    if (typeof options.stagger === 'number' && options.stagger < 0) {
-      throw new MotionError(
-        `Stagger must be non-negative, got: ${options.stagger}ms`,
-        ErrorCode.INVALID_MARK_OPTIONS,
-        ErrorSeverity.FATAL,
-        { providedValue: options.stagger },
       );
     }
   }

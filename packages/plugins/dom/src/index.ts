@@ -10,11 +10,29 @@ export const DOMPlugin: MotionPlugin = {
   version: '0.0.0',
   setup(appInstance: MotionApp) {
     // Register Transform component
-    appInstance.registerComponent('Transform', TransformComponent);
+    try {
+      appInstance.registerComponent('Transform', TransformComponent);
+    } catch (err) {
+      if (
+        !(err instanceof Error) ||
+        !err.message.includes("Component 'Transform' is already registered")
+      ) {
+        throw err;
+      }
+    }
     debugLog('Transform component registered');
 
     // Register DOM renderer
-    appInstance.registerRenderer('dom', createDOMRenderer());
+    try {
+      appInstance.registerRenderer('dom', createDOMRenderer());
+    } catch (err) {
+      if (
+        !(err instanceof Error) ||
+        !err.message.includes("Renderer 'dom' is already registered")
+      ) {
+        throw err;
+      }
+    }
     debugLog("Renderer 'dom' registered");
   },
 };

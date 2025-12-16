@@ -10,7 +10,16 @@ export const SpringPlugin: MotionPlugin = {
   version: '0.0.0',
   setup(appInstance: MotionApp) {
     // Register Spring component
-    appInstance.registerComponent('Spring', SpringComponent);
+    try {
+      appInstance.registerComponent('Spring', SpringComponent);
+    } catch (err) {
+      if (
+        !(err instanceof Error) ||
+        !err.message.includes("Component 'Spring' is already registered")
+      ) {
+        throw err;
+      }
+    }
     debugLog('Spring component registered');
 
     // Register Spring system (runs before InterpolationSystem)

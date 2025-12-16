@@ -1,3 +1,5 @@
+import { isDev } from '@g-motion/utils';
+
 export interface GPUBatchStatus {
   enabled: boolean;
   activeEntityCount: number;
@@ -174,6 +176,7 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
 }
 
 let provider: GPUMetricsProvider | null = null;
+let legacyWarningIssued = false;
 
 function seedFromLegacyIfPresent(target: GPUMetricsProvider): void {
   const g = globalThis as any;
@@ -186,6 +189,15 @@ function seedFromLegacyIfPresent(target: GPUMetricsProvider): void {
     metrics: Array.isArray(g.__motionGPUMetrics) ? g.__motionGPUMetrics : undefined,
     gpuInitialized: g.__webgpuInitialized,
   });
+
+  // Warn once in development about legacy globals
+  if (isDev() && !legacyWarningIssued) {
+    console.warn(
+      'Motion detected legacy globals (__motionThresholdContext, __motionGPUMetrics, __webgpuInitialized). ' +
+        'These will be deprecated in future versions. Please migrate to the new API.',
+    );
+    legacyWarningIssued = true;
+  }
 }
 
 export function getGPUMetricsProvider(): GPUMetricsProvider {
@@ -202,4 +214,5 @@ export function setGPUMetricsProvider(customProvider: GPUMetricsProvider): void 
 
 export function __resetGPUMetricsProviderForTests(): void {
   provider = null;
+  legacyWarningIssued = false;
 }

@@ -67,7 +67,7 @@ describe('Error Validation Tests', () => {
 
     test('throws on negative time', () => {
       expect(() => {
-        motion({ value: 0 }).mark({ to: { value: 100 }, time: -50 });
+        motion({ value: 0 }).mark({ to: { value: 100 }, at: -50 });
       }).toThrow(/time must be non-negative/);
     });
 
@@ -86,7 +86,7 @@ describe('Error Validation Tests', () => {
     test('warns when both time and duration provided', () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      motion({ value: 0 }).mark({ to: { value: 100 }, time: 100, duration: 200 });
+      motion({ value: 0 }).mark({ to: { value: 100 }, at: 100, duration: 200 });
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining("Using 'time', ignoring 'duration'"),
@@ -182,7 +182,7 @@ describe('Error Validation Tests', () => {
 
     test('accepts valid time', () => {
       expect(() => {
-        motion({ value: 0 }).mark({ to: { value: 100 }, time: 500 });
+        motion({ value: 0 }).mark({ to: { value: 100 }, at: 500 });
       }).not.toThrow();
     });
 

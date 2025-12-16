@@ -5,7 +5,7 @@ describe('Unified Motion API', () => {
   it('should handle single entity animation', () => {
     const obj = { value: 0 };
     const control = motion(obj)
-      .mark([{ to: { value: 100 }, time: 1000 }])
+      .mark([{ to: { value: 100 }, at: 1000 }])
       .animate();
 
     expect(control).toBeDefined();
@@ -15,7 +15,7 @@ describe('Unified Motion API', () => {
   it('should handle array of entities', () => {
     const objects = [{ x: 0 }, { x: 0 }, { x: 0 }];
     const control = motion(objects)
-      .mark([{ to: { x: 100 }, time: 1000 }])
+      .mark([{ to: { x: 100 }, at: 1000 }])
       .animate();
 
     expect(control).toBeDefined();
@@ -29,7 +29,7 @@ describe('Unified Motion API', () => {
       .mark([
         {
           to: (index) => ({ x: 100 + index * 10 }),
-          time: 1000,
+          at: 1000,
         },
       ])
       .animate();
@@ -44,7 +44,7 @@ describe('Unified Motion API', () => {
       .mark([
         {
           to: { x: 100 },
-          time: 1000,
+          at: 1000,
           stagger: 100, // 100ms between each entity
         },
       ])
@@ -57,7 +57,7 @@ describe('Unified Motion API', () => {
   it('should provide unified control methods for batch', () => {
     const objects = [{ x: 0 }, { x: 0 }];
     const control = motion(objects)
-      .mark([{ to: { x: 100 }, time: 1000 }])
+      .mark([{ to: { x: 100 }, at: 1000 }])
       .animate();
 
     expect(typeof control.play).toBe('function');
@@ -74,7 +74,7 @@ describe('Unified Motion API', () => {
       .mark([
         {
           to: (index) => ({ x: 50 + index * 10 }),
-          time: 1000,
+          at: 1000,
         },
       ])
       .animate();

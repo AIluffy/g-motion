@@ -11,10 +11,14 @@ describe('DOM renderer selector cache', () => {
 
   it('clears cache on DOM mutation', () => {
     const renderer = createDOMRenderer();
-    const comps = { Render: { rendererId: 'dom', target: '#box', props: { x: 10 } } } as any;
+    const comps = {
+      Render: { rendererId: 'dom', target: '#box', props: { x: 10, y: 20 } },
+      Transform: { x: 10, y: 20 },
+    } as any;
 
-    // First update should resolve and cache
+    renderer.preFrame?.();
     renderer.update(1, '#box', comps);
+    renderer.postFrame?.();
     const el1 = document.querySelector('#box') as HTMLElement;
     expect(el1.style.transform).toContain('translate');
 
@@ -26,8 +30,9 @@ describe('DOM renderer selector cache', () => {
     newEl.id = 'box';
     container.appendChild(newEl);
 
-    // Second update should re-resolve after cache clear
+    renderer.preFrame?.();
     renderer.update(1, '#box', comps);
+    renderer.postFrame?.();
     const el2 = document.querySelector('#box') as HTMLElement;
     expect(el2.style.transform).toContain('translate');
   });

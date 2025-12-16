@@ -33,7 +33,7 @@ describe('Chainable API', () => {
     const onUpdate = vi.fn();
 
     const control = motion(0)
-      .mark([{ to: 100, time: 50, ease: 'easeOutQuad' }])
+      .mark([{ to: 100, at: 50, ease: 'easeOutQuad' }])
       .animate({ onUpdate });
 
     expect(control).toBeDefined();

@@ -84,6 +84,12 @@ export class MotionBuilder {
 
     // Store precompiled templates for batch animation (don't process tracks yet)
     if (this.isBatch) {
+      for (const opt of optsArray) {
+        validateMarkOptions({
+          ...(opt as any),
+          time: (opt as any).time ?? opt.at,
+        });
+      }
       const staticResolved: ResolvedMarkOptions[] = [];
       const dynamic: MarkOptions[] = [];
       for (const opt of optsArray) {
@@ -248,8 +254,11 @@ export class MotionBuilder {
   // Private: Mark Processing Helpers
   // ============================================================================
   private processSingleMark(rawOptions: MarkOptions): void {
+    validateMarkOptions({
+      ...(rawOptions as any),
+      time: (rawOptions as any).time ?? rawOptions.at,
+    });
     const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
-    validateMarkOptions(resolved);
 
     const targetType = getTargetType(this.target);
     const easing = resolved.ease;

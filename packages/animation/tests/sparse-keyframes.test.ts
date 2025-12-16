@@ -16,9 +16,9 @@ describe('Sparse Keyframe Interpolation', () => {
 
     motion(target)
       .mark([
-        { to: { x: 0, y: 0, scale: 0 }, time: 0 },
-        { to: { scale: 1 }, time: 50 }, // No x, y here - they should interpolate from 0 to 100 over full duration
-        { to: { x: 100, y: 100, scale: 0 }, time: 100 },
+        { to: { x: 0, y: 0, scale: 0 }, at: 0 },
+        { to: { scale: 1 }, at: 50 }, // No x, y here - they should interpolate from 0 to 100 over full duration
+        { to: { x: 100, y: 100, scale: 0 }, at: 100 },
       ])
       .animate({
         onUpdate: (val) => {
@@ -50,9 +50,9 @@ describe('Sparse Keyframe Interpolation', () => {
 
     const control = motion(mockElement)
       .mark([
-        { to: { x: 0, y: 0, scale: 0 }, time: 0 },
-        { to: { scale: 1 }, time: 50 }, // No x, y - should interpolate over full duration
-        { to: { x: 100, y: 100, scale: 0 }, time: 100 },
+        { to: { x: 0, y: 0, scale: 0 }, at: 0 },
+        { to: { scale: 1 }, at: 50 }, // No x, y - should interpolate over full duration
+        { to: { x: 100, y: 100, scale: 0 }, at: 100 },
       ])
       .animate();
 
@@ -73,8 +73,8 @@ describe('Sparse Keyframe Interpolation', () => {
     // Primitive animation with basic timeline
     motion(0)
       .mark([
-        { to: 0, time: 0 },
-        { to: 100, time: 100 },
+        { to: 0, at: 0 },
+        { to: 100, at: 100 },
       ])
       .animate({ onUpdate: (val) => (value = val) });
 

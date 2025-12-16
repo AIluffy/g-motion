@@ -13,7 +13,7 @@ describe('Delay and Repeat Handling', () => {
     const onUpdate = vi.fn();
 
     motion(0)
-      .mark([{ to: 10, time: 50 }])
+      .mark([{ to: 10, at: 50 }])
       .animate({ onUpdate, delay: 40 });
 
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -30,7 +30,7 @@ describe('Delay and Repeat Handling', () => {
     const onUpdate = vi.fn();
 
     motion(0)
-      .mark([{ to: 20, time: 30 }])
+      .mark([{ to: 20, at: 30 }])
       .animate({ onUpdate, repeat: 1 });
 
     await new Promise((resolve) => setTimeout(resolve, 90));

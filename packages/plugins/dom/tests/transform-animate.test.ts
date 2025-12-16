@@ -26,7 +26,7 @@ describe('DOM Transform Animation', () => {
 
     // Create animation
     const control = motion('#test-box')
-      .mark([{ to: { x: 100, y: 50, scaleX: 1.2, rotate: 45 }, time: 100 }])
+      .mark([{ to: { x: 100, y: 50, scaleX: 1.2, rotate: 45 }, at: 100 }])
       .animate();
 
     expect(control).toBeTruthy();
@@ -69,7 +69,7 @@ describe('DOM Transform Animation', () => {
             scale: 1.1,
             perspective: 700,
           },
-          time: 120,
+          at: 120,
         },
       ])
       .animate();

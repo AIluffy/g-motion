@@ -13,8 +13,8 @@ describe('Chained Animation', () => {
 
     // 0 -> 100 (0-50ms) -> 200 (50-100ms)
     motion(0)
-      .mark([{ to: 100, time: 50 }])
-      .mark([{ to: 200, time: 100 }])
+      .mark([{ to: 100, at: 50 }])
+      .mark([{ to: 200, at: 100 }])
       .animate({ onUpdate });
 
     // Wait for first part to finish (50ms) + partial second

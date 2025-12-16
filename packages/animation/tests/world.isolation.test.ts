@@ -16,14 +16,14 @@ describe('WorldProvider multi-world isolation', () => {
     // Animate in world1
     const ctrl1 = WorldProvider.withWorld(world1, () => {
       return motion(0, { world: world1 })
-        .mark([{ to: 100, time: 500 }])
+        .mark([{ to: 100, at: 500 }])
         .animate();
     });
 
     // Animate in world2
     const ctrl2 = WorldProvider.withWorld(world2, () => {
       return motion(0, { world: world2 })
-        .mark([{ to: 200, time: 800 }])
+        .mark([{ to: 200, at: 800 }])
         .animate();
     });
 
@@ -51,13 +51,13 @@ describe('WorldProvider multi-world isolation', () => {
 
     WorldProvider.withWorld(world1, () => {
       motion(0, { world: world1 })
-        .mark([{ to: 100, time: 500 }])
+        .mark([{ to: 100, at: 500 }])
         .animate({ onUpdate: () => world1Updates++ });
     });
 
     WorldProvider.withWorld(world2, () => {
       motion(0, { world: world2 })
-        .mark([{ to: 200, time: 800 }])
+        .mark([{ to: 200, at: 800 }])
         .animate({ onUpdate: () => world2Updates++ });
     });
 
@@ -91,7 +91,7 @@ describe('WorldProvider multi-world isolation', () => {
 
     const ctrl = WorldProvider.withWorld(world1, () => {
       return motion(targets, { world: world1 })
-        .mark([{ to: 100, time: 500, stagger: 50 }])
+        .mark([{ to: 100, at: 500, stagger: 50 }])
         .animate();
     });
 

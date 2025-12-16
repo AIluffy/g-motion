@@ -29,7 +29,7 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 100,
-          time: 50, // Very short time
+          at: 50, // Very short time
           spring: {
             stiffness: 100,
             damping: 10,
@@ -48,7 +48,7 @@ describe('Spring Duration Behavior', () => {
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
       if (stateBuffer && archetype.entityCount > 0) {
-        const state = stateBuffer[archetype.entityCount - 1];
+        const state = stateBuffer[archetype.entityCount - 1] as any;
         if (state.status === MotionStatus.Running) {
           stillRunning = true;
         }
@@ -67,7 +67,7 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 10,
-          time: 100, // This time is ignored
+          at: 100, // This time is ignored
           spring: {
             stiffness: 1000, // Very stiff
             damping: 100, // High damping
@@ -86,7 +86,7 @@ describe('Spring Duration Behavior', () => {
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
       if (stateBuffer && archetype.entityCount > 0) {
-        const state = stateBuffer[archetype.entityCount - 1];
+        const state = stateBuffer[archetype.entityCount - 1] as any;
         if (state.status === MotionStatus.Finished) {
           isFinished = true;
         }
@@ -104,7 +104,7 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 100,
-          time: 50,
+          at: 50,
           spring: { stiffness: 100, damping: 10 },
         },
       ])
@@ -128,7 +128,7 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 100,
-          time: 100, // Short duration
+          at: 100, // Short duration
           spring: {
             stiffness: 50, // Slow spring
             damping: 5, // Low damping = bouncy/slow
@@ -147,7 +147,7 @@ describe('Spring Duration Behavior', () => {
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
       if (stateBuffer && archetype.entityCount > 0) {
-        status = stateBuffer[archetype.entityCount - 1].status;
+        status = (stateBuffer[archetype.entityCount - 1] as any).status;
       }
     }
 
