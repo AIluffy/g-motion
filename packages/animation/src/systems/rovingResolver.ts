@@ -1,4 +1,4 @@
-import { SystemDef, World } from '@g-motion/core';
+import { SystemDef, WorldProvider } from '@g-motion/core';
 import type { TimelineComponentData } from '../component-types';
 
 type GaussianKernel = { weights: number[]; radius: number };
@@ -46,7 +46,7 @@ export const RovingResolverSystem: SystemDef = {
   name: 'RovingResolverSystem',
   order: 12,
   update() {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
     for (const archetype of world.getArchetypes()) {
       const timelineBuffer = archetype.getBuffer('Timeline');
       if (!timelineBuffer) continue;

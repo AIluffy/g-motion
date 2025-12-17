@@ -1,10 +1,10 @@
 import {
   SystemDef,
-  World,
   MotionStatus,
   findActiveKeyframe,
   resolveEasing,
   extractTransformTypedBuffers,
+  WorldProvider,
 } from '@g-motion/core';
 import { getProgress, resolveInterpMode } from '../api/timeline';
 import type {
@@ -18,7 +18,7 @@ export const InterpolationSystem: SystemDef = {
   name: 'InterpolationSystem',
   order: 20,
   update() {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
       const timelineBuffer = archetype.getBuffer('Timeline');

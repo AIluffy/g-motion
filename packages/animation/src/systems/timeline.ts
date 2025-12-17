@@ -1,10 +1,10 @@
-import { SystemDef, World, MotionStatus } from '@g-motion/core';
+import { SystemDef, MotionStatus, WorldProvider } from '@g-motion/core';
 
 export const TimelineSystem: SystemDef = {
   name: 'TimelineSystem',
   order: 10,
   update() {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
     let activeCount = 0;
 
     for (const archetype of world.getArchetypes()) {

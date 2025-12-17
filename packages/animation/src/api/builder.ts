@@ -7,6 +7,7 @@ import {
   MotionStatus,
 } from '@g-motion/core';
 import { WorldProvider } from '@g-motion/core';
+import { registerAnimationSystems } from '../index';
 import { AnimationControl } from './control';
 import { validateMarkOptions } from './validation';
 import { TrackBuilder } from './track';
@@ -133,6 +134,11 @@ export class MotionBuilder {
 
     const injectedWorld = (this as any)._world as World | undefined;
     const world = injectedWorld ?? WorldProvider.useWorld();
+    // Ensure animation systems are registered for this world (idempotent guard)
+    if (!(world as any).__animationSystemsRegistered) {
+      registerAnimationSystems(world);
+      (world as any).__animationSystemsRegistered = true;
+    }
     this.registerCoreComponents(world);
 
     const targetType = getTargetType(this.target);

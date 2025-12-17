@@ -20,8 +20,18 @@ function initEngine() {
   if (initialized) return;
   initialized = true;
 
+  // For backwards compatibility register systems into the default singleton World
   const world = World.get();
-  debug('Initializing engine, registering systems');
+  debug('Initializing engine, registering systems (singleton world)');
+  registerAnimationSystems(world);
+}
+
+/**
+ * Register animation systems into a specific World instance.
+ * This enables per-world system registration for multi-world isolation.
+ */
+export function registerAnimationSystems(world: World) {
+  debug('Registering animation systems for world');
   // Register threshold monitor first to decide GPU eligibility
   world.scheduler.add(ThresholdMonitorSystem);
   world.scheduler.add(TimeSystem);
