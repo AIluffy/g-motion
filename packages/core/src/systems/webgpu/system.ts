@@ -5,13 +5,15 @@
  * Orchestrates initialization, pipeline management, and per-archetype dispatch.
  */
 
-import { SystemDef } from '../../plugin';
+import type { SystemContext, SystemDef } from '../../plugin';
 import { getWebGPUBufferManager, WebGPUBufferManager } from '../../webgpu/buffer';
 import { buildInterpolationShader } from '../../webgpu/shader';
 import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
-import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
-import { getAppContext } from '../../context';
 import { getTimingHelper, TimingHelper } from '../../webgpu/timing-helper';
+import { enqueueGPUResults } from '../../webgpu/sync-manager';
+import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
+import { StagingBufferPool } from '../../webgpu/staging-pool';
+import { AsyncReadbackManager } from '../../webgpu/async-readback';
 import { initWebGPUCompute } from './initialization';
 import { cachePipeline } from './pipeline';
 import { dispatchGPUBatch } from './dispatch';
@@ -22,6 +24,18 @@ let isInitialized = false;
 let deviceAvailable = false;
 let shaderVersion = -1;
 let timingHelper: TimingHelper | null = null;
+let stagingPool: StagingBufferPool | null = null;
+let readbackManager: AsyncReadbackManager | null = null;
+
+export function __resetWebGPUComputeSystemForTests(): void {
+  bufferManager = null;
+  isInitialized = false;
+  deviceAvailable = false;
+  shaderVersion = -1;
+  timingHelper = null;
+  stagingPool = null;
+  readbackManager = null;
+}
 
 /**
  * WebGPU Compute System with Per-Archetype Dispatch
@@ -39,7 +53,15 @@ export const WebGPUComputeSystem: SystemDef = {
   name: 'WebGPUComputeSystem',
   order: 6, // Run after BatchSamplingSystem (order 5)
 
-  async update(_dt: number) {
+  async update(_dt: number, ctx?: SystemContext) {
+    const metricsProvider = ctx?.services.metrics;
+    const processor = ctx?.services.batchProcessor;
+    const config = ctx?.services.config as any;
+
+    if (!metricsProvider || !processor || !config) {
+      return;
+    }
+
     // Lazy initialization
     if (!isInitialized) {
       bufferManager = getWebGPUBufferManager();
@@ -49,11 +71,14 @@ export const WebGPUComputeSystem: SystemDef = {
       shaderVersion = initResult.shaderVersion;
 
       if (deviceAvailable && bufferManager) {
-        timingHelper = getTimingHelper(bufferManager.getDevice());
+        const device = bufferManager.getDevice();
+        timingHelper = getTimingHelper(device);
         const pipeline = (bufferManager as any).computePipeline;
         if (pipeline) {
           cachePipeline(64, pipeline);
         }
+        stagingPool = new StagingBufferPool(device);
+        readbackManager = new AsyncReadbackManager();
       }
     }
 
@@ -63,7 +88,6 @@ export const WebGPUComputeSystem: SystemDef = {
 
     const device = bufferManager.getDevice();
     if (!device) return;
-
     // Rebuild pipeline if custom easing set changed
     const currentVersion = getCustomEasingVersion();
     if (currentVersion !== shaderVersion) {
@@ -99,22 +123,24 @@ export const WebGPUComputeSystem: SystemDef = {
     }
 
     // Adaptive threshold check with frame budget monitoring
-    const metricsProvider = getGPUMetricsProvider();
     const status = metricsProvider.getStatus();
 
-    // Calculate dynamic threshold based on frame performance
-    const dynamicThreshold = metricsProvider.calculateDynamicThreshold(
-      status.threshold,
-      16, // 60fps target
-    );
+    const gpuMode = config.gpuCompute ?? 'auto';
+    if (gpuMode === 'never') {
+      return;
+    }
 
-    // Check if GPU should be enabled based on dynamic threshold
-    if (!status.enabled || status.activeEntityCount < dynamicThreshold) {
-      // Update status with fallback flag if frame budget exceeded
+    let belowThreshold = false;
+    if (gpuMode === 'auto') {
+      const dynamicThreshold = metricsProvider.calculateDynamicThreshold(status.threshold, 16);
+      belowThreshold = status.activeEntityCount < dynamicThreshold;
+    }
+
+    if (!status.enabled || belowThreshold) {
       if (status.frameTimeMs && status.frameTimeMs > 12) {
         metricsProvider.updateStatus({ cpuFallbackActive: true });
       }
-      return; // Below dynamic threshold or GPU disabled
+      return;
     }
 
     // Clear fallback flag when GPU processing proceeds
@@ -122,24 +148,117 @@ export const WebGPUComputeSystem: SystemDef = {
       metricsProvider.updateStatus({ cpuFallbackActive: false });
     }
 
-    const context = getAppContext();
-    const processor = context.getBatchProcessor();
-
-    if (!processor) {
-      return;
-    }
-
     // Get all per-archetype batches prepared by BatchSamplingSystem
     const archetypeBatches = processor.getArchetypeBatches();
-    if (archetypeBatches.size === 0) {
+    if (archetypeBatches.size === 0 || !stagingPool) {
       return;
     }
 
     const queue = device.queue;
+    const channelRegistry = getGPUChannelMappingRegistry();
 
-    // Dispatch once per archetype
     for (const [archetypeId, batch] of archetypeBatches) {
-      await dispatchGPUBatch(device, queue, batch, timingHelper, archetypeId);
+      const leaseId = (batch as any).entityIdsLeaseId as number | undefined;
+      const table = channelRegistry.getChannels(archetypeId);
+      const channels = table?.channels ?? [];
+      const channelCount = channels.length || 1;
+
+      try {
+        const { outputBuffer, entityCount } = await dispatchGPUBatch(
+          device,
+          queue,
+          batch,
+          timingHelper,
+          archetypeId,
+          channelCount,
+        );
+
+        const bufferSize = (outputBuffer as any).size as number | undefined;
+        const expectedSize = entityCount * channelCount * 4;
+        const byteSize = Math.min(bufferSize ?? expectedSize, expectedSize);
+
+        const stride = channelCount;
+        const stagingBuffer = stagingPool.acquire(archetypeId, byteSize);
+        if (!stagingBuffer) {
+          outputBuffer.destroy();
+          if (typeof leaseId === 'number') {
+            processor.releaseEntityIds(leaseId);
+          }
+          continue;
+        }
+        if (typeof leaseId === 'number') {
+          processor.markEntityIdsInFlight(leaseId);
+        }
+        stagingPool.markInFlight(stagingBuffer);
+
+        const copyEncoder = device.createCommandEncoder({
+          label: `copy-output-${archetypeId}`,
+        });
+        copyEncoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, byteSize);
+        queue.submit([copyEncoder.finish()]);
+        outputBuffer.destroy();
+
+        if (readbackManager) {
+          const mapPromise = stagingBuffer.mapAsync((GPUMapMode as any).READ);
+          readbackManager.enqueueMapAsync(
+            archetypeId,
+            batch.entityIds,
+            stagingBuffer,
+            mapPromise,
+            byteSize,
+            200, // 200ms timeout
+            stride,
+            channels.length ? channels : undefined,
+            leaseId,
+          );
+        }
+      } catch {
+        if (typeof leaseId === 'number') {
+          processor.releaseEntityIds(leaseId);
+        }
+      }
     }
+
+    // Process completed readbacks
+    if (readbackManager) {
+      // Limit readback processing to 2ms per frame to prevent blocking
+      readbackManager.drainCompleted(2).then((results) => {
+        for (const res of results) {
+          const values = res.values;
+          const shouldApply = !res.expired && values;
+          if (shouldApply) {
+            enqueueGPUResults({
+              archetypeId: res.archetypeId,
+              entityIds: res.entityIds,
+              values,
+              stride: res.stride,
+              channels: res.channels,
+            });
+          }
+
+          try {
+            metricsProvider.recordMetric({
+              batchId: `${res.archetypeId}-sync`,
+              entityCount: res.entityIds.length,
+              timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+              gpu: true,
+              syncPerformed: true,
+              syncDurationMs: res.syncDurationMs ?? 0,
+              syncDataSize: res.byteSize,
+            });
+          } catch {
+            // ignore
+          }
+
+          stagingPool!.markAvailable(res.stagingBuffer);
+
+          if (typeof res.leaseId === 'number') {
+            processor.releaseEntityIds(res.leaseId);
+          }
+        }
+      });
+    }
+
+    stagingPool.nextFrame();
   },
 };

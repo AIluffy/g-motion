@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { World, WorldProvider } from '@g-motion/core';
+import {
+  World,
+  WorldProvider,
+  getEngineForWorld,
+  MotionStatus,
+  MotionStateComponent,
+  TimelineComponent,
+  RenderComponent,
+} from '@g-motion/core';
 import { motion } from '../src/api/builder';
+import { InterpolationSystem } from '../src/systems/interpolation';
 
 describe('WorldProvider multi-world isolation', () => {
   let world1: World;
@@ -15,14 +24,14 @@ describe('WorldProvider multi-world isolation', () => {
   it('isolates entities between different worlds', () => {
     // Animate in world1
     const ctrl1 = WorldProvider.withWorld(world1, () => {
-      return motion(0, { world: world1 })
+      return motion(0, { world: world1 as any })
         .mark([{ to: 100, at: 500 }])
         .animate();
     });
 
     // Animate in world2
     const ctrl2 = WorldProvider.withWorld(world2, () => {
-      return motion(0, { world: world2 })
+      return motion(0, { world: world2 as any })
         .mark([{ to: 200, at: 800 }])
         .animate();
     });
@@ -50,18 +59,19 @@ describe('WorldProvider multi-world isolation', () => {
     let world2Updates = 0;
 
     WorldProvider.withWorld(world1, () => {
-      motion(0, { world: world1 })
+      motion(0, { world: world1 as any })
         .mark([{ to: 100, at: 500 }])
         .animate({ onUpdate: () => world1Updates++ });
     });
 
     WorldProvider.withWorld(world2, () => {
-      motion(0, { world: world2 })
+      motion(0, { world: world2 as any })
         .mark([{ to: 200, at: 800 }])
         .animate({ onUpdate: () => world2Updates++ });
     });
 
-    // Start only world1 scheduler
+    // Attach engine to world1 only and start its scheduler
+    getEngineForWorld(world1);
     world1.scheduler.start();
 
     // Give some time for updates (note: in real tests you'd advance time manually)
@@ -90,7 +100,7 @@ describe('WorldProvider multi-world isolation', () => {
     const targets = [0, 1, 2];
 
     const ctrl = WorldProvider.withWorld(world1, () => {
-      return motion(targets, { world: world1 })
+      return motion(targets, { world: world1 as any })
         .mark([{ to: 100, at: 500, stagger: 50 }])
         .animate();
     });
@@ -105,5 +115,56 @@ describe('WorldProvider multi-world isolation', () => {
       // Verify not in world2
       expect(world2.getEntityArchetype(entityId)).toBeUndefined();
     });
+  });
+
+  it('supports tickInterval to reduce update frequency for low priority entities', () => {
+    const world = new World();
+    world.registry.register('MotionState', MotionStateComponent);
+    world.registry.register('Timeline', TimelineComponent);
+    world.registry.register('Render', RenderComponent);
+
+    world.createEntity({
+      MotionState: {
+        status: MotionStatus.Running,
+        currentTime: 0,
+        playbackRate: 1,
+        startTime: 0,
+        delay: 0,
+        iteration: 0,
+        tickInterval: 2,
+        tickPhase: 0,
+      },
+      Timeline: {
+        duration: 1000,
+        tracks: new Map([['x', [{ startTime: 0, time: 1000, startValue: 0, endValue: 100 }]]]),
+      },
+      Render: {
+        rendererId: 'object',
+        rendererCode: 0,
+        target: {},
+        props: {},
+        version: 0,
+        renderedVersion: -1,
+      },
+    });
+
+    const archetype = Array.from(world.getArchetypes())[0];
+    const stateBuffer = archetype.getBuffer('MotionState') as any[];
+    const renderBuffer = archetype.getBuffer('Render') as any[];
+    const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime')!;
+
+    const services = { world, config: world.config } as any;
+
+    InterpolationSystem.update(0, { services, dt: 0 } as any);
+    InterpolationSystem.update(0, { services, dt: 0 } as any);
+    expect(renderBuffer[0].props.x).toBeCloseTo(0, 5);
+    const v1 = renderBuffer[0].version;
+
+    stateBuffer[0].currentTime = 500;
+    typedCurrentTime[0] = 500;
+    InterpolationSystem.update(0, { services, dt: 0 } as any);
+    InterpolationSystem.update(0, { services, dt: 0 } as any);
+    expect(renderBuffer[0].props.x).toBeCloseTo(50, 5);
+    expect(renderBuffer[0].version).toBe(v1 + 1);
   });
 });

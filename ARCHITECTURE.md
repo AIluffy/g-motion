@@ -37,11 +37,11 @@ ECS runtime and core systems foundation.
 - **Constants** (`constants.ts`): Configuration constants (ARCHETYPE_DEFAULTS, SCHEDULER_LIMITS, WEBGPU_WORKGROUPS, BATCH_BUFFER_CACHE)
 
 **Core Systems**:
-- `TimeSystem`: Global and per-frame timing
+- `TimeSystem`: Global and per-frame timing, updates `MotionState.currentTime` (timeline time)
 - `RenderSystem`: Applies computed values to targets (DOM/object/callback)
 - `ThresholdMonitorSystem`: GPU eligibility monitoring
-- `BatchSamplingSystem`: Collects GPU-eligible entities
-- `WebGPUComputeSystem`: GPU-accelerated interpolation dispatch
+- `BatchSamplingSystem`: Collects GPU-eligible entities, packing `MotionState.currentTime` into GPU state buffers
+- `WebGPUComputeSystem`: GPU-accelerated interpolation dispatch that consumes the same timeline time as the CPU path
 
 **Components**:
 - `MotionState`: Animation state (playing, progress, repeat)

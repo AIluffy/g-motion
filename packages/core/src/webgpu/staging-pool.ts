@@ -16,7 +16,7 @@ export class StagingBufferPool {
   private device: GPUDevice;
   private currentFrame = 0;
   private readonly initialSize = 4096; // 4KB default
-  private readonly maxPoolPerArchetype = 3; // max 3 buffers per archetype
+  private readonly maxPoolPerArchetype = 8;
   private readonly frameThreshold = 5; // reclaim if unused for N frames
 
   constructor(device: GPUDevice) {
@@ -26,7 +26,7 @@ export class StagingBufferPool {
   /**
    * Get or create a staging buffer for readback
    */
-  acquire(archetypeId: string, requiredSize: number): GPUBuffer {
+  acquire(archetypeId: string, requiredSize: number): GPUBuffer | null {
     if (!this.pools.has(archetypeId)) {
       this.pools.set(archetypeId, []);
     }
@@ -61,15 +61,7 @@ export class StagingBufferPool {
       return buffer;
     }
 
-    // Reuse smallest sufficient buffer (even if in-flight, for now)
-    let bestEntry = pool[0];
-    for (const entry of pool) {
-      if (entry.size >= requiredSize && entry.size < bestEntry.size) {
-        bestEntry = entry;
-      }
-    }
-    bestEntry.lastUsedFrame = this.currentFrame;
-    return bestEntry.buffer;
+    return null;
   }
 
   /**

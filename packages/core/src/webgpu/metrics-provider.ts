@@ -34,11 +34,21 @@ export interface GPUArchetypeTiming {
   entityCount: number;
 }
 
+export interface SystemTimingStat {
+  avgMs: number;
+  minMs: number;
+  maxMs: number;
+  count: number;
+  lastMs: number;
+}
+
 export interface GPUMetricsProvider {
   getStatus(): GPUBatchStatus;
   updateStatus(update: Partial<GPUBatchStatus>): GPUBatchStatus;
   recordMetric(metric: GPUBatchMetric): void;
   getMetrics(): GPUBatchMetric[];
+  recordSystemTiming?(name: string, durationMs: number): void;
+  getSystemTimings?(): Record<string, SystemTimingStat>;
   clear(): void;
   seedFromLegacy(input: {
     status?: any;
@@ -62,7 +72,14 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   private status: GPUBatchStatus = { ...DEFAULT_STATUS };
   private metrics: GPUBatchMetric[] = [];
   private archetypeTimings = new Map<string, GPUArchetypeTiming>();
+  private systemTimings = new Map<string, SystemTimingStat>();
   private readonly MAX_METRICS = 100;
+  private readonly MAX_SYSTEM_TIMINGS = 64;
+  private syncToGlobalEnabled = false;
+
+  enableGlobalSync(enabled: boolean): void {
+    this.syncToGlobalEnabled = enabled;
+  }
 
   getStatus(): GPUBatchStatus {
     return this.status;
@@ -90,6 +107,43 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
     this.syncToGlobal(metric);
   }
 
+  recordSystemTiming(name: string, durationMs: number): void {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return;
+
+    const existing = this.systemTimings.get(name);
+    if (!existing) {
+      if (this.systemTimings.size >= this.MAX_SYSTEM_TIMINGS) {
+        const first = this.systemTimings.keys().next().value as string | undefined;
+        if (first) this.systemTimings.delete(first);
+      }
+      this.systemTimings.set(name, {
+        avgMs: durationMs,
+        minMs: durationMs,
+        maxMs: durationMs,
+        count: 1,
+        lastMs: durationMs,
+      });
+      return;
+    }
+
+    const nextCount = existing.count + 1;
+    this.systemTimings.set(name, {
+      avgMs: (existing.avgMs * existing.count + durationMs) / nextCount,
+      minMs: Math.min(existing.minMs, durationMs),
+      maxMs: Math.max(existing.maxMs, durationMs),
+      count: nextCount,
+      lastMs: durationMs,
+    });
+  }
+
+  getSystemTimings(): Record<string, SystemTimingStat> {
+    const out: Record<string, SystemTimingStat> = {};
+    for (const [name, stat] of this.systemTimings) {
+      out[name] = stat;
+    }
+    return out;
+  }
+
   private updateArchetypeTiming(metric: GPUBatchMetric): void {
     const existing = this.archetypeTimings.get(metric.batchId);
     if (!existing) {
@@ -114,6 +168,7 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   }
 
   private syncToGlobal(metric: GPUBatchMetric): void {
+    if (!this.syncToGlobalEnabled) return;
     if (typeof globalThis === 'undefined') return;
 
     const g = globalThis as any;
@@ -135,6 +190,8 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   clear(): void {
     this.metrics = [];
     this.archetypeTimings.clear();
+    this.systemTimings.clear();
+    this.status = { ...DEFAULT_STATUS };
   }
 
   seedFromLegacy(input: {
@@ -177,6 +234,7 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
 
 let provider: GPUMetricsProvider | null = null;
 let legacyWarningIssued = false;
+let globalSyncEnabled = false;
 
 function seedFromLegacyIfPresent(target: GPUMetricsProvider): void {
   const g = globalThis as any;
@@ -202,7 +260,9 @@ function seedFromLegacyIfPresent(target: GPUMetricsProvider): void {
 
 export function getGPUMetricsProvider(): GPUMetricsProvider {
   if (!provider) {
-    provider = new InMemoryGPUMetricsProvider();
+    const impl = new InMemoryGPUMetricsProvider();
+    impl.enableGlobalSync(globalSyncEnabled);
+    provider = impl;
     seedFromLegacyIfPresent(provider);
   }
   return provider;
@@ -210,6 +270,13 @@ export function getGPUMetricsProvider(): GPUMetricsProvider {
 
 export function setGPUMetricsProvider(customProvider: GPUMetricsProvider): void {
   provider = customProvider;
+}
+
+export function setGPUGlobalMetricsSyncEnabled(enabled: boolean): void {
+  globalSyncEnabled = enabled;
+  if (provider && provider instanceof InMemoryGPUMetricsProvider) {
+    provider.enableGlobalSync(enabled);
+  }
 }
 
 export function __resetGPUMetricsProviderForTests(): void {

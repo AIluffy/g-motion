@@ -9,6 +9,9 @@ export const MotionStateComponent: ComponentDef = {
     playbackRate: 'float32',
     status: 'int32', // 0: Idle, 1: Running, 2: Paused, 3: Finished
     iteration: 'int32',
+    tickInterval: 'int32',
+    tickPhase: 'int32',
+    tickPriority: 'int32',
   },
 };
 

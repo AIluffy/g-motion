@@ -1,4 +1,4 @@
-import { MotionPlugin, MotionApp, app } from '@g-motion/core';
+import { MotionPlugin, MotionApp } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 import { InertiaComponent } from './component';
 import { InertiaSystem } from './inertia-system';
@@ -8,7 +8,7 @@ const debugLog = createDebugger('Inertia');
 export const InertiaPlugin: MotionPlugin = {
   name: 'InertiaPlugin',
   version: '0.0.0',
-  setup(appInstance: MotionApp) {
+  setup(appInstance: MotionApp, _services?: unknown) {
     // Register Inertia component
     try {
       appInstance.registerComponent('Inertia', InertiaComponent);
@@ -27,12 +27,6 @@ export const InertiaPlugin: MotionPlugin = {
     debugLog('InertiaSystem registered');
   },
 };
-
-// Auto-register the Inertia plugin when this module is imported (only in browser environments)
-if (typeof window !== 'undefined' && typeof requestAnimationFrame !== 'undefined') {
-  debugLog('Auto-registering InertiaPlugin');
-  InertiaPlugin.setup(app);
-}
 
 export * from './component';
 export * from './inertia-system';

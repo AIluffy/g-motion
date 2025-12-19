@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, type AnimationControl } from '@g-motion/animation';
+import { motion, type AnimationControl, getGPUMetrics } from '@g-motion/animation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -83,9 +83,24 @@ function WebgpuPage() {
   }, [runKey]);
 
   const gpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
-  const metricsArr = (globalThis as any).__motionGPUMetrics;
-  const lastMetrics =
-    Array.isArray(metricsArr) && metricsArr.length > 0 ? metricsArr[metricsArr.length - 1] : null;
+  const [lastMetrics, setLastMetrics] = useState<{ entityCount: number; timestamp: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const id = window.setInterval(() => {
+      const metrics = getGPUMetrics();
+      if (!mounted || !Array.isArray(metrics) || metrics.length === 0) return;
+      const last = metrics[0];
+      setLastMetrics({ entityCount: last.entityCount, timestamp: last.timestamp });
+    }, 500);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(id);
+    };
+  }, []);
 
   return (
     <div className="page-shell">

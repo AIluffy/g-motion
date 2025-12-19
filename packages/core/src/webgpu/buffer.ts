@@ -298,6 +298,22 @@ export class WebGPUBufferManager {
       })),
     };
   }
+
+  clear(): void {
+    for (const alloc of this.buffers.values()) {
+      try {
+        if (alloc.buffer && typeof alloc.buffer.destroy === 'function') {
+          alloc.buffer.destroy();
+        }
+      } catch {}
+    }
+    this.buffers.clear();
+    this.resetMetrics();
+    this.device = null;
+    this.queue = null;
+    this.computePipeline = null;
+    this.initPromise = null;
+  }
 }
 
 let sharedBufferManager: WebGPUBufferManager | null = null;

@@ -138,13 +138,18 @@ class BurstManager {
   getPendingCount(): number {
     return this.pendingDeletions.length;
   }
+
+  peekPendingDeletions(): readonly number[] {
+    return this.pendingDeletions;
+  }
 }
 
 export class World {
   readonly registry = new ComponentRegistry();
   readonly entityManager = new EntityManager();
   readonly scheduler = new SystemScheduler();
-  config: MotionAppConfig = { webgpuThreshold: 1000 };
+  config: MotionAppConfig;
+  private activeMotionEntityCount = 0;
 
   // Map Archetype ID (string signature) to Archetype instance
   private archetypes = new Map<string, Archetype>();
@@ -155,47 +160,93 @@ export class World {
   // Burst manager for batch operations
   private burstManager: BurstManager;
 
-  private static instance: World;
-
   private static worldCounter = 0;
 
-  private constructor() {
+  constructor(config?: MotionAppConfig) {
     this.burstManager = new BurstManager(this.entityManager, this.entityArchetypes);
     // Assign a unique ID namespace to this world to avoid cross-world collisions
     const namespaceOffset = World.worldCounter++ * 1_000_000;
     this.entityManager.setOffset(namespaceOffset);
+
+    this.config = World.normalizeConfig(config);
   }
 
-  static get(config?: MotionAppConfig): World {
-    if (!World.instance) {
-      World.instance = new World();
-      if (config) {
-        // Validate gpuCompute mode if provided
-        if (config.gpuCompute && !['auto', 'always', 'never'].includes(config.gpuCompute)) {
-          throw new MotionError(
-            `Invalid gpuCompute mode: ${config.gpuCompute}. Must be 'auto', 'always', or 'never'.`,
-            ErrorCode.INVALID_GPU_MODE,
-            ErrorSeverity.FATAL,
-            { providedMode: config.gpuCompute },
-          );
-        }
-
-        World.instance.config = {
-          webgpuThreshold: 1000,
-          gpuCompute: 'auto',
-          gpuEasing: true,
-          ...config,
-        };
-      } else {
-        World.instance.config = {
-          webgpuThreshold: 1000,
-          gpuCompute: 'auto',
-          gpuEasing: true,
-        };
-      }
-      // Don't auto-start scheduler - it will start when first entity is created
+  private static normalizeConfig(config?: MotionAppConfig): MotionAppConfig {
+    if (config?.gpuCompute && !['auto', 'always', 'never'].includes(config.gpuCompute)) {
+      throw new MotionError(
+        `Invalid gpuCompute mode: ${config.gpuCompute}. Must be 'auto', 'always', or 'never'.`,
+        ErrorCode.INVALID_GPU_MODE,
+        ErrorSeverity.FATAL,
+        { providedMode: config.gpuCompute },
+      );
     }
-    return World.instance;
+
+    return {
+      webgpuThreshold: 1000,
+      gpuCompute: 'auto',
+      gpuEasing: true,
+      ...config,
+    };
+  }
+
+  static create(config?: MotionAppConfig): World {
+    return new World(config);
+  }
+
+  setConfig(config?: MotionAppConfig): void {
+    this.config = World.normalizeConfig(config);
+  }
+
+  resetState(): void {
+    this.archetypes.clear();
+    this.entityArchetypes.clear();
+    this.entityManager.clear();
+    this.burstManager = new BurstManager(this.entityManager, this.entityArchetypes);
+    this.activeMotionEntityCount = 0;
+    this.scheduler.setActiveEntityCount(0);
+  }
+
+  getActiveMotionEntityCount(): number {
+    return this.activeMotionEntityCount;
+  }
+
+  setMotionStatus(entityId: number, nextStatus: number): void {
+    const archetype = this.entityArchetypes.get(entityId);
+    if (!archetype) return;
+    const internal = archetype as ArchetypeInternal;
+    const index = internal.getInternalEntityIndices().get(entityId);
+    if (index === undefined) return;
+    this.setMotionStatusAt(archetype, index, nextStatus);
+  }
+
+  setMotionStatusAt(archetype: Archetype, index: number, nextStatus: number): void {
+    const stateBuffer = archetype.getBuffer('MotionState');
+    if (!stateBuffer) return;
+    const state = stateBuffer[index] as { status?: number };
+    const prevStatus = typeof state?.status === 'number' ? state.status : undefined;
+    state.status = nextStatus;
+    const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
+    if (typedStatus) typedStatus[index] = nextStatus;
+    this.applyActiveMotionDelta(prevStatus, nextStatus);
+  }
+
+  private isActiveMotionStatus(status: number | undefined): boolean {
+    return status === 1 || status === 2;
+  }
+
+  private applyActiveMotionDelta(prevStatus: number | undefined, nextStatus: number): void {
+    const wasActive = this.isActiveMotionStatus(prevStatus);
+    const isActive = this.isActiveMotionStatus(nextStatus);
+    if (wasActive === isActive) return;
+    this.activeMotionEntityCount += isActive ? 1 : -1;
+    if (!Number.isFinite(this.activeMotionEntityCount) || this.activeMotionEntityCount < 0) {
+      this.activeMotionEntityCount = 0;
+    }
+    this.scheduler.setActiveEntityCount(this.activeMotionEntityCount);
+  }
+
+  dispose(): void {
+    this.scheduler.stop();
   }
 
   getArchetype(componentNames: string[]): Archetype {
@@ -235,6 +286,12 @@ export class World {
     const archetype = this.getArchetype(names);
     archetype.addEntity(id, components);
     this.entityArchetypes.set(id, archetype);
+
+    const motionState = components.MotionState as { status?: number } | undefined;
+    if (motionState && typeof motionState.status === 'number') {
+      this.applyActiveMotionDelta(undefined, motionState.status);
+    }
+
     return id;
   }
 
@@ -246,7 +303,19 @@ export class World {
    */
   createEntitiesBurst(componentNames: string[], dataArray: ComponentData[]): number[] {
     const archetype = this.getArchetype(componentNames);
-    return this.burstManager.createBatch(archetype, dataArray);
+    const createdIds = this.burstManager.createBatch(archetype, dataArray);
+    let delta = 0;
+    for (const data of dataArray) {
+      const motionState = data.MotionState as { status?: number } | undefined;
+      if (motionState && (motionState.status === 1 || motionState.status === 2)) {
+        delta++;
+      }
+    }
+    if (delta > 0) {
+      this.activeMotionEntityCount += delta;
+      this.scheduler.setActiveEntityCount(this.activeMotionEntityCount);
+    }
+    return createdIds;
   }
 
   /**
@@ -261,6 +330,25 @@ export class World {
    * Process all pending deletions efficiently
    */
   flushDeletions(): void {
+    const pending = this.burstManager.peekPendingDeletions();
+    if (pending.length > 0) {
+      const unique = new Set<number>();
+      for (const id of pending) unique.add(id);
+      for (const entityId of unique) {
+        const archetype = this.entityArchetypes.get(entityId);
+        if (!archetype) continue;
+        const internal = archetype as ArchetypeInternal;
+        const index = internal.getInternalEntityIndices().get(entityId);
+        if (index === undefined) continue;
+        const stateBuffer = archetype.getBuffer('MotionState');
+        if (!stateBuffer) continue;
+        const state = stateBuffer[index] as { status?: number };
+        const status = typeof state?.status === 'number' ? state.status : undefined;
+        if (this.isActiveMotionStatus(status)) {
+          this.applyActiveMotionDelta(status, 0);
+        }
+      }
+    }
     this.burstManager.flushDeletions();
   }
 

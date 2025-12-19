@@ -1,14 +1,36 @@
+import type { SystemContext } from '../../plugin';
 import { SystemDef } from '../../plugin';
-import { WorldProvider } from '../../worldProvider';
 import { MotionStatus } from '../../components/state';
-import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
 import { getEasingId } from '../easing-registry';
-import { getAppContext } from '../../context';
-import { BatchEntity, BatchKeyframe } from './types';
 import { BatchBufferCache } from './buffer-cache';
+import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
+import type { TimelineData, Track, Keyframe } from '../../types';
+import { getRendererCode } from '../../renderer-code';
 
-// Global buffer cache instance (reused across frames)
 const bufferCache = new BatchBufferCache();
+const MAX_KEYFRAMES_PER_CHANNEL = 4;
+
+const archetypeScratch: any[] = [];
+const pickedArchetypesScratch: any[] = [];
+let archetypeCursor = 0;
+
+const entityIndicesScratchByArchetype = new Map<string, Int32Array>();
+
+let frameId = 0;
+
+const keyframesPackedCache = new Map<
+  string,
+  { versionSig: number; entitySig: number; channelCount: number; buffer: Float32Array }
+>();
+
+function hashEntityIndices(buf: Int32Array, len: number): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < len; i++) {
+    h ^= buf[i] >>> 0;
+    h = (h * 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
 
 /**
  * Batch Sampling System
@@ -39,145 +61,301 @@ export const BatchSamplingSystem: SystemDef = {
   name: 'BatchSamplingSystem',
   order: 5, // Run before WebGPUComputeSystem
 
-  update() {
-    const world = WorldProvider.useWorld();
+  update(_dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    const metrics = ctx?.services.metrics;
+    const processor = ctx?.services.batchProcessor;
+    const appContext = ctx?.services.appContext;
+
+    if (!world || !metrics || !processor || !appContext) {
+      return;
+    }
     const now = performance.now();
+    const frame = frameId++;
     const config = world.config;
+    const channelRegistry = getGPUChannelMappingRegistry();
+    const callbackCode = getRendererCode('callback');
 
     // Determine GPU eligibility based on config.gpuCompute mode
     let gpuEnabled: boolean;
     if (config.gpuCompute === 'never') {
       // Skip GPU processing if explicitly disabled
+      processor.clearArchetypeBatches();
       return;
     } else if (config.gpuCompute === 'always') {
       // Always use GPU if available
       gpuEnabled = true;
     } else {
       // Auto mode: check threshold
-      gpuEnabled = getGPUMetricsProvider().getStatus().enabled;
+      gpuEnabled = metrics.getStatus().enabled;
     }
 
     // Skip batch processing if GPU is disabled
     if (!gpuEnabled) {
+      processor.clearArchetypeBatches();
       return;
     }
-
-    // Initialize processor
-    const context = getAppContext();
-    const processor = context.getBatchProcessor({ maxBatchSize: 1024 });
 
     // Clear previous archetype batches (per-frame refresh)
     processor.clearArchetypeBatches();
 
     // Per-archetype batch collection
     let totalEntities = 0;
-    for (const archetype of world.getArchetypes()) {
+
+    const slice = (config as any).workSlicing as
+      | {
+          enabled?: boolean;
+          batchSamplingArchetypesPerFrame?: number;
+        }
+      | undefined;
+    const perFrame = slice?.enabled ? slice.batchSamplingArchetypesPerFrame : undefined;
+    let toProcess: Iterable<any>;
+    if (typeof perFrame === 'number' && Number.isFinite(perFrame)) {
+      archetypeScratch.length = 0;
+      for (const a of world.getArchetypes()) archetypeScratch.push(a);
+      const len = archetypeScratch.length;
+      if (len === 0) return;
+      const limit = Math.max(1, Math.min(Math.floor(perFrame), len));
+      const start = ((archetypeCursor % len) + len) % len;
+      pickedArchetypesScratch.length = 0;
+      const picked = pickedArchetypesScratch;
+      for (let n = 0; n < limit; n++) {
+        picked.push(archetypeScratch[(start + n) % len]);
+      }
+      archetypeCursor = (start + limit) % len;
+      toProcess = picked;
+    } else {
+      toProcess = world.getArchetypes();
+    }
+
+    for (const archetype of toProcess) {
       const stateBuffer = archetype.getBuffer('MotionState');
       const timelineBuffer = archetype.getBuffer('Timeline');
       const renderBuffer = archetype.getBuffer('Render');
+      const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
+      const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+      const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+      const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+      const typedTickInterval = archetype.getTypedBuffer('MotionState', 'tickInterval');
+      const typedTickPhase = archetype.getTypedBuffer('MotionState', 'tickPhase');
+      const typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
 
       if (!stateBuffer || !timelineBuffer || !renderBuffer) {
         continue; // Skip archetypes missing animation components
       }
 
-      // Collect entities from this archetype that are:
-      // - Running or Paused
-      // - NOT using callback renderers (GPU only for numeric/DOM)
-      const archEntities: BatchEntity[] = [];
-      const archKeyframes: BatchKeyframe[] = [];
+      const table = channelRegistry.getChannels(archetype.id);
+      const channels = table?.channels ?? [];
+      const channelCount = channels.length;
+
+      let entityIndicesBuf: Int32Array =
+        entityIndicesScratchByArchetype.get(archetype.id) ?? new Int32Array(64);
+      if (!entityIndicesScratchByArchetype.has(archetype.id)) {
+        entityIndicesScratchByArchetype.set(archetype.id, entityIndicesBuf);
+      }
+      let entityCount = 0;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i] as {
-          status: MotionStatus;
-          startTime: number;
-          playbackRate: number;
-        };
-        const timeline = timelineBuffer[i] as {
-          tracks?: Map<string, unknown>;
-        };
-        const render = renderBuffer[i] as {
-          rendererId: string;
-        };
-
-        // Skip callback renderers (custom onUpdate)
-        if (render.rendererId === 'callback') {
+        let rendererCode = typedRendererCode ? typedRendererCode[i] : 0;
+        let rendererId: string | undefined;
+        if (!typedRendererCode) {
+          const render = renderBuffer[i] as { rendererId: string; rendererCode?: number };
+          rendererCode = render.rendererCode ?? 0;
+          rendererId = render.rendererId;
+        }
+        if (rendererCode === callbackCode || rendererId === 'callback') {
           continue;
         }
 
         // Only include running/paused animations
-        if (state.status !== MotionStatus.Running && state.status !== MotionStatus.Paused) {
+        const status = typedStatus
+          ? (typedStatus[i] as unknown as MotionStatus)
+          : ((stateBuffer[i] as any).status as MotionStatus);
+        if (status !== MotionStatus.Running && status !== MotionStatus.Paused) {
           continue;
         }
 
-        const entityId = archetype.getEntityId(i);
-        archEntities.push({
-          id: entityId,
-          startTime: state.startTime,
-          currentTime: now,
-          playbackRate: state.playbackRate,
-          status: state.status,
-        });
-
-        // Collect keyframes for this entity
-        if (timeline.tracks && timeline.tracks.size > 0) {
-          for (const [, track] of timeline.tracks) {
-            if (Array.isArray(track)) {
-              for (const kf of track) {
-                // Map easing functions to IDs using getEasingId()
-                // If gpuEasing=false, always use easingId=0 (linear)
-                // If gpuEasing=true, use getEasingId(kf.easing)
-                const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
-
-                archKeyframes.push({
-                  entityId,
-                  startTime: kf.startTime,
-                  duration: kf.time - kf.startTime,
-                  startValue: kf.startValue,
-                  endValue: kf.endValue,
-                  easingId,
-                });
-              }
+        if (status === MotionStatus.Running) {
+          const interval = typedTickInterval
+            ? typedTickInterval[i]
+            : Number((stateBuffer[i] as any).tickInterval ?? 0);
+          if (interval > 1) {
+            const phase = typedTickPhase
+              ? typedTickPhase[i]
+              : Number((stateBuffer[i] as any).tickPhase ?? 0);
+            if ((frame + phase) % interval !== 0) {
+              continue;
             }
           }
         }
+
+        if (entityCount >= entityIndicesBuf.length) {
+          const nextBuf: Int32Array = new Int32Array(entityIndicesBuf.length * 2);
+          nextBuf.set(entityIndicesBuf);
+          entityIndicesBuf = nextBuf;
+          entityIndicesScratchByArchetype.set(archetype.id, entityIndicesBuf);
+        }
+        entityIndicesBuf[entityCount] = i;
+        entityCount++;
       }
 
       // Create per-archetype batch if entities exist
-      if (archEntities.length > 0) {
+      if (entityCount > 0) {
+        const lease = processor.acquireEntityIds(entityCount);
+        const entityIdsView = lease.buffer.subarray(0, entityCount);
+        for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+          entityIdsView[eIndex] = archetype.getEntityId(entityIndicesBuf[eIndex]);
+        }
         // Pack entity states using cached buffer (eliminates per-frame allocation)
-        const statesData = bufferCache.getStatesBuffer(archetype.id, archEntities.length * 4);
-        archEntities.forEach((entity, idx) => {
-          const offset = idx * 4;
-          statesData[offset] = entity.startTime;
-          statesData[offset + 1] = entity.currentTime;
-          statesData[offset + 2] = entity.playbackRate;
-          statesData[offset + 3] = entity.status;
-        });
+        const statesData = bufferCache.getStatesBuffer(archetype.id, entityCount * 4);
+        for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+          const i = entityIndicesBuf[eIndex];
+          const stateObj = stateBuffer[i] as any;
+          const status = typedStatus
+            ? (typedStatus[i] as unknown as MotionStatus)
+            : (stateObj.status as MotionStatus);
+          const offset = eIndex * 4;
+          statesData[offset] = typedStartTime ? typedStartTime[i] : Number(stateObj.startTime ?? 0);
+          statesData[offset + 1] = typedCurrentTime
+            ? typedCurrentTime[i]
+            : Number(stateObj.currentTime ?? 0);
+          statesData[offset + 2] = typedPlaybackRate
+            ? typedPlaybackRate[i]
+            : Number(stateObj.playbackRate ?? 0);
+          statesData[offset + 3] = status;
+        }
 
-        // Pack keyframes using cached buffer (eliminates per-frame allocation)
-        const keyframesData = bufferCache.getKeyframesBuffer(
-          archetype.id,
-          archKeyframes.length * 5,
-        );
-        archKeyframes.forEach((keyframe, idx) => {
-          const offset = idx * 5;
-          keyframesData[offset] = keyframe.startTime;
-          keyframesData[offset + 1] = keyframe.duration;
-          keyframesData[offset + 2] = keyframe.startValue;
-          keyframesData[offset + 3] = keyframe.endValue;
-          keyframesData[offset + 4] = keyframe.easingId;
-        });
+        let keyframesData: Float32Array;
 
-        // Extract entity IDs efficiently
-        const entityIds: number[] = [];
-        for (let i = 0; i < archEntities.length; i++) {
-          entityIds.push(archEntities[i].id);
+        // Build signatures for static-cache decision
+        let versionSig = 0 >>> 0;
+        const typedTimelineVersion = archetype.getTypedBuffer('Timeline', 'version');
+        for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+          const i = entityIndicesBuf[eIndex];
+          const v = typedTimelineVersion
+            ? (typedTimelineVersion[i] as unknown as number)
+            : Number((timelineBuffer[i] as any).version ?? 0);
+          versionSig = (((versionSig * 31) >>> 0) ^ (v >>> 0)) >>> 0;
+        }
+        const entitySig = hashEntityIndices(entityIndicesBuf, entityCount);
+
+        if (channelCount > 0) {
+          const required = entityCount * channelCount * MAX_KEYFRAMES_PER_CHANNEL * 5;
+          const cached = keyframesPackedCache.get(archetype.id);
+          const canReuse =
+            cached &&
+            cached.versionSig === versionSig &&
+            cached.entitySig === entitySig &&
+            cached.channelCount === channelCount &&
+            cached.buffer.length >= required;
+          if (canReuse) {
+            keyframesData = cached!.buffer.subarray(0, required);
+          } else {
+            keyframesData = bufferCache.getKeyframesBuffer(archetype.id, required);
+            for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+              const i = entityIndicesBuf[eIndex];
+              const timeline = timelineBuffer[i] as { tracks?: TimelineData };
+              const tracks = timeline.tracks as TimelineData | undefined;
+
+              for (let cIndex = 0; cIndex < channelCount; cIndex++) {
+                const prop = channels[cIndex].property;
+                const track = tracks?.get(prop) as Track | undefined;
+                const count = track ? Math.min(track.length, MAX_KEYFRAMES_PER_CHANNEL) : 0;
+
+                for (let kIndex = 0; kIndex < MAX_KEYFRAMES_PER_CHANNEL; kIndex++) {
+                  const globalIndex =
+                    (eIndex * channelCount * MAX_KEYFRAMES_PER_CHANNEL +
+                      cIndex * MAX_KEYFRAMES_PER_CHANNEL +
+                      kIndex) *
+                    5;
+
+                  if (track && kIndex < count) {
+                    const kf = track[kIndex] as Keyframe;
+                    const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+                    keyframesData[globalIndex] = kf.startTime;
+                    keyframesData[globalIndex + 1] = kf.time - kf.startTime;
+                    keyframesData[globalIndex + 2] = kf.startValue;
+                    keyframesData[globalIndex + 3] = kf.endValue;
+                    keyframesData[globalIndex + 4] = easingId;
+                  } else {
+                    keyframesData[globalIndex] = 0;
+                    keyframesData[globalIndex + 1] = 0;
+                    keyframesData[globalIndex + 2] = 0;
+                    keyframesData[globalIndex + 3] = 0;
+                    keyframesData[globalIndex + 4] = 0;
+                  }
+                }
+              }
+            }
+            keyframesPackedCache.set(archetype.id, {
+              versionSig,
+              entitySig,
+              channelCount,
+              buffer: keyframesData,
+            });
+          }
+        } else {
+          let totalKeyframes = 0;
+          for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+            const i = entityIndicesBuf[eIndex];
+            const timeline = timelineBuffer[i] as { tracks?: TimelineData };
+            const tracks = timeline.tracks as TimelineData | undefined;
+            if (!tracks || tracks.size === 0) continue;
+            for (const [, track] of tracks) {
+              if (Array.isArray(track)) totalKeyframes += track.length;
+            }
+          }
+
+          const size = Math.max(5, totalKeyframes * 5);
+          const cached = keyframesPackedCache.get(archetype.id);
+          const canReuse =
+            cached &&
+            cached.versionSig === versionSig &&
+            cached.entitySig === entitySig &&
+            cached.channelCount === 0 &&
+            cached.buffer.length >= size;
+          if (canReuse) {
+            keyframesData = cached!.buffer.subarray(0, size);
+          } else {
+            keyframesData = bufferCache.getKeyframesBuffer(archetype.id, size);
+            let w = 0;
+            for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+              const i = entityIndicesBuf[eIndex];
+              const timeline = timelineBuffer[i] as { tracks?: TimelineData };
+              const tracks = timeline.tracks as TimelineData | undefined;
+              if (!tracks || tracks.size === 0) continue;
+              for (const [, track] of tracks) {
+                if (!Array.isArray(track) || track.length === 0) continue;
+                for (let kIndex = 0; kIndex < track.length; kIndex++) {
+                  const kf = track[kIndex] as Keyframe;
+                  const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+                  keyframesData[w] = kf.startTime;
+                  keyframesData[w + 1] = kf.time - kf.startTime;
+                  keyframesData[w + 2] = kf.startValue;
+                  keyframesData[w + 3] = kf.endValue;
+                  keyframesData[w + 4] = easingId;
+                  w += 5;
+                }
+              }
+            }
+            for (; w < size; w++) {
+              keyframesData[w] = 0;
+            }
+            keyframesPackedCache.set(archetype.id, {
+              versionSig,
+              entitySig,
+              channelCount: 0,
+              buffer: keyframesData,
+            });
+          }
         }
 
         // Add per-archetype batch with adaptive workgroup hint
         const batch = processor.addArchetypeBatch(
           archetype.id,
-          entityIds,
+          entityIdsView,
+          entityCount,
+          lease.leaseId,
           statesData,
           keyframesData,
         );
@@ -188,7 +366,7 @@ export const BatchSamplingSystem: SystemDef = {
 
     // Update context for WebGPUComputeSystem to access per-archetype batches
     if (totalEntities > 0) {
-      context.updateBatchContext({
+      appContext.updateBatchContext({
         lastBatchId: `batch-${Math.floor(now / 1000)}`,
         entityCount: totalEntities,
         archetypeBatchesReady: true,

@@ -61,8 +61,8 @@ describe('Compute Shader Logic', () => {
 
     it('should perform linear interpolation', () => {
       // Verify linear interpolation formula
-      expect(INTERPOLATION_SHADER).toContain('kf.startValue');
-      expect(INTERPOLATION_SHADER).toContain('kf.endValue');
+      expect(INTERPOLATION_SHADER).toContain('activeKf.startValue');
+      expect(INTERPOLATION_SHADER).toContain('activeKf.endValue');
       expect(INTERPOLATION_SHADER).toContain('interpolatedValue');
     });
   });
@@ -73,7 +73,7 @@ describe('Compute Shader Logic', () => {
     });
 
     it('should output zero for non-running entities', () => {
-      expect(INTERPOLATION_SHADER).toContain('outputs[index] = 0.0');
+      expect(INTERPOLATION_SHADER).toContain('outputs[outIndex] = 0.0');
     });
   });
 });

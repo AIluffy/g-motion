@@ -324,7 +324,7 @@ Cache Statistics:
 // --- GPU result delivery queue (Phase 1: primitive channel) ---
 export type GPUResultPacket = {
   archetypeId: string;
-  entityIds: number[];
+  entityIds: ArrayLike<number>;
   values: Float32Array; // one value per entity (primitive)
   // Phase 4: Multi-channel support
   stride?: number; // values per entity (default 1)

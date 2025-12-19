@@ -3,6 +3,7 @@ import {
   getGPUMetricsProvider,
   setGPUMetricsProvider,
   __resetGPUMetricsProviderForTests,
+  setGPUGlobalMetricsSyncEnabled,
 } from '../src/webgpu/metrics-provider';
 
 const legacyStatus = {
@@ -86,6 +87,7 @@ describe('GPUMetricsProvider', () => {
 
   it('records metrics and returns newest first', () => {
     const provider = getGPUMetricsProvider();
+    setGPUGlobalMetricsSyncEnabled(false);
     provider.recordMetric({ batchId: 'a', entityCount: 1, timestamp: 1, gpu: false });
     provider.recordMetric({ batchId: 'b', entityCount: 2, timestamp: 2, gpu: true });
 
@@ -101,6 +103,7 @@ describe('GPUMetricsProvider', () => {
     (globalThis as any).__webgpuInitialized = true;
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
+    setGPUGlobalMetricsSyncEnabled(true);
     const provider = getGPUMetricsProvider();
 
     expect(provider.getStatus()).toEqual({

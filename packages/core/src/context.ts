@@ -103,6 +103,16 @@ export class AppContext {
   static reset(): void {
     AppContext.instance = null as any;
   }
+
+  dispose(): void {
+    try {
+      this.batchProcessor?.clear();
+    } catch {}
+    this.batchProcessor = null;
+    this.batchContext = {};
+    this.webgpuInitialized = false;
+    this.errorHandler = null;
+  }
 }
 
 /**

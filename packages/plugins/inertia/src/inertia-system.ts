@@ -1,4 +1,4 @@
-import { SystemDef, MotionStatus, WorldProvider } from '@g-motion/core';
+import { SystemDef, MotionStatus, SystemContext, World } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 
 const debug = createDebugger('InertiaSystem');
@@ -46,8 +46,11 @@ export const InertiaSystem: SystemDef = {
   name: 'InertiaSystem',
   order: 19, // Before InterpolationSystem (20)
 
-  update(dt: number) {
-    const world = WorldProvider.useWorld();
+  update(dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    if (!world) {
+      return;
+    }
 
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
@@ -63,6 +66,8 @@ export const InertiaSystem: SystemDef = {
         const state = stateBuffer[i] as MotionStateData;
         const timeline = timelineBuffer[i] as any;
         const inertia = inertiaBuffer[i] as InertiaData;
+        const render = renderBuffer ? (renderBuffer[i] as any) : undefined;
+        let changed = false;
 
         // Only process running entities
         if (state.status !== MotionStatus.Running) continue;
@@ -287,19 +292,27 @@ export const InertiaSystem: SystemDef = {
           if (transformBuffer) {
             const transform = transformBuffer[i] as any;
             if (transform && key in transform) {
-              transform[key] = newValue;
+              if (!Object.is(transform[key], newValue)) {
+                transform[key] = newValue;
+                changed = true;
+              }
               handled = true;
             }
           }
 
           if (!handled && renderBuffer) {
-            const render = renderBuffer[i] as any;
-            if (!render.props) render.props = {};
+            if (render && !render.props) render.props = {};
             // For primitive renderer, write to __primitive
             if (key === '__primitive') {
-              render.props.__primitive = newValue;
+              if (!Object.is(render?.props?.__primitive, newValue)) {
+                render.props.__primitive = newValue;
+                changed = true;
+              }
             } else {
-              render.props[key] = newValue;
+              if (!Object.is(render?.props?.[key], newValue)) {
+                render.props[key] = newValue;
+                changed = true;
+              }
             }
           }
 
@@ -330,9 +343,17 @@ export const InertiaSystem: SystemDef = {
           }
         }
 
+        if (changed && render) {
+          render.version = (render.version ?? 0) + 1;
+        }
+
         // Mark animation as finished if all tracks are settled
         if (allTracksSettled && timeline.tracks.size > 0) {
-          state.status = MotionStatus.Finished;
+          if (typeof (world as any).setMotionStatusAt === 'function') {
+            (world as any).setMotionStatusAt(archetype, i, MotionStatus.Finished);
+          } else {
+            state.status = MotionStatus.Finished;
+          }
           debug(`Entity ${archetype.getEntityId(i)} inertia animation completed`);
         }
       }

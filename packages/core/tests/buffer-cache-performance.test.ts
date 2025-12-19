@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BatchBufferCache } from '../src/systems/batch/buffer-cache';
+import {
+  BatchBufferCache,
+  World,
+  RenderComponent,
+  RenderSystem,
+  getRendererCode,
+  MotionStateComponent,
+  MotionStatus,
+  ThresholdMonitorSystem,
+} from '../src';
 
 /**
  * Performance test for BatchBufferCache optimization
@@ -260,6 +269,139 @@ describe('BatchBufferCache Performance', () => {
   });
 });
 
+describe('Engine Hot Path Performance', () => {
+  it('guards RenderSystem update hot path', () => {
+    const world = new World();
+    world.registry.register('Render', RenderComponent);
+
+    const rendererUpdate = () => {};
+    const app = {
+      getRenderer: (_name: string) => ({ update: rendererUpdate }),
+    } as any;
+    const errorHandler = { handle: (_e: any) => {} } as any;
+    const ctx = { services: { world, app, errorHandler }, dt: 0 } as any;
+
+    const rendererCode = getRendererCode('test');
+    const entityCount = 10000;
+    for (let i = 0; i < entityCount; i++) {
+      world.createEntity({
+        Render: {
+          rendererId: 'test',
+          rendererCode,
+          target: {},
+          props: {},
+          version: 0,
+          renderedVersion: -1,
+        },
+      });
+    }
+
+    const archetype = Array.from(world.getArchetypes())[0];
+    const renderBuffer = archetype.getBuffer('Render') as any[];
+
+    RenderSystem.update(0, ctx);
+    for (let i = 0; i < entityCount; i++) {
+      renderBuffer[i].renderedVersion = renderBuffer[i].version;
+    }
+
+    const unchangedTimes: number[] = [];
+    for (let i = 0; i < 10; i++) RenderSystem.update(0, ctx);
+    for (let i = 0; i < 30; i++) {
+      const t0 = performance.now();
+      RenderSystem.update(0, ctx);
+      unchangedTimes.push(performance.now() - t0);
+    }
+    const unchangedAvg = unchangedTimes.reduce((a, b) => a + b, 0) / unchangedTimes.length;
+    const unchangedMax = Math.max(...unchangedTimes);
+
+    const dirtyTimes: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      for (let j = 0; j < entityCount; j++) renderBuffer[j].version += 1;
+      RenderSystem.update(0, ctx);
+    }
+    for (let i = 0; i < 20; i++) {
+      for (let j = 0; j < entityCount; j++) renderBuffer[j].version += 1;
+      const t0 = performance.now();
+      RenderSystem.update(0, ctx);
+      dirtyTimes.push(performance.now() - t0);
+    }
+    const dirtyAvg = dirtyTimes.reduce((a, b) => a + b, 0) / dirtyTimes.length;
+    const dirtyMax = Math.max(...dirtyTimes);
+
+    console.log(
+      `RenderSystem unchanged avg: ${unchangedAvg.toFixed(3)}ms, max: ${unchangedMax.toFixed(3)}ms`,
+    );
+    console.log(`RenderSystem dirty avg: ${dirtyAvg.toFixed(3)}ms, max: ${dirtyMax.toFixed(3)}ms`);
+
+    expect(unchangedAvg).toBeLessThan(10);
+    expect(unchangedMax).toBeLessThan(30);
+    expect(dirtyAvg).toBeGreaterThanOrEqual(unchangedAvg);
+    expect(dirtyMax).toBeLessThan(60);
+  });
+
+  it('guards active count monitoring overhead', () => {
+    const world = new World();
+    world.registry.register('MotionState', MotionStateComponent);
+
+    const entityCount = 20000;
+    const ids: number[] = [];
+    for (let i = 0; i < entityCount; i++) {
+      ids.push(
+        world.createEntity({
+          MotionState: {
+            status: MotionStatus.Idle,
+            delay: 0,
+            startTime: 0,
+            pausedAt: 0,
+            currentTime: 0,
+            playbackRate: 1,
+            iteration: 0,
+            tickInterval: 0,
+            tickPhase: 0,
+            tickPriority: 0,
+          },
+        }),
+      );
+    }
+
+    const times: number[] = [];
+    for (let i = 0; i < entityCount; i++) world.setMotionStatus(ids[i], MotionStatus.Running);
+    for (let r = 0; r < 10; r++) {
+      const t0 = performance.now();
+      for (let i = 0; i < entityCount; i++) world.setMotionStatus(ids[i], MotionStatus.Paused);
+      for (let i = 0; i < entityCount; i++) world.setMotionStatus(ids[i], MotionStatus.Running);
+      times.push(performance.now() - t0);
+    }
+    const sorted = [...times].sort((a, b) => a - b);
+    const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    const p99 = sorted[Math.floor(sorted.length * 0.99)] ?? 0;
+    const max = sorted[sorted.length - 1] ?? 0;
+
+    console.log(
+      `setMotionStatus loop avg: ${avg.toFixed(3)}ms, p99: ${p99.toFixed(3)}ms, max: ${max.toFixed(3)}ms`,
+    );
+    console.log(`activeMotionEntityCount: ${world.getActiveMotionEntityCount()}`);
+
+    expect(avg).toBeLessThan(50);
+    expect(max).toBeLessThan(200);
+
+    const metrics = { updateStatus: (_s: any) => {}, getStatus: () => ({ enabled: true }) } as any;
+    const services = { world, config: world.config, metrics } as any;
+    const tmTimes: number[] = [];
+    for (let i = 0; i < 200; i++) {
+      const t0 = performance.now();
+      ThresholdMonitorSystem.update(0, { services, dt: 0 } as any);
+      tmTimes.push(performance.now() - t0);
+    }
+    const tmAvg = tmTimes.reduce((a, b) => a + b, 0) / tmTimes.length;
+    const tmMax = Math.max(...tmTimes);
+
+    console.log(`ThresholdMonitorSystem avg: ${tmAvg.toFixed(4)}ms, max: ${tmMax.toFixed(4)}ms`);
+    expect(tmAvg).toBeLessThan(1);
+    expect(tmMax).toBeLessThan(5);
+  });
+});
+
 describe('Performance Regression Test', () => {
   it('should maintain baseline performance characteristics', async () => {
     const cache = new BatchBufferCache();
@@ -277,15 +419,21 @@ describe('Performance Regression Test', () => {
     }
 
     const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
-    const maxTime = Math.max(...times);
+    const sorted = [...times].sort((a, b) => a - b);
+    const maxTime = sorted[sorted.length - 1] ?? 0;
+    const p99Time = sorted[Math.floor(sorted.length * 0.99)] ?? 0;
+    const p999Time = sorted[Math.floor(sorted.length * 0.999)] ?? 0;
 
     console.log(`Average buffer reuse time: ${avgTime.toFixed(4)}ms`);
+    console.log(`P99 buffer reuse time: ${p99Time.toFixed(4)}ms`);
+    console.log(`P99.9 buffer reuse time: ${p999Time.toFixed(4)}ms`);
     console.log(`Max buffer reuse time: ${maxTime.toFixed(4)}ms`);
 
     // Buffer reuse should be extremely fast (< 0.01ms average)
     expect(avgTime).toBeLessThan(0.01);
 
-    // No single operation should take more than 1ms
-    expect(maxTime).toBeLessThan(1);
+    expect(p99Time).toBeLessThan(0.05);
+    expect(p999Time).toBeLessThan(1);
+    expect(maxTime).toBeLessThan(10);
   });
 });

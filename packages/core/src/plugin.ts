@@ -10,7 +10,16 @@ export interface SystemDef {
   name: string;
   order?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  update(dt: number, entities?: Int32Array): void;
+  update(dt: number, ctx?: SystemContext): void;
+}
+
+export interface RendererBatchContext {
+  world: import('./world').World;
+  archetypeId: string;
+  entityIds: number[];
+  targets: unknown[];
+  componentBuffers: Map<string, Array<unknown>>;
+  transformTypedBuffers: Record<string, unknown>;
 }
 
 export interface RendererDef {
@@ -18,6 +27,16 @@ export interface RendererDef {
   update(entity: number, target: any, components: any): void;
   preFrame?(): void; // Optional: called before batch processing begins
   postFrame?(): void; // Optional: called after all entities processed
+  // Optional fast-path: avoid per-entity object allocation in RenderSystem
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateWithAccessor?(
+    entity: number,
+    arget: any,
+    getComponent: (name: string) => any,
+    getTransformTyped?: () => any,
+  ): void;
+  // Optional batch interface: process a whole archetype at once
+  updateBatch?(ctx: RendererBatchContext): void;
 }
 
 /**
@@ -43,13 +62,34 @@ export interface MotionAppConfig {
   globalSpeed?: number;
   targetFps?: number;
   frameDuration?: number;
-  gpuEasingEnabled?: boolean;
+
+  workSlicing?: {
+    enabled?: boolean;
+    batchSamplingArchetypesPerFrame?: number;
+    interpolationArchetypesPerFrame?: number;
+  };
 
   /**
    * Whether to enable GPU-accelerated easing functions.
    * Default: true
    */
   gpuEasing?: boolean;
+}
+
+export interface EngineServices {
+  world: import('./world').World;
+  scheduler: import('./scheduler').SystemScheduler;
+  app: MotionApp;
+  config: MotionAppConfig;
+  batchProcessor: import('./systems/batch').ComputeBatchProcessor;
+  metrics: import('./webgpu/metrics-provider').GPUMetricsProvider;
+  errorHandler: import('./error-handler').ErrorHandler;
+  appContext: import('./context').AppContext;
+}
+
+export interface SystemContext {
+  services: EngineServices;
+  dt: number;
 }
 
 // Minimal interface to avoid circular dependency with App
@@ -66,5 +106,5 @@ export interface MotionApp {
 export interface MotionPlugin {
   name: string;
   version?: string;
-  setup(app: MotionApp): void;
+  setup(app: MotionApp, services?: EngineServices): void;
 }

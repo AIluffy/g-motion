@@ -36,7 +36,6 @@ describe('DOM Transform Animation', () => {
 
     // Check if transform was applied
     const transform = box.style.transform;
-    console.log('2D Transform result:', transform);
 
     expect(transform).toContain('translate');
     expect(transform).toContain('100px');
@@ -75,14 +74,10 @@ describe('DOM Transform Animation', () => {
       .animate();
 
     expect(control).toBeTruthy();
-    console.log('Control created:', !!control);
 
     await new Promise((resolve) => setTimeout(resolve, 250));
 
     const transform = box.style.transform;
-    console.log('3D Transform result:', transform);
-    console.log('Box element:', box);
-    console.log('Transform should have 3D properties');
     expect(transform).toContain('perspective');
     expect(transform).toContain('700px');
     expect(transform).toContain('translate3d');

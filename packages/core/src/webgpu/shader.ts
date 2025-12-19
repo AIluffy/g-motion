@@ -3,6 +3,8 @@ import { CustomGpuEasing } from './custom-easing';
 // T031: Built-in WGSL Shader for Interpolation
 
 const BASE_INTERPOLATION_SHADER = `
+const MAX_KEYFRAMES_PER_CHANNEL: u32 = 4u;
+
 // Keyframe structure for animation data
 struct Keyframe {
     startTime: f32,
@@ -284,35 +286,74 @@ fn applyEasing(t: f32, easingId: f32) -> f32 {
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
-    if (index >= arrayLength(&states)) {
+    let entityCount = arrayLength(&states);
+    if (index >= entityCount) {
         return;
     }
 
     var state = states[index];
 
-    // Skip non-running entities
+    let totalOutputs = arrayLength(&outputs);
+    let channelCount = max(1u, totalOutputs / entityCount);
+
     if (state.status != 1.0) {
-        outputs[index] = 0.0;
+        for (var c: u32 = 0u; c < channelCount; c = c + 1u) {
+            let outIndex = index * channelCount + c;
+            outputs[outIndex] = 0.0;
+        }
         return;
     }
 
-    // Get keyframe data (assumes 1 keyframe per entity for MVP)
-    let kf = keyframes[index];
-
-    // Calculate progress within the keyframe
     let elapsedTime = state.currentTime - state.startTime;
     let adjustedElapsedTime = elapsedTime * state.playbackRate;
-    var progress = adjustedElapsedTime / kf.duration;
-    progress = clamp(progress, 0.0, 1.0);
 
-    // Apply easing function
-    let easedProgress = applyEasing(progress, kf.easingId);
+    for (var c: u32 = 0u; c < channelCount; c = c + 1u) {
+        let baseIndex = index * channelCount * MAX_KEYFRAMES_PER_CHANNEL + c * MAX_KEYFRAMES_PER_CHANNEL;
 
-    // Linear interpolation
-    let interpolatedValue = kf.startValue + (kf.endValue - kf.startValue) * easedProgress;
+        var activeKf = keyframes[baseIndex];
+        var found = false;
 
-    // Write result
-    outputs[index] = interpolatedValue;
+        for (var i: u32 = 0u; i < MAX_KEYFRAMES_PER_CHANNEL; i = i + 1u) {
+            let idx = baseIndex + i;
+            let kf = keyframes[idx];
+
+            if (kf.duration <= 0.0) {
+                break;
+            }
+
+            let start = kf.startTime;
+            let endTime = kf.startTime + kf.duration;
+
+            if (!found && adjustedElapsedTime < start) {
+                activeKf = kf;
+                found = true;
+                break;
+            }
+
+            activeKf = kf;
+            found = true;
+
+            if (adjustedElapsedTime <= endTime) {
+                break;
+            }
+        }
+
+        if (activeKf.duration <= 0.0) {
+            let outIndex = index * channelCount + c;
+            outputs[outIndex] = 0.0;
+            continue;
+        }
+
+        var progress = (adjustedElapsedTime - activeKf.startTime) / activeKf.duration;
+        progress = clamp(progress, 0.0, 1.0);
+
+        let easedProgress = applyEasing(progress, activeKf.easingId);
+
+        let interpolatedValue = activeKf.startValue + (activeKf.endValue - activeKf.startValue) * easedProgress;
+
+        let outIndex = index * channelCount + c;
+        outputs[outIndex] = interpolatedValue;
+    }
 }
 `;
 

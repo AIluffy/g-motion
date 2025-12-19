@@ -45,13 +45,7 @@ export class AnimationControl {
 
     const world = this.getWorld();
     for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-
-      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
-      if (state) {
-        state.status = MotionStatus.Finished;
-      }
+      world.setMotionStatus(entityId, MotionStatus.Finished);
     }
   }
 
@@ -73,8 +67,8 @@ export class AnimationControl {
         pausedAt?: number;
       };
       if (state && state.status === MotionStatus.Running) {
-        state.status = MotionStatus.Paused;
         state.pausedAt = performance.now();
+        world.setMotionStatus(entityId, MotionStatus.Paused);
       }
     }
   }
@@ -102,8 +96,15 @@ export class AnimationControl {
           const pausedDuration = performance.now() - state.pausedAt;
           state.startTime += pausedDuration;
           state.pausedAt = 0;
+          const index = (archetype as any).getInternalEntityIndices?.().get(entityId);
+          if (index !== undefined) {
+            const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+            if (typedStartTime) typedStartTime[index] = state.startTime;
+            const typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');
+            if (typedPausedAt) typedPausedAt[index] = 0;
+          }
         }
-        state.status = MotionStatus.Running;
+        world.setMotionStatus(entityId, MotionStatus.Running);
         // Ensure scheduler is running when animation is resumed
         world.scheduler.ensureRunning();
       }
@@ -131,9 +132,14 @@ export class AnimationControl {
       const currentRate = state.playbackRate ?? 1;
       const newRate = currentRate === 0 ? -1 : -Math.abs(currentRate);
       state.playbackRate = newRate;
+      const index = (archetype as any).getInternalEntityIndices?.().get(entityId);
+      if (index !== undefined) {
+        const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+        if (typedPlaybackRate) typedPlaybackRate[index] = newRate;
+      }
 
       // Ensure we are running
-      state.status = MotionStatus.Running;
+      world.setMotionStatus(entityId, MotionStatus.Running);
       if (typeof (world.scheduler as any).ensureRunning === 'function') {
         (world.scheduler as any).ensureRunning();
       } else {
@@ -174,6 +180,11 @@ export class AnimationControl {
 
       const clamped = Math.max(0, Math.min(timeMs, timeline.duration ?? 0));
       state.currentTime = clamped;
+      const index = (archetype as any).getInternalEntityIndices?.().get(entityId);
+      if (index !== undefined) {
+        const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+        if (typedCurrentTime) typedCurrentTime[index] = clamped;
+      }
     }
   }
 
@@ -215,6 +226,11 @@ export class AnimationControl {
       const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
       if (state && Number.isFinite(rate) && rate > 0) {
         state.playbackRate = rate;
+        const index = (archetype as any).getInternalEntityIndices?.().get(entityId);
+        if (index !== undefined) {
+          const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+          if (typedPlaybackRate) typedPlaybackRate[index] = rate;
+        }
       }
     }
   }

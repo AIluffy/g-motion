@@ -5,6 +5,8 @@ import {
   TimelineData,
   RenderComponent,
   MotionStatus,
+  getGPUChannelMappingRegistry,
+  createBatchChannelTable,
 } from '@g-motion/core';
 import { WorldProvider } from '@g-motion/core';
 import { registerAnimationSystems } from '../index';
@@ -21,6 +23,7 @@ import {
   resolveTimeValue,
   computeMaxTime,
   getTargetType,
+  TargetType,
 } from './mark';
 import { addKeyframesForTarget } from './keyframes';
 import { analyzeSpringTracks, analyzeInertiaTracks, buildInertiaComponent } from './physics';
@@ -46,6 +49,7 @@ export class MotionBuilder {
   private isBatch: boolean;
   // Precompiled batch templates: static marks resolved once
   private batchTemplates: BatchTemplate[] = [];
+  private timelineVersion = 0;
 
   constructor(target: any, opts?: { world?: World }) {
     // Normalize to array for unified handling
@@ -72,6 +76,7 @@ export class MotionBuilder {
   adjust(params: { offset?: number; scale?: number }): MotionBuilder {
     this.tracks = applyAdjust(this.tracks, params);
     this.currentTime = computeMaxTime(this.tracks);
+    this.timelineVersion++;
     return this;
   }
 
@@ -162,8 +167,10 @@ export class MotionBuilder {
       Timeline: {
         tracks: this.tracks,
         duration: this.currentTime,
-        loop: 0,
+        loop: Infinity,
         repeat: options?.repeat ?? 0,
+        version: this.timelineVersion,
+        rovingApplied: 0,
       },
     };
 
@@ -190,6 +197,24 @@ export class MotionBuilder {
     }
     if (renderData.Render) {
       components.Render = renderData.Render;
+    }
+
+    if (
+      this.tracks.size > 0 &&
+      (targetType === TargetType.DOM || targetType === TargetType.Object)
+    ) {
+      const properties: string[] = [];
+      for (const key of this.tracks.keys()) {
+        if (key === '__primitive') continue;
+        properties.push(key);
+      }
+      if (properties.length) {
+        const componentNames = Object.keys(components).sort();
+        const archetypeId = componentNames.join('|');
+        const registry = getGPUChannelMappingRegistry();
+        const table = createBatchChannelTable(archetypeId, 1, properties);
+        registry.registerBatchChannels(table);
+      }
     }
 
     const entityId = world.createEntity(components);
@@ -269,8 +294,8 @@ export class MotionBuilder {
     const targetType = getTargetType(this.target);
     const easing = resolved.ease;
     addKeyframesForTarget(this.tracks, this.target, targetType, resolved, easing);
-
     this.currentTime = resolved.time;
+    this.timelineVersion++;
   }
 
   // Apply a pre-resolved mark without re-resolving per entity
@@ -280,6 +305,7 @@ export class MotionBuilder {
     const targetType = getTargetType(this.target);
     addKeyframesForTarget(this.tracks, this.target, targetType, resolved, easing);
     this.currentTime = resolved.time;
+    this.timelineVersion++;
   }
   // ============================================================================
   // Private: Animation Setup Helpers

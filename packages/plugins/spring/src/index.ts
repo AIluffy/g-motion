@@ -1,4 +1,4 @@
-import { MotionPlugin, MotionApp, app } from '@g-motion/core';
+import { MotionPlugin, MotionApp } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 import { SpringComponent } from './component';
 import { SpringSystem } from './spring-system';
@@ -8,7 +8,7 @@ const debugLog = createDebugger('Spring');
 export const SpringPlugin: MotionPlugin = {
   name: 'SpringPlugin',
   version: '0.0.0',
-  setup(appInstance: MotionApp) {
+  setup(appInstance: MotionApp, _services?: unknown) {
     // Register Spring component
     try {
       appInstance.registerComponent('Spring', SpringComponent);
@@ -27,12 +27,6 @@ export const SpringPlugin: MotionPlugin = {
     debugLog('SpringSystem registered');
   },
 };
-
-// Auto-register the Spring plugin when this module is imported (only in browser environments)
-if (typeof window !== 'undefined' && typeof requestAnimationFrame !== 'undefined') {
-  debugLog('Auto-registering SpringPlugin');
-  SpringPlugin.setup(app);
-}
 
 export * from './component';
 export * from './spring-system';

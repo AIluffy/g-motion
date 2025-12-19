@@ -22,11 +22,7 @@ function Cube3d() {
   const cubeControlRef = useRef<AnimationControl | null>(null);
 
   useEffect(() => {
-    // 调试：检查元素是否存在
-    const el = document.getElementById(cubeId);
-    console.log('🔍 Cube element found:', el);
-    console.log('🔍 Initial transform:', el?.style.transform);
-    console.log('🔍 Initial rotate:', el?.style.rotate);
+    document.getElementById(cubeId);
 
     let frameCount = 0;
     const control = motion(`#${cubeId}`)
@@ -52,13 +48,6 @@ function Cube3d() {
         repeat: Infinity,
         onUpdate: () => {
           frameCount++;
-          if (frameCount % 10 === 0) {
-            // console.log(`🔄 Frame ${frameCount} update`);
-            // 每10帧打印一次
-            // const el = document.getElementById(cubeId);
-            // console.log(`📊 Frame ${frameCount} - transform:`, el?.style.transform);
-            // console.log(`   rotateX value (from style):`, el?.style.getPropertyValue('--rotate-x'));
-          }
         },
       });
 

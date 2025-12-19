@@ -1,13 +1,17 @@
-import { World, ComponentDef, SystemDef, RendererDef } from './index';
+import { World } from './world';
+import type { ComponentDef, SystemDef, RendererDef } from './plugin';
 import { registerEasingWithWGSL } from './systems/easing-registry';
 import { createDebugger } from '@g-motion/utils';
 import { MotionApp, MotionAppConfig } from './plugin';
+import { WorldProvider } from './worldProvider';
+import { getRendererCode } from './renderer-code';
 
 const debug = createDebugger('Core');
 
+export { getRendererCode, getRendererName } from './renderer-code';
+
 // App facade implementing MotionApp interface
 export class App implements MotionApp {
-  private config: MotionAppConfig;
   private renderers = new Map<string, RendererDef>();
   private easings = new Map<string, (t: number) => number>();
 
@@ -15,18 +19,11 @@ export class App implements MotionApp {
     private world: World,
     config: MotionAppConfig = {},
   ) {
-    this.config = {
-      webgpuThreshold: 1000,
-      gpuCompute: 'auto',
-      gpuEasing: true,
-      ...config,
-    };
-
-    // Validate gpuCompute mode if provided
-    if (this.config.gpuCompute && !['auto', 'always', 'never'].includes(this.config.gpuCompute)) {
-      throw new Error(
-        `Invalid gpuCompute mode: ${this.config.gpuCompute}. Must be 'auto', 'always', or 'never'.`,
-      );
+    if (config && Object.keys(config).length > 0) {
+      this.world.setConfig({
+        ...this.world.config,
+        ...config,
+      });
     }
   }
 
@@ -76,6 +73,8 @@ export class App implements MotionApp {
       );
     }
 
+    getRendererCode(name);
+
     this.renderers.set(name, renderer);
     debug('Registered renderer', name);
   }
@@ -92,7 +91,7 @@ export class App implements MotionApp {
   }
 
   getConfig(): MotionAppConfig {
-    return this.config;
+    return this.world.config;
   }
 
   getRenderer(name: string): RendererDef | undefined {
@@ -104,45 +103,81 @@ export class App implements MotionApp {
   }
 }
 
-export const app = new App(World.get());
+export function registerBuiltInRenderers(app: App): void {
+  app.registerRenderer('callback', {
+    update(_entity: number, target: any, components: any) {
+      const props = components.Render?.props;
+      if (!props) return;
 
-// Register built-in renderers
-app.registerRenderer('callback', {
-  update(_entity: number, target: any, components: any) {
-    const props = components.Render?.props;
-    if (!props) return;
-
-    if (target.onUpdate) {
-      // If there's a single property, pass it directly
-      if (Object.keys(props).length === 1) {
-        const value = Object.values(props)[0];
-        target.onUpdate(value);
-      } else {
-        target.onUpdate(props);
-      }
-    }
-  },
-});
-
-app.registerRenderer('primitive', {
-  update(_entity: number, target: any, components: any) {
-    const props = components.Render?.props;
-    if (!props) return;
-
-    if (props.__primitive !== undefined) {
-      target.value = props.__primitive;
       if (target.onUpdate) {
-        target.onUpdate(props.__primitive);
+        if (Object.keys(props).length === 1) {
+          const value = Object.values(props)[0];
+          target.onUpdate(value);
+        } else {
+          target.onUpdate(props);
+        }
       }
-    }
-  },
-});
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as { props?: Record<string, unknown> } | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
 
-app.registerRenderer('object', {
-  update(_entity: number, target: any, components: any) {
-    const props = components.Render?.props;
-    if (!props) return;
+      if (target.onUpdate) {
+        if (Object.keys(props).length === 1) {
+          const value = Object.values(props)[0];
+          target.onUpdate(value);
+        } else {
+          target.onUpdate(props);
+        }
+      }
+    },
+  });
 
-    Object.assign(target, props);
-  },
-});
+  app.registerRenderer('primitive', {
+    update(_entity: number, target: any, components: any) {
+      const props = components.Render?.props;
+      if (!props) return;
+
+      if (props.__primitive !== undefined) {
+        target.value = props.__primitive;
+        if (target.onUpdate) {
+          target.onUpdate(props.__primitive);
+        }
+      }
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as { props?: Record<string, any> } | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      if (props.__primitive !== undefined) {
+        target.value = props.__primitive;
+        if (target.onUpdate) {
+          target.onUpdate(props.__primitive);
+        }
+      }
+    },
+  });
+
+  app.registerRenderer('object', {
+    update(_entity: number, target: any, components: any) {
+      const props = components.Render?.props;
+      if (!props) return;
+
+      Object.assign(target, props);
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as { props?: Record<string, any> } | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      Object.assign(target, props);
+    },
+  });
+}
+
+export const appWorld = WorldProvider.useWorld();
+export const app = new App(appWorld);
+
+registerBuiltInRenderers(app);

@@ -1,4 +1,4 @@
-import { SystemDef } from './plugin';
+import type { EngineServices, SystemContext, SystemDef } from './plugin';
 import { WorldProvider } from './worldProvider';
 import { SCHEDULER_LIMITS } from './constants';
 import { getErrorHandler } from './context';
@@ -10,8 +10,22 @@ export class SystemScheduler {
   private lastTime = 0;
   private frameId = 0;
   private activeEntityCount = 0;
+  private metricsCounter = 0;
+
+  private services?: EngineServices;
+
+  setServices(services: EngineServices): void {
+    this.services = services;
+  }
+
+  clearServices(): void {
+    this.services = undefined;
+  }
 
   private getWorld() {
+    if (this.services?.world) {
+      return this.services.world;
+    }
     try {
       return WorldProvider.useWorld();
     } catch {
@@ -56,6 +70,7 @@ export class SystemScheduler {
 
   start(): void {
     if (this.isRunning) return;
+    if (!this.services) return;
     this.isRunning = true;
     this.lastTime = performance.now();
     this.loop();
@@ -77,29 +92,41 @@ export class SystemScheduler {
 
   private loop = (): void => {
     if (!this.isRunning) return;
+    if (!this.services) {
+      this.isRunning = false;
+      return;
+    }
 
     const time = performance.now();
     const dt = time - this.lastTime;
 
     // FPS limiting: check if enough time has passed
-    const frameDuration = (this.getWorld()?.config as any)?.frameDuration;
+    const frameDuration =
+      (this.services?.config as any)?.frameDuration ??
+      (this.getWorld()?.config as any)?.frameDuration;
     if (frameDuration && dt < frameDuration) {
       this.frameId = requestAnimationFrame(this.loop);
       return; // Skip frame if not enough time has passed
     }
 
     this.lastTime = time;
+    const frameStart = performance.now();
 
     // Safety cap for dt to prevent spiraling on lag spikes (e.g., tab background)
     const safeDt = Math.min(dt, SCHEDULER_LIMITS.MAX_FRAME_TIME_MS);
 
+    const ctx: SystemContext | undefined = this.services
+      ? {
+          services: this.services,
+          dt: safeDt,
+        }
+      : undefined;
+
     for (const system of this.systems) {
+      const systemStart = performance.now();
       try {
-        // Systems iterate archetypes directly via World.getArchetypes()
-        // This is more efficient than a separate query system for our archetype-based ECS
-        system.update(safeDt);
+        system.update(safeDt, ctx);
       } catch (e) {
-        // Handle system errors via ErrorHandler (non-fatal, log and continue)
         const error = new MotionError(
           `System '${system.name}' update failed`,
           ErrorCode.SYSTEM_UPDATE_FAILED,
@@ -109,9 +136,23 @@ export class SystemScheduler {
             originalError: e instanceof Error ? e.message : String(e),
           },
         );
-        getErrorHandler().handle(error);
+        (this.services?.errorHandler ?? getErrorHandler()).handle(error);
+      } finally {
+        const systemDuration = performance.now() - systemStart;
+        const samplingRate = ((this.services?.config as any)?.metricsSamplingRate ?? 1) as number;
+        this.metricsCounter++;
+        const shouldSample =
+          samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
+        if (shouldSample) {
+          (this.services.metrics as any).recordSystemTiming?.(system.name, systemDuration);
+        }
       }
     }
+
+    const frameDurationMs = performance.now() - frameStart;
+    try {
+      this.services.metrics.updateStatus({ frameTimeMs: frameDurationMs });
+    } catch {}
 
     this.frameId = requestAnimationFrame(this.loop);
   };

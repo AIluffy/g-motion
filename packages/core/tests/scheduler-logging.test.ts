@@ -44,6 +44,16 @@ describe('SystemScheduler Logging', () => {
     process.env.NODE_ENV = 'production';
 
     const scheduler = new SystemScheduler();
+    scheduler.setServices({
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor: AppContext.getInstance().getBatchProcessor(),
+      metrics: {} as any,
+      errorHandler: AppContext.getInstance().getErrorHandler(),
+      appContext: AppContext.getInstance(),
+    });
     const testSystem: SystemDef = {
       name: 'TestSystem',
       order: 1,
@@ -76,6 +86,16 @@ describe('SystemScheduler Logging', () => {
     process.env.NODE_ENV = 'development';
 
     const scheduler = new SystemScheduler();
+    scheduler.setServices({
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor: AppContext.getInstance().getBatchProcessor(),
+      metrics: {} as any,
+      errorHandler: AppContext.getInstance().getErrorHandler(),
+      appContext: AppContext.getInstance(),
+    });
     let errorThrown = false;
     const errorSystem: SystemDef = {
       name: 'ErrorSystem',
@@ -115,6 +135,16 @@ describe('SystemScheduler Logging', () => {
     process.env.NODE_ENV = 'production';
 
     const scheduler = new SystemScheduler();
+    scheduler.setServices({
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor: AppContext.getInstance().getBatchProcessor(),
+      metrics: {} as any,
+      errorHandler: AppContext.getInstance().getErrorHandler(),
+      appContext: AppContext.getInstance(),
+    });
     const errorSystem: SystemDef = {
       name: 'ErrorSystem',
       order: 1,
@@ -147,6 +177,16 @@ describe('SystemScheduler Logging', () => {
     process.env.NODE_ENV = 'development';
 
     const scheduler = new SystemScheduler();
+    scheduler.setServices({
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor: AppContext.getInstance().getBatchProcessor(),
+      metrics: {} as any,
+      errorHandler: AppContext.getInstance().getErrorHandler(),
+      appContext: AppContext.getInstance(),
+    });
     let errorThrown = false;
     let successSystemRan = false;
 

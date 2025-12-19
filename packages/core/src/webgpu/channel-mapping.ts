@@ -110,8 +110,6 @@ let registryInstance: GPUChannelMappingRegistry | null = null;
 export function getGPUChannelMappingRegistry(): GPUChannelMappingRegistry {
   if (!registryInstance) {
     registryInstance = new GPUChannelMappingRegistry();
-    // Initialize with default mapping
-    registryInstance.setDefaultChannels(5);
   }
   return registryInstance;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion } from '../src/index';
-import { World } from '@g-motion/core';
+import { WorldProvider } from '@g-motion/core';
 
 describe('Delay and Repeat Handling', () => {
   beforeAll(() => {
@@ -38,7 +38,8 @@ describe('Delay and Repeat Handling', () => {
     const lastValue = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0];
     expect(lastValue).toBeCloseTo(20, 0);
 
-    const activeCount = World.get().scheduler.getActiveEntityCount();
+    const world = WorldProvider.useWorld();
+    const activeCount = world.scheduler.getActiveEntityCount();
     expect(activeCount).toBe(0);
   });
 });

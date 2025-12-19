@@ -1,15 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion } from '@g-motion/animation';
-import { World, app } from '@g-motion/core';
+import { WorldProvider, MotionStatus, app } from '@g-motion/core';
 import { SpringPlugin } from '../src/index';
-
-// Import MotionStatus enum values
-const MotionStatus = {
-  Idle: 0,
-  Running: 1,
-  Paused: 2,
-  Finished: 3,
-} as const;
 
 describe('Spring Duration Behavior', () => {
   beforeAll(() => {
@@ -21,7 +13,7 @@ describe('Spring Duration Behavior', () => {
   });
 
   it('ignores time parameter for spring animations', async () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
     const onUpdate = vi.fn();
 
     // Create spring animation with short time parameter
@@ -60,7 +52,7 @@ describe('Spring Duration Behavior', () => {
   });
 
   it('completes only when physics reach rest state', async () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     // Create spring with quick settling parameters
     motion(0)
@@ -122,7 +114,7 @@ describe('Spring Duration Behavior', () => {
   });
 
   it('timeline duration check is skipped for spring entities', async () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([

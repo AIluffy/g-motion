@@ -25,6 +25,7 @@ export async function dispatchGPUBatch(
   batch: ArchetypeBatchDescriptor,
   timingHelper: TimingHelper | null,
   archetypeId: string,
+  channelCount: number,
 ): Promise<{ outputBuffer: GPUBuffer; entityCount: number; archetypeId: string }> {
   if (batch.entityCount === 0) {
     throw new Error('dispatchGPUBatch: entityCount must be > 0');
@@ -49,9 +50,8 @@ export async function dispatchGPUBatch(
   new Float32Array(keyframeGPUBuffer.getMappedRange()).set(batch.keyframesData);
   keyframeGPUBuffer.unmap();
 
-  // Create output buffer (1 f32 per entity)
   const outputBuffer = device.createBuffer({
-    size: batch.entityCount * 4,
+    size: batch.entityCount * Math.max(channelCount, 1) * 4,
     usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as any,
     label: `output-${archetypeId}`,
   });
@@ -78,7 +78,7 @@ export async function dispatchGPUBatch(
   });
 
   // 4. Dispatch with adaptive workgroup sizing
-  const workgroupSize = batch.workgroupHint; // 16, 32, 64, or 128
+  const workgroupSize = batch.workgroupHint;
   const workgroupsX = Math.ceil(batch.entityCount / workgroupSize);
 
   const cmdEncoder = device.createCommandEncoder({
@@ -122,11 +122,10 @@ export async function dispatchGPUBatch(
       });
   }
 
-  // 5. Cleanup dispatch buffers (staging buffers are pooled; see stagingPool.nextFrame())
+  // 5. Cleanup dispatch buffers (output buffer is owned by caller for readback)
   setTimeout(() => {
     stateGPUBuffer.destroy();
     keyframeGPUBuffer.destroy();
-    outputBuffer.destroy();
   }, 16);
 
   // Return output buffer for readback via staging pool

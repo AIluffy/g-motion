@@ -1,6 +1,9 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, type AnimationControl } from '@g-motion/animation';
+import { motion, type AnimationControl, getGPUMetrics, engine } from '@g-motion/animation';
+import { useAtom } from 'jotai';
+import { engineGpuModeAtom, gpuEasingEnabledAtom } from '@/state/engineState';
+import { useGpuThresholdRecommendation } from '@/state/useGpuThresholdRecommendation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -51,14 +54,15 @@ function GPUConfigPage() {
   const [runKey, setRunKey] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
 
-  // GPU Configuration states
-  const [gpuMode, setGpuMode] = useState<'auto' | 'always' | 'never'>('auto');
-  const [gpuEasing, setGpuEasing] = useState(true);
-  const [threshold, setThreshold] = useState(1000);
+  // GPU Configuration states (shared via jotai)
+  const [gpuMode, setGpuMode] = useAtom(engineGpuModeAtom);
+  const [gpuEasing, setGpuEasing] = useAtom(gpuEasingEnabledAtom);
+  const { threshold, setThreshold, recommended, isLoading, isError, applyRecommendation } =
+    useGpuThresholdRecommendation();
   const [selectedEasing, setSelectedEasing] = useState<string>('easeInQuad');
 
   // Note: In a real application, you would configure the World before initializing the engine:
-  // World.get({
+  // const world = World.create({
   //   gpuCompute: gpuMode,
   //   gpuEasing: gpuEasing,
   //   webgpuThreshold: threshold,
@@ -83,6 +87,12 @@ function GPUConfigPage() {
     setCount(targetCount);
     setRunKey((k) => k + 1);
   };
+
+  useEffect(() => {
+    engine.forceGpu(gpuMode);
+    (engine as any).setGpuEasing?.(gpuEasing);
+    (engine as any).setGpuThreshold?.(threshold);
+  }, [gpuMode, gpuEasing, threshold]);
 
   const stopAll = () => {
     controlsRef.current.forEach((c) => c.stop());
@@ -131,9 +141,24 @@ function GPUConfigPage() {
   }, [runKey, selectedEasing]);
 
   const gpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
-  const metricsArr = (globalThis as any).__motionGPUMetrics;
-  const lastMetrics =
-    Array.isArray(metricsArr) && metricsArr.length > 0 ? metricsArr[metricsArr.length - 1] : null;
+  const [lastMetrics, setLastMetrics] = useState<{ entityCount: number; timestamp: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const id = window.setInterval(() => {
+      const metrics = getGPUMetrics();
+      if (!mounted || !Array.isArray(metrics) || metrics.length === 0) return;
+      const last = metrics[0];
+      setLastMetrics({ entityCount: last.entityCount, timestamp: last.timestamp });
+    }, 500);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(id);
+    };
+  }, []);
 
   return (
     <div className="page-shell">
@@ -205,6 +230,34 @@ function GPUConfigPage() {
                   ? '✓ Supported easing functions run on GPU; unsupported ones fallback to CPU'
                   : '✗ All easing calculations run on CPU (even on GPU compute path)'}
               </p>
+            </div>
+
+            {/* Threshold Recommendation */}
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-200">GPU Threshold</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  className="w-32 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-50"
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value) || 0)}
+                />
+                <Button
+                  type="button"
+                  onClick={applyRecommendation}
+                  disabled={isLoading || isError || recommended == null}
+                  className="text-xs"
+                >
+                  Use recommended
+                </Button>
+                <span className="text-xs text-slate-400">
+                  {isLoading && 'Loading recommendation…'}
+                  {isError && 'Failed to load recommendation'}
+                  {!isLoading && !isError && recommended != null
+                    ? `Suggested: ${recommended}`
+                    : null}
+                </span>
+              </div>
             </div>
 
             {/* Threshold Control (only for auto mode) */}

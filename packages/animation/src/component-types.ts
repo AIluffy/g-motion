@@ -12,6 +12,9 @@ export interface MotionStateComponentData {
   delay?: number;
   playbackRate: number;
   startTime: number;
+  tickInterval?: number;
+  tickPhase?: number;
+  tickPriority?: number;
 }
 
 export interface TimelineComponentData {
@@ -43,6 +46,9 @@ export interface TransformComponentData {
 
 export interface RenderComponentData {
   rendererId: string;
+  rendererCode?: number;
   target: unknown;
   props?: Record<string, unknown>;
+  version?: number;
+  renderedVersion?: number;
 }

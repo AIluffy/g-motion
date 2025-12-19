@@ -7,6 +7,8 @@ export const TimelineComponent: ComponentDef = {
     duration: 'float32',
     loop: 'int32', // boolean 0/1
     repeat: 'int32', // count, -1 = infinite
+    version: 'int32',
+    rovingApplied: 'int32',
   },
 };
 

@@ -1,126 +1,205 @@
-import { SystemDef } from '../index';
-import { WorldProvider } from '../worldProvider';
-import { app } from '../app';
+import { SystemDef, SystemContext } from '../index';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
-import { getErrorHandler } from '../context';
 import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
+import { getRendererName } from '../renderer-code';
+
+import type { RendererBatchContext, RendererDef } from '../plugin';
 
 const missingRendererWarned = new Set<string>();
 
-/**
- * Renderer interface with optional lifecycle hooks
- */
-interface Renderer {
-  update(entityId: number, target: unknown, components: Record<string, unknown>): void;
-  preFrame?(): void;
-  postFrame?(): void;
-}
+type RendererGroupScratch = {
+  renderer: RendererDef;
+  entityIds: number[];
+  targets: unknown[];
+  indices: number[];
+};
 
-/**
- * Entity render data
- */
-interface EntityRenderData {
-  entityId: number;
-  target: unknown;
-  components: Record<string, unknown>;
-  renderer: Renderer;
-}
+const byRendererScratch = new Map<string | number, RendererGroupScratch>();
+const rendererGroupPool = new Map<string | number, RendererGroupScratch>();
 
 export const RenderSystem: SystemDef = {
   name: 'RenderSystem',
   order: 30,
-  update() {
-    const world = WorldProvider.useWorld();
+  update(_dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    const app = ctx?.services.app;
+    const errorHandler = ctx?.services.errorHandler;
+    if (!world || !app || !errorHandler) {
+      return;
+    }
 
-    // Group entities by renderer for batch optimization
-    const rendererGroups = new Map<string, EntityRenderData[]>();
-
-    // First pass: collect entities by renderer
     for (const archetype of world.getArchetypes()) {
       const renderBuffer = archetype.getBuffer('Render');
       if (!renderBuffer) continue;
 
-      // Cache buffer references to avoid repeated Map lookups per entity
-      const componentBuffers = new Map<string, Array<unknown>>();
-      for (const name of archetype.componentNames) {
-        const buffer = archetype.getBuffer(name);
-        if (buffer) {
-          componentBuffers.set(name, buffer);
+      const componentBuffers = archetype.getInternalBuffers() as unknown as Map<
+        string,
+        Array<unknown>
+      >;
+      const componentNamesScratch: string[] = [];
+      const componentBuffersScratch: Array<Array<unknown>> = [];
+      for (const [name, buffer] of componentBuffers) {
+        componentNamesScratch.push(name);
+        componentBuffersScratch.push(buffer);
+      }
+      const componentsScratch: Record<string, unknown> = {};
+
+      // Cache typed Transform buffers once per archetype (optional)
+      const transformTypedBuffers = extractTransformTypedBuffers(archetype) as Record<
+        string,
+        unknown
+      >;
+
+      let hasAnyTransformTyped = false;
+      for (const k in transformTypedBuffers) {
+        if ((transformTypedBuffers as Record<string, unknown>)[k]) {
+          hasAnyTransformTyped = true;
+          break;
         }
       }
 
-      // Cache typed Transform buffers once per archetype (optional)
-      const transformTypedBuffers = extractTransformTypedBuffers(archetype);
+      const byRenderer = byRendererScratch;
+      byRenderer.clear();
+
+      const typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const render = renderBuffer[i] as { rendererId: string; target: unknown };
-        const rendererId = render.rendererId;
-
-        // Get renderer from app registry (includes built-in and plugin renderers)
-        const renderer = app.getRenderer(rendererId) as Renderer | undefined;
+        const render = renderBuffer[i] as {
+          rendererId: string;
+          rendererCode?: number;
+          target: unknown;
+          version?: number;
+          renderedVersion?: number;
+        };
+        const version = render.version ?? 0;
+        const renderedVersion = render.renderedVersion ?? -1;
+        if (version === renderedVersion) {
+          continue;
+        }
+        const rendererCode = typedRendererCode ? typedRendererCode[i] : (render.rendererCode ?? 0);
+        const rendererName = getRendererName(rendererCode) ?? render.rendererId;
+        const renderer = app.getRenderer(rendererName);
 
         if (!renderer) {
-          // Warn once per missing renderer id via ErrorHandler, then skip
-          if (!missingRendererWarned.has(rendererId)) {
-            missingRendererWarned.add(rendererId);
+          if (!missingRendererWarned.has(rendererName)) {
+            missingRendererWarned.add(rendererName);
             const error = new MotionError(
-              `Renderer '${rendererId}' not found; skipping updates.`,
+              `Renderer '${rendererName}' not found; skipping updates.`,
               ErrorCode.RENDERER_NOT_FOUND,
               ErrorSeverity.WARNING,
-              { rendererId, archetypeId: archetype.id },
+              { rendererId: rendererName, archetypeId: archetype.id },
             );
-            getErrorHandler().handle(error);
+            errorHandler.handle(error);
           }
           continue;
         }
 
-        // Collect all components for this entity's archetype (use cached buffers)
-        const components: Record<string, unknown> = {};
-        for (const [name, buffer] of componentBuffers) {
-          components[name] = buffer[i];
+        const groupKey = rendererCode > 0 ? rendererCode : rendererName;
+        let group = byRenderer.get(groupKey);
+        if (!group) {
+          group = rendererGroupPool.get(groupKey);
+          if (!group) {
+            group = {
+              renderer,
+              entityIds: [],
+              targets: [],
+              indices: [],
+            };
+            rendererGroupPool.set(groupKey, group);
+          }
+          group.renderer = renderer;
+          group.entityIds.length = 0;
+          group.targets.length = 0;
+          group.indices.length = 0;
+          byRenderer.set(groupKey, group);
         }
 
-        // Provide typed Transform buffers to renderer when available (optional, backward-compatible)
-        const hasAnyTyped = Object.values(transformTypedBuffers).some(Boolean);
-        if (hasAnyTyped) {
-          components.TransformTyped = {
-            index: i,
-            buffers: transformTypedBuffers,
+        group.entityIds.push(archetype.getEntityId(i));
+        group.targets.push(render.target);
+        group.indices.push(i);
+      }
+
+      for (const group of byRenderer.values()) {
+        if (group.indices.length === 0) continue;
+        const renderer = group.renderer;
+        const batch = renderer.updateBatch;
+        const fast = renderer.updateWithAccessor;
+
+        if (batch) {
+          const ctxBatch: RendererBatchContext = {
+            world,
+            archetypeId: archetype.id,
+            entityIds: group.entityIds,
+            targets: group.targets,
+            componentBuffers,
+            transformTypedBuffers,
           };
+          renderer.preFrame?.();
+          batch.call(renderer, ctxBatch);
+          renderer.postFrame?.();
+          for (let j = 0; j < group.indices.length; j++) {
+            const index = group.indices[j];
+            const r = renderBuffer[index] as {
+              version?: number;
+              renderedVersion?: number;
+            };
+            r.renderedVersion = r.version ?? 0;
+          }
+          continue;
         }
 
-        // Group by renderer
-        if (!rendererGroups.has(rendererId)) {
-          rendererGroups.set(rendererId, []);
+        if (fast) {
+          let currentIndex = -1;
+          const getComponent = (name: string) => {
+            const buffer = componentBuffers.get(name);
+            return buffer ? buffer[currentIndex] : undefined;
+          };
+          const getTransformTyped = hasAnyTransformTyped
+            ? () => ({ index: currentIndex, buffers: transformTypedBuffers })
+            : () => undefined;
+
+          renderer.preFrame?.();
+          for (let j = 0; j < group.indices.length; j++) {
+            currentIndex = group.indices[j];
+            fast.call(
+              renderer,
+              group.entityIds[j],
+              group.targets[j],
+              getComponent,
+              getTransformTyped,
+            );
+            const r = renderBuffer[currentIndex] as {
+              version?: number;
+              renderedVersion?: number;
+            };
+            r.renderedVersion = r.version ?? 0;
+          }
+          renderer.postFrame?.();
+          continue;
         }
-        rendererGroups.get(rendererId)!.push({
-          entityId: archetype.getEntityId(i),
-          target: render.target,
-          components,
-          renderer,
-        });
-      }
-    }
 
-    // Second pass: process by renderer with lifecycle hooks
-    for (const [, entities] of rendererGroups) {
-      if (entities.length === 0) continue;
-
-      const renderer = entities[0].renderer;
-
-      // Call preFrame hook if available
-      if (renderer.preFrame) {
-        renderer.preFrame();
-      }
-
-      // Process all entities for this renderer
-      for (const { entityId, target, components } of entities) {
-        renderer.update(entityId, target, components);
-      }
-
-      // Call postFrame hook if available
-      if (renderer.postFrame) {
-        renderer.postFrame();
+        renderer.preFrame?.();
+        for (let j = 0; j < group.indices.length; j++) {
+          const index = group.indices[j];
+          for (let k = 0; k < componentNamesScratch.length; k++) {
+            componentsScratch[componentNamesScratch[k]] = componentBuffersScratch[k][index];
+          }
+          if (hasAnyTransformTyped) {
+            componentsScratch.TransformTyped = {
+              index,
+              buffers: transformTypedBuffers,
+            };
+          } else {
+            delete componentsScratch.TransformTyped;
+          }
+          renderer.update(group.entityIds[j], group.targets[j], componentsScratch);
+          const r = renderBuffer[index] as {
+            version?: number;
+            renderedVersion?: number;
+          };
+          r.renderedVersion = r.version ?? 0;
+        }
+        renderer.postFrame?.();
       }
     }
   },

@@ -3,7 +3,7 @@ import { World, SystemDef } from '../src/index';
 
 describe('Custom System', () => {
   it('registers and executes custom system', () => {
-    const world = World.get();
+    const world = new World();
     const updateSpy = vi.fn();
 
     const CustomSystem: SystemDef = {

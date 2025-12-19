@@ -1,19 +1,11 @@
-import { World } from '@g-motion/core';
+import { WorldProvider } from '@g-motion/core';
 
 /**
  * Global engine configuration object for controlling animation behavior
  */
 class EngineConfig {
-  private world?: World;
-
-  /**
-   * Get or initialize the World instance
-   */
-  private getWorld(): World {
-    if (!this.world) {
-      this.world = World.get();
-    }
-    return this.world;
+  private getWorld() {
+    return WorldProvider.useWorld();
   }
 
   /**
@@ -129,6 +121,41 @@ class EngineConfig {
     return world.config.gpuEasing ?? true;
   }
 
+  setMetricsSamplingRate(rate: number): void {
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new Error(`[Motion Engine] metricsSamplingRate must be positive, got: ${rate}`);
+    }
+    const world = this.getWorld();
+    (world.config as any).metricsSamplingRate = Math.floor(rate);
+  }
+
+  getMetricsSamplingRate(): number {
+    const world = this.getWorld();
+    return Number((world.config as any).metricsSamplingRate ?? 1);
+  }
+
+  setWorkSlicing(options: {
+    enabled?: boolean;
+    interpolationArchetypesPerFrame?: number;
+    batchSamplingArchetypesPerFrame?: number;
+  }): void {
+    const world = this.getWorld();
+    const current = (world.config as any).workSlicing || {};
+    (world.config as any).workSlicing = {
+      ...current,
+      ...options,
+    };
+  }
+
+  getWorkSlicing(): {
+    enabled?: boolean;
+    interpolationArchetypesPerFrame?: number;
+    batchSamplingArchetypesPerFrame?: number;
+  } {
+    const world = this.getWorld();
+    return ((world.config as any).workSlicing || {}) as any;
+  }
+
   /**
    * Configure multiple engine settings at once
    * @param config - Configuration object
@@ -147,6 +174,12 @@ class EngineConfig {
     gpuMode?: 'auto' | 'always' | 'never';
     gpuThreshold?: number;
     gpuEasing?: boolean;
+    metricsSamplingRate?: number;
+    workSlicing?: {
+      enabled?: boolean;
+      interpolationArchetypesPerFrame?: number;
+      batchSamplingArchetypesPerFrame?: number;
+    };
   }): void {
     if (config.speed !== undefined) {
       this.setSpeed(config.speed);
@@ -163,6 +196,12 @@ class EngineConfig {
     if (config.gpuEasing !== undefined) {
       this.setGpuEasing(config.gpuEasing);
     }
+    if (config.metricsSamplingRate !== undefined) {
+      this.setMetricsSamplingRate(config.metricsSamplingRate);
+    }
+    if (config.workSlicing !== undefined) {
+      this.setWorkSlicing(config.workSlicing);
+    }
   }
 
   /**
@@ -175,6 +214,12 @@ class EngineConfig {
     gpuMode: 'auto' | 'always' | 'never';
     gpuThreshold: number;
     gpuEasing: boolean;
+    metricsSamplingRate: number;
+    workSlicing: {
+      enabled?: boolean;
+      interpolationArchetypesPerFrame?: number;
+      batchSamplingArchetypesPerFrame?: number;
+    };
   } {
     return {
       speed: this.getSpeed(),
@@ -182,6 +227,8 @@ class EngineConfig {
       gpuMode: this.getGpuMode(),
       gpuThreshold: this.getGpuThreshold(),
       gpuEasing: this.getGpuEasing(),
+      metricsSamplingRate: this.getMetricsSamplingRate(),
+      workSlicing: this.getWorkSlicing(),
     };
   }
 
@@ -195,6 +242,12 @@ class EngineConfig {
       gpuMode: 'auto',
       gpuThreshold: 1000,
       gpuEasing: true,
+      metricsSamplingRate: 1,
+      workSlicing: {
+        enabled: false,
+        interpolationArchetypesPerFrame: 0,
+        batchSamplingArchetypesPerFrame: 0,
+      },
     });
   }
 }

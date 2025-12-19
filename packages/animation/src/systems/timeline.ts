@@ -1,16 +1,21 @@
-import { SystemDef, MotionStatus, WorldProvider } from '@g-motion/core';
+import { SystemDef, SystemContext, MotionStatus } from '@g-motion/core';
 
 export const TimelineSystem: SystemDef = {
   name: 'TimelineSystem',
   order: 10,
-  update() {
-    const world = WorldProvider.useWorld();
-    let activeCount = 0;
+  update(_dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    if (!world) {
+      return;
+    }
 
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
       const timelineBuffer = archetype.getBuffer('Timeline');
       const springBuffer = archetype.getBuffer('Spring');
+      const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
+      const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+      const typedIteration = archetype.getTypedBuffer('MotionState', 'iteration');
 
       if (!stateBuffer || !timelineBuffer) continue;
 
@@ -26,11 +31,10 @@ export const TimelineSystem: SystemDef = {
           loop?: boolean;
         };
 
-        if (state.status === MotionStatus.Running) {
-          activeCount++;
-        }
+        const status = typedStatus ? (typedStatus[i] as unknown as MotionStatus) : state.status;
+        if (status !== MotionStatus.Running) continue;
 
-        if (state.status !== MotionStatus.Running) continue;
+        const currentTime = typedCurrentTime ? typedCurrentTime[i] : state.currentTime;
 
         // Skip duration check for spring-based animations
         // Spring animations are physics-driven and complete when reaching rest state
@@ -40,23 +44,24 @@ export const TimelineSystem: SystemDef = {
         }
 
         // For non-spring animations, check duration-based completion
-        if (state.currentTime >= timeline.duration) {
+        if (currentTime >= timeline.duration) {
           const maxRepeat = timeline.repeat ?? (timeline.loop ? -1 : 0);
-          const currentIteration = state.iteration || 0;
+          const currentIteration = typedIteration ? typedIteration[i] : state.iteration || 0;
 
           if (maxRepeat === -1 || currentIteration < maxRepeat) {
-            state.currentTime %= timeline.duration;
-            state.iteration = currentIteration + 1;
+            const nextTime = currentTime % timeline.duration;
+            const nextIteration = currentIteration + 1;
+            state.currentTime = nextTime;
+            state.iteration = nextIteration;
+            if (typedCurrentTime) typedCurrentTime[i] = nextTime;
+            if (typedIteration) typedIteration[i] = nextIteration;
           } else {
             state.currentTime = timeline.duration;
-            state.status = MotionStatus.Finished;
-            activeCount--; // This entity just finished
+            if (typedCurrentTime) typedCurrentTime[i] = timeline.duration;
+            world.setMotionStatusAt(archetype, i, MotionStatus.Finished);
           }
         }
       }
     }
-
-    // Update scheduler with active entity count
-    world.scheduler.setActiveEntityCount(activeCount);
   },
 };

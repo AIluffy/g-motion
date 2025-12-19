@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { getGPUMetrics } from '@g-motion/animation';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import './perf-panel.css';
@@ -73,7 +74,6 @@ export function PerfPanel({ title = 'Performance', context, items = [] }: PerfPa
       const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
       const last = buf[buf.length - 1];
 
-      // Collect GPU→DOM sync metrics from global array
       let gpuSyncPerformed = false;
       let gpuSyncDurationMs = 0;
       let gpuSyncDataSizeBytes = 0;
@@ -84,7 +84,7 @@ export function PerfPanel({ title = 'Performance', context, items = [] }: PerfPa
       let gpuComputeLastMs: number | undefined = undefined;
       let gpuBatchCount: number | undefined = undefined;
 
-      const metricsArr = (globalThis as any).__motionGPUMetrics;
+      const metricsArr = getGPUMetrics();
       if (Array.isArray(metricsArr) && metricsArr.length > 0) {
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
         const windowMs = 2000; // look at last 2s of metrics to avoid dropping async GPU timings
@@ -232,9 +232,9 @@ function formatBytes(value: number) {
 }
 
 function readBatch(): { entityCount: number; timestamp: number } | null {
-  const metricsArr = (globalThis as any).__motionGPUMetrics;
+  const metricsArr = getGPUMetrics();
   if (Array.isArray(metricsArr) && metricsArr.length > 0) {
-    const last = metricsArr[metricsArr.length - 1];
+    const last = metricsArr[0];
     if (typeof last?.entityCount === 'number' && typeof last?.timestamp === 'number') {
       return { entityCount: last.entityCount, timestamp: last.timestamp };
     }

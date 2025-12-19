@@ -19,4 +19,8 @@ export class EntityManager {
   exists(id: number): boolean {
     return this.activeEntities.has(id);
   }
+
+  clear(): void {
+    this.activeEntities.clear();
+  }
 }

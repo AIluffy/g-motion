@@ -1,4 +1,4 @@
-import { SystemDef, WorldProvider } from '@g-motion/core';
+import { SystemDef, SystemContext } from '@g-motion/core';
 import type { TimelineComponentData } from '../component-types';
 
 type GaussianKernel = { weights: number[]; radius: number };
@@ -45,17 +45,31 @@ export function distributeDurations(lengths: number[], totalDuration: number): n
 export const RovingResolverSystem: SystemDef = {
   name: 'RovingResolverSystem',
   order: 12,
-  update() {
-    const world = WorldProvider.useWorld();
+  update(_dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    if (!world) {
+      return;
+    }
     for (const archetype of world.getArchetypes()) {
       const timelineBuffer = archetype.getBuffer('Timeline');
+      const typedVersion = archetype.getTypedBuffer('Timeline', 'version');
+      const typedApplied = archetype.getTypedBuffer('Timeline', 'rovingApplied');
       if (!timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
         const timeline = timelineBuffer[i] as TimelineComponentData & {
           tracks: Map<string, Array<Record<string, unknown>>>;
           duration: number;
+          version?: number;
+          rovingApplied?: number;
         };
+        const ver = typedVersion ? (typedVersion[i] as unknown as number) : (timeline.version ?? 0);
+        const applied = typedApplied
+          ? (typedApplied[i] as unknown as number)
+          : (timeline.rovingApplied ?? 0);
+        if (applied === ver) {
+          continue;
+        }
         const tracks = timeline.tracks;
         let durationDirty = false;
 
@@ -104,6 +118,13 @@ export const RovingResolverSystem: SystemDef = {
               [...track].sort((a, b) => (a.time as number) - (b.time as number)),
             );
           }
+        }
+
+        // mark roving applied equals to current version
+        if (typedApplied) {
+          typedApplied[i] = ver;
+        } else {
+          timeline.rovingApplied = ver;
         }
       }
     }

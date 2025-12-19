@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion } from '@g-motion/animation';
-import { World, app } from '@g-motion/core';
+import { WorldProvider, app } from '@g-motion/core';
 import { InertiaPlugin } from '../src/index';
 
 describe('Inertia Physics Plugin', () => {
@@ -14,7 +14,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('creates InertiaComponent when inertia option is provided', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([{ inertia: { velocity: 500 } }])
@@ -26,7 +26,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('uses default inertia parameters when not specified', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([{ inertia: { velocity: 800 } }])
@@ -52,7 +52,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('accepts custom inertia parameters', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([
@@ -94,7 +94,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('initializes per-track velocity from static value', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     const control = motion({ x: 0 })
       .mark([
@@ -123,7 +123,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('resolves velocity from function', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
     let velocityValue = 600;
 
     const control = motion(0)
@@ -154,7 +154,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('resolves velocity via custom velocitySource when using auto', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     const control = motion({ x: 0 })
       .mark([
@@ -181,7 +181,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('maps bounds and clamp options into component', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([{ inertia: { velocity: 500, bounds: { min: -50, max: 50 }, clamp: true } }])
@@ -200,7 +200,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('accepts snap alias and bounce=false without enabling bounce', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([{ inertia: { velocity: 300, snap: 20, bounce: false } }])
@@ -218,7 +218,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('stores handoff configuration for later spring transition', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([{ inertia: { velocity: 400, handoff: { type: 'spring', to: 120 } } }])
@@ -250,7 +250,7 @@ describe('Inertia Physics Plugin', () => {
 
   it('allows different physics on different tracks', () => {
     // Note: This test requires spring plugin to be registered
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     // X-axis with inertia, Y-axis without physics
     motion({ x: 0, y: 0 })
@@ -304,7 +304,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('handles implicit boundary from to parameter', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     const control = motion(0)
       .mark([
@@ -337,7 +337,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('initializes bounce state maps', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([
@@ -400,7 +400,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('snaps to exact end value when end is a number', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     const control = motion(0)
       .mark([
@@ -430,7 +430,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('snaps to closest value in array', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     const control = motion(0)
       .mark([
@@ -461,7 +461,7 @@ describe('Inertia Physics Plugin', () => {
   });
 
   it('uses custom snap function', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
     const snapFn = (naturalEnd: number) => Math.round(naturalEnd / 50) * 50;
 
     const control = motion(0)

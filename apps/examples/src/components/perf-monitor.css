@@ -12,18 +12,31 @@
 }
 
 .perf-monitor-content {
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 4px;
-  padding: 8px;
-  min-width: 90px;
-  width: 150px;
-  max-height: 500px;
-  overflow-y: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  padding: 4px;
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.perf-panel-canvas {
+  image-rendering: pixelated;
+  display: block;
+}
+
+.perf-panel-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.perf-debug {
+  margin-top: 4px;
 }
 
 .perf-stat {

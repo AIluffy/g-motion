@@ -1,4 +1,4 @@
-import { World } from '@g-motion/core';
+import { World, getRendererCode } from '@g-motion/core';
 import { TargetType } from './mark';
 
 export function buildRenderComponent(
@@ -12,8 +12,11 @@ export function buildRenderComponent(
     const result: { Render: any; Transform?: any } = {
       Render: {
         rendererId: 'dom',
+        rendererCode: getRendererCode('dom'),
         target,
         onUpdate,
+        version: 0,
+        renderedVersion: -1,
       },
     };
     if (hasTransform) {
@@ -38,7 +41,10 @@ export function buildRenderComponent(
     return {
       Render: {
         rendererId: 'callback',
+        rendererCode: getRendererCode('callback'),
         target: { onUpdate },
+        version: 0,
+        renderedVersion: -1,
       },
     };
   }
@@ -48,17 +54,23 @@ export function buildRenderComponent(
       return {
         Render: {
           rendererId: 'primitive',
+          rendererCode: getRendererCode('primitive'),
           target: {
             value: target,
             onUpdate,
           },
+          version: 0,
+          renderedVersion: -1,
         },
       };
     case TargetType.Object:
       return {
         Render: {
           rendererId: 'object',
+          rendererCode: getRendererCode('object'),
           target,
+          version: 0,
+          renderedVersion: -1,
         },
       };
     default:

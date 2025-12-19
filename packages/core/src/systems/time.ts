@@ -1,14 +1,19 @@
-import { SystemDef, MotionStatus } from '../index';
-import { WorldProvider } from '../worldProvider';
+import { MotionStatus, SystemDef } from '../index';
+import type { SystemContext } from '../index';
 
 export const TimeSystem: SystemDef = {
   name: 'TimeSystem',
   order: 0,
-  update(dt: number) {
-    const world = WorldProvider.useWorld();
+  update(dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+
+    if (!world) {
+      return;
+    }
 
     // Apply global speed multiplier if set
-    const globalSpeed = (world.config as any).globalSpeed ?? 1;
+    const globalSpeed =
+      (ctx?.services.config as any)?.globalSpeed ?? (world.config as any).globalSpeed ?? 1;
     const adjustedDt = dt * globalSpeed;
 
     for (const archetype of world.getArchetypes()) {
@@ -18,6 +23,8 @@ export const TimeSystem: SystemDef = {
       // Pre-fetch typed buffers for MotionState numeric fields if available
       const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
       const typedDelay = archetype.getTypedBuffer('MotionState', 'delay');
+      const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+      const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
 
       for (let i = 0; i < archetype.entityCount; i++) {
         const state = stateBuffer[i] as {
@@ -26,8 +33,11 @@ export const TimeSystem: SystemDef = {
           currentTime: number;
           playbackRate: number;
         };
-        if (state.status === MotionStatus.Running) {
-          const remainingDelay = state.delay ?? 0;
+        const status = typedStatus ? (typedStatus[i] as unknown as MotionStatus) : state.status;
+        if (status === MotionStatus.Running) {
+          const playbackRate = typedPlaybackRate ? typedPlaybackRate[i] : state.playbackRate;
+          const remainingDelay = typedDelay ? typedDelay[i] : (state.delay ?? 0);
+          const currentTime = typedCurrentTime ? typedCurrentTime[i] : state.currentTime;
 
           // Consume delay first; carry any leftover time into the animation clock.
           if (remainingDelay > 0) {
@@ -42,13 +52,15 @@ export const TimeSystem: SystemDef = {
             state.delay = 0;
             if (typedDelay) typedDelay[i] = 0;
             const usableDt = adjustedDt - remainingDelay;
-            state.currentTime += usableDt * state.playbackRate;
-            if (typedCurrentTime) typedCurrentTime[i] = state.currentTime;
+            const nextTime = currentTime + usableDt * playbackRate;
+            state.currentTime = nextTime;
+            if (typedCurrentTime) typedCurrentTime[i] = nextTime;
             continue;
           }
 
-          state.currentTime += adjustedDt * state.playbackRate;
-          if (typedCurrentTime) typedCurrentTime[i] = state.currentTime;
+          const nextTime = currentTime + adjustedDt * playbackRate;
+          state.currentTime = nextTime;
+          if (typedCurrentTime) typedCurrentTime[i] = nextTime;
         }
       }
     }

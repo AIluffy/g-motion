@@ -11,7 +11,7 @@ describe('ComputeBatchProcessor - boundary cases', () => {
   it('throws when adding archetype batch with zero entities', () => {
     const p = new ComputeBatchProcessor();
     expect(() =>
-      p.addArchetypeBatch('arch-1', [], new Float32Array(0), new Float32Array(0)),
+      p.addArchetypeBatch('arch-1', [], 0, undefined, new Float32Array(0), new Float32Array(0)),
     ).toThrow();
   });
 

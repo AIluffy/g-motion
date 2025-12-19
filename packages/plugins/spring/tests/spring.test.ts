@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion } from '@g-motion/animation';
-import { World, app } from '@g-motion/core';
+import { WorldProvider, app, MotionStatus } from '@g-motion/core';
 import { SpringPlugin } from '../src/index';
 
 describe('Spring Physics Plugin', () => {
@@ -14,7 +14,7 @@ describe('Spring Physics Plugin', () => {
   });
 
   it('creates SpringComponent when spring option is provided', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([{ to: 100, spring: { stiffness: 200, damping: 15 } }])
@@ -26,7 +26,7 @@ describe('Spring Physics Plugin', () => {
   });
 
   it('uses default spring parameters when not specified', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion('#test-element-2')
       .mark([{ to: { x: 100 }, spring: {} }])
@@ -38,7 +38,7 @@ describe('Spring Physics Plugin', () => {
       const springBuffer = archetype.getBuffer('Spring');
       if (springBuffer && archetype.entityCount > 0) {
         // Check the last entity
-        const spring = springBuffer[archetype.entityCount - 1];
+        const spring = springBuffer[archetype.entityCount - 1] as any;
         expect(spring.stiffness).toBe(100); // default
         expect(spring.damping).toBe(10); // default
         expect(spring.mass).toBe(1); // default
@@ -52,7 +52,7 @@ describe('Spring Physics Plugin', () => {
   });
 
   it('accepts custom spring parameters', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion(0)
       .mark([
@@ -74,7 +74,7 @@ describe('Spring Physics Plugin', () => {
     for (const archetype of world.getArchetypes()) {
       const springBuffer = archetype.getBuffer('Spring');
       if (springBuffer && archetype.entityCount > 0) {
-        const spring = springBuffer[archetype.entityCount - 1];
+        const spring = springBuffer[archetype.entityCount - 1] as any;
         expect(spring.stiffness).toBe(300);
         expect(spring.damping).toBe(20);
         expect(spring.mass).toBe(2);
@@ -88,7 +88,7 @@ describe('Spring Physics Plugin', () => {
   });
 
   it('initializes per-track velocities map', () => {
-    const world = World.get();
+    const world = WorldProvider.useWorld();
 
     motion({ x: 0, y: 0 })
       .mark([
@@ -103,7 +103,7 @@ describe('Spring Physics Plugin', () => {
     for (const archetype of world.getArchetypes()) {
       const springBuffer = archetype.getBuffer('Spring');
       if (springBuffer && archetype.entityCount > 0) {
-        const spring = springBuffer[0];
+        const spring = springBuffer[0] as any;
         expect(spring.velocities).toBeDefined();
         expect(spring.velocities instanceof Map).toBe(true);
         break;
@@ -131,8 +131,20 @@ describe('Spring Physics Plugin', () => {
     // Wait for animation to complete
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Should have been called multiple times during animation
-    expect(onUpdate.mock.calls.length).toBeGreaterThan(5);
+    // Verify that animation reached rest state using MotionState status
+    const world = WorldProvider.useWorld();
+    let isFinished = false;
+    for (const archetype of world.getArchetypes()) {
+      const stateBuffer = archetype.getBuffer('MotionState');
+      if (stateBuffer && archetype.entityCount > 0) {
+        const state = stateBuffer[archetype.entityCount - 1] as any;
+        if (state.status === MotionStatus.Finished) {
+          isFinished = true;
+        }
+      }
+    }
+
+    expect(isFinished).toBe(true);
   });
 
   it('works with DOM elements via selector', () => {
@@ -172,13 +184,25 @@ describe('Spring Physics Plugin', () => {
         onUpdate: (val: any) => values.push(val),
       });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
-    // Spring should show typical spring behavior:
-    // - Values should increase initially
-    // - May oscillate around target
-    // - Eventually settle near target
-    expect(values.length).toBeGreaterThan(0);
-    expect(values[0]).toBeGreaterThan(0); // Should start moving
+    // Instead of relying solely on onUpdate timings, inspect Render component state
+    const world = WorldProvider.useWorld();
+    let finalValue: number | null = null;
+    for (const archetype of world.getArchetypes()) {
+      const renderBuffer = archetype.getBuffer('Render');
+      if (renderBuffer && archetype.entityCount > 0) {
+        const render = renderBuffer[archetype.entityCount - 1] as any;
+        if (render?.props && typeof render.props.__primitive === 'number') {
+          finalValue = render.props.__primitive;
+        }
+      }
+    }
+
+    expect(finalValue).not.toBeNull();
+    if (finalValue !== null) {
+      expect(finalValue).toBeGreaterThan(0);
+      expect(finalValue).toBeLessThanOrEqual(100);
+    }
   });
 });

@@ -1,11 +1,14 @@
 import {
   World,
+  WorldProvider,
   TimeSystem,
   RenderSystem,
   BatchSamplingSystem,
   WebGPUComputeSystem,
   ThresholdMonitorSystem,
   GPUResultApplySystem,
+  ActiveEntityMonitorSystem,
+  getEngineForWorld,
 } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 import { TimelineSystem } from './systems/timeline';
@@ -20,9 +23,10 @@ function initEngine() {
   if (initialized) return;
   initialized = true;
 
-  // For backwards compatibility register systems into the default singleton World
-  const world = World.get();
-  debug('Initializing engine, registering systems (singleton world)');
+  const world = WorldProvider.useWorld();
+  getEngineForWorld(world);
+
+  debug('Initializing engine, registering systems');
   registerAnimationSystems(world);
 }
 
@@ -32,17 +36,17 @@ function initEngine() {
  */
 export function registerAnimationSystems(world: World) {
   debug('Registering animation systems for world');
-  // Register threshold monitor first to decide GPU eligibility
   world.scheduler.add(ThresholdMonitorSystem);
   world.scheduler.add(TimeSystem);
   world.scheduler.add(TimelineSystem);
   world.scheduler.add(RovingResolverSystem);
   world.scheduler.add(InterpolationSystem);
-  // Apply GPU results before final render
   world.scheduler.add(GPUResultApplySystem);
-  // Register GPU batch systems for high-load scenarios
   world.scheduler.add(BatchSamplingSystem);
   world.scheduler.add(WebGPUComputeSystem);
+  if ((ActiveEntityMonitorSystem as any)?.update) {
+    world.scheduler.add(ActiveEntityMonitorSystem);
+  }
   world.scheduler.add(RenderSystem);
 }
 

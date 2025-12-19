@@ -1,4 +1,4 @@
-import { SystemDef, MotionStatus, WorldProvider } from '@g-motion/core';
+import { SystemDef, MotionStatus, SystemContext, World } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 
 const debug = createDebugger('SpringSystem');
@@ -45,8 +45,11 @@ export const SpringSystem: SystemDef = {
   name: 'SpringSystem',
   order: 19, // Before InterpolationSystem (20)
 
-  update(dt: number) {
-    const world = WorldProvider.useWorld();
+  update(dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    if (!world) {
+      return;
+    }
 
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
@@ -84,6 +87,8 @@ export const SpringSystem: SystemDef = {
         const spring = springBuffer[i] as SpringData;
         const inertia = inertiaBuffer ? inertiaBuffer[i] : undefined;
         const transform = transformBuffer ? (transformBuffer[i] as TransformData) : undefined;
+        const render = renderBuffer ? (renderBuffer[i] as any) : undefined;
+        let changed = false;
 
         // Only process running entities
         if (state.status !== MotionStatus.Running) continue;
@@ -147,21 +152,27 @@ export const SpringSystem: SystemDef = {
           let handled = false;
 
           if (transform && key in transform) {
-            // Write to AoS Transform object
-            transform[key] = newValue;
-            // Also write to typed buffer for this key when available
-            const tbuf = typedBuffers[key];
-            if (tbuf) {
-              tbuf[i] = newValue;
+            if (!Object.is(currentValue, newValue)) {
+              transform[key] = newValue;
+              const tbuf = typedBuffers[key];
+              if (tbuf) {
+                tbuf[i] = newValue;
+              }
+              changed = true;
             }
             handled = true;
           }
 
           // Fallback to Render.props when Transform is absent
           if (!handled && renderBuffer) {
-            const render = renderBuffer[i] as RenderData;
-            if (!render.props) render.props = {};
-            render.props[key] = newValue;
+            const next = newValue;
+            const props = (render as RenderData | undefined)?.props;
+            const prev = props ? props[key] : undefined;
+            if (!Object.is(prev, next)) {
+              if (render && !render.props) render.props = {};
+              (render as any).props[key] = next;
+              changed = true;
+            }
             // No Transform component: attempt to write to typed buffer anyway
             const tbuf = typedBuffers[key];
             if (tbuf) {
@@ -176,25 +187,41 @@ export const SpringSystem: SystemDef = {
           } else {
             // Snap to target when at rest (both typed buffers and AoS)
             if (transform && key in transform) {
-              transform[key] = targetValue;
+              if (!Object.is(transform[key], targetValue)) {
+                transform[key] = targetValue;
+                changed = true;
+              }
               // Also write to typed buffer
               const tbuf = typedBuffers[key];
               if (tbuf) {
-                tbuf[i] = targetValue;
+                if (!Object.is(tbuf[i], targetValue)) {
+                  tbuf[i] = targetValue;
+                  changed = true;
+                }
               }
             } else if (renderBuffer) {
-              const render = renderBuffer[i] as RenderData;
-              if (render?.props) {
-                render.props[key] = targetValue;
+              const props = (render as RenderData | undefined)?.props;
+              const prev = props ? props[key] : undefined;
+              if (!Object.is(prev, targetValue)) {
+                if (render && !render.props) render.props = {};
+                (render as any).props[key] = targetValue;
+                changed = true;
               }
               // Attempt typed buffer write
               const tbuf = typedBuffers[key];
               if (tbuf) {
-                tbuf[i] = targetValue;
+                if (!Object.is(tbuf[i], targetValue)) {
+                  tbuf[i] = targetValue;
+                  changed = true;
+                }
               }
             }
             velocities.set(key, 0);
           }
+        }
+
+        if (changed && render) {
+          render.version = (render.version ?? 0) + 1;
         }
 
         // Mark animation as finished if all tracks are at rest
@@ -215,9 +242,17 @@ export const SpringSystem: SystemDef = {
             // Remove spring component from this entity so SpringSystem stops processing
             springBuffer[i] = undefined as unknown as typeof spring;
             // Keep entity running for inertia to pick up
-            state.status = MotionStatus.Running;
+            if (typeof (world as any).setMotionStatusAt === 'function') {
+              (world as any).setMotionStatusAt(archetype, i, MotionStatus.Running);
+            } else {
+              state.status = MotionStatus.Running;
+            }
           } else {
-            state.status = MotionStatus.Finished;
+            if (typeof (world as any).setMotionStatusAt === 'function') {
+              (world as any).setMotionStatusAt(archetype, i, MotionStatus.Finished);
+            } else {
+              state.status = MotionStatus.Finished;
+            }
           }
           debug(`Entity ${archetype.getEntityId(i)} spring animation completed`);
         }

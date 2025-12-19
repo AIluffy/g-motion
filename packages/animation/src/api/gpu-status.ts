@@ -1,6 +1,7 @@
 import {
   GPUBatchMetric,
   GPUBatchStatus as CoreGPUBatchStatus,
+  SystemTimingStat,
   getGPUMetricsProvider,
 } from '@g-motion/core';
 
@@ -12,6 +13,8 @@ import {
 
 export type GPUBatchStatus = CoreGPUBatchStatus;
 export type GPUBatchMetrics = GPUBatchMetric;
+
+export type SystemTimings = Record<string, SystemTimingStat>;
 
 /**
  * Check if WebGPU is available in the current browser.
@@ -57,4 +60,9 @@ export function getLatestGPUMetric(): GPUBatchMetrics | null {
  */
 export function clearGPUMetrics(): void {
   getGPUMetricsProvider().clear();
+}
+
+export function getSystemTimings(): SystemTimings {
+  const provider = getGPUMetricsProvider() as any;
+  return (provider.getSystemTimings?.() as SystemTimings | undefined) ?? {};
 }

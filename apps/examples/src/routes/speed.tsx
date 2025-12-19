@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, type AnimationControl } from '@g-motion/animation';
+import { motion, type AnimationControl, engine as motionEngine } from '@g-motion/animation';
 
 export const Route = createFileRoute('/speed')({
   component: SpeedRoute,
@@ -303,8 +303,6 @@ strong { color: #fff; }
         };
 
         wrapped.control?.stop?.();
-
-        console.log('gmotion tween', delay, s.duration);
 
         wrapped.control = motion(state)
           .mark([{ to: from, at: 0 }])
@@ -955,6 +953,14 @@ strong { color: #fff; }
   }, [buildTests]);
 
   useEffect(() => {
+    const prevMode = (motionEngine as any).getGpuMode?.() ?? 'auto';
+    motionEngine.forceGpu('always');
+    return () => {
+      motionEngine.forceGpu(prevMode as any);
+    };
+  }, []);
+
+  useEffect(() => {
     const t = window.setTimeout(() => setInstructionsVisible(true), 250);
     return () => window.clearTimeout(t);
   }, []);
@@ -1087,13 +1093,14 @@ strong { color: #fff; }
                 onChange={(e) => setDotQuantity(Number(e.target.value))}
                 disabled={inProgress}
               >
-                {[25, 50, 100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000].map(
-                  (n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ),
-                )}
+                {[
+                  25, 50, 100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 5000,
+                  7000, 10000,
+                ].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </li>
 

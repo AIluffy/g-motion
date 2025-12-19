@@ -22,6 +22,11 @@ export class ComputeBatchProcessor {
   // Per-archetype batches (new)
   private archetypeBatches: Map<string, ArchetypeBatchDescriptor> = new Map();
 
+  private nextEntityIdsLeaseId = 1;
+  private entityIdsLeases = new Map<number, Int32Array>();
+  private entityIdsInFlight = new Set<number>();
+  private entityIdsPool: Int32Array[] = [];
+
   // Configuration
   private maxBatchSize: number;
   private enableResultCaching: boolean;
@@ -84,11 +89,12 @@ export class ComputeBatchProcessor {
    */
   addArchetypeBatch(
     archetypeId: string,
-    entityIds: number[],
+    entityIds: ArrayLike<number>,
+    entityCount: number,
+    entityIdsLeaseId: number | undefined,
     statesData: Float32Array,
     keyframesData: Float32Array,
   ): ArchetypeBatchDescriptor {
-    const entityCount = entityIds.length;
     if (entityCount === 0) {
       throw new MotionError(
         `Cannot create batch for archetype ${archetypeId} with zero entities`,
@@ -105,6 +111,7 @@ export class ComputeBatchProcessor {
       archetypeId,
       entityIds,
       entityCount,
+      entityIdsLeaseId,
       statesData,
       keyframesData,
       workgroupHint,
@@ -116,6 +123,44 @@ export class ComputeBatchProcessor {
     this.stats.dispatchCount += 1;
 
     return batch;
+  }
+
+  acquireEntityIds(minLength: number): { leaseId: number; buffer: Int32Array } {
+    const len = Math.max(1, Math.floor(minLength));
+    let pickedIndex = -1;
+    let buffer: Int32Array | undefined;
+    for (let i = 0; i < this.entityIdsPool.length; i++) {
+      const candidate = this.entityIdsPool[i];
+      if (candidate.length >= len) {
+        pickedIndex = i;
+        buffer = candidate;
+        break;
+      }
+    }
+    if (!buffer) {
+      let cap = 16;
+      while (cap < len) cap *= 2;
+      buffer = new Int32Array(cap);
+    } else {
+      this.entityIdsPool.splice(pickedIndex, 1);
+    }
+
+    const leaseId = this.nextEntityIdsLeaseId++;
+    this.entityIdsLeases.set(leaseId, buffer);
+    return { leaseId, buffer };
+  }
+
+  markEntityIdsInFlight(leaseId: number): void {
+    if (!this.entityIdsLeases.has(leaseId)) return;
+    this.entityIdsInFlight.add(leaseId);
+  }
+
+  releaseEntityIds(leaseId: number): void {
+    const buffer = this.entityIdsLeases.get(leaseId);
+    if (!buffer) return;
+    this.entityIdsInFlight.delete(leaseId);
+    this.entityIdsLeases.delete(leaseId);
+    this.entityIdsPool.push(buffer);
   }
 
   /**
@@ -136,6 +181,12 @@ export class ComputeBatchProcessor {
    * Clear all archetype batches (called per frame)
    */
   clearArchetypeBatches(): void {
+    for (const batch of this.archetypeBatches.values()) {
+      const leaseId = batch.entityIdsLeaseId;
+      if (typeof leaseId === 'number' && !this.entityIdsInFlight.has(leaseId)) {
+        this.releaseEntityIds(leaseId);
+      }
+    }
     this.archetypeBatches.clear();
     this.stats.archetypeCount = 0;
   }
@@ -299,5 +350,13 @@ export class ComputeBatchProcessor {
       valid: errors.length === 0,
       errors,
     };
+  }
+
+  clear(): void {
+    this.entityBatches.clear();
+    this.keyframeBatches.clear();
+    this.resultCache.clear();
+    this.archetypeBatches.clear();
+    this.resetStats();
   }
 }

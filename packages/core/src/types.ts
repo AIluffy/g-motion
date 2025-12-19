@@ -159,8 +159,11 @@ export interface TransformData {
  */
 export interface RenderData {
   rendererId: string;
+  rendererCode?: number;
   target: any;
   props?: Record<string, number>;
+  version?: number;
+  renderedVersion?: number;
 }
 
 /**
@@ -189,8 +192,9 @@ export interface VelocityData {
  */
 export interface ArchetypeBatchDescriptor {
   archetypeId: string;
-  entityIds: number[];
+  entityIds: ArrayLike<number>;
   entityCount: number;
+  entityIdsLeaseId?: number;
   statesData: Float32Array; // Flat: [st₀, ct₀, pr₀, s₀, st₁, ct₁, pr₁, s₁, ...]
   keyframesData: Float32Array; // Flat: [t₀, dur₀, sv₀, ev₀, eid₀, ...]
   workgroupHint: number; // 16, 32, 64, or 128 (adaptive based on entity count)

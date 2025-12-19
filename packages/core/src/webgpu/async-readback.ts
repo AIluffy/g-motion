@@ -5,11 +5,18 @@
 
 export interface PendingReadback {
   archetypeId: string;
-  entityIds: number[];
+  entityIds: ArrayLike<number>;
   stagingBuffer: GPUBuffer;
   mapPromise: Promise<void>;
   timestamp: number;
   timeoutMs: number;
+  byteSize: number;
+  stride?: number;
+  channels?: Array<{ index: number; property: string }>;
+  leaseId?: number;
+  startTime?: number;
+  resolveTime?: number;
+  expired?: boolean;
 }
 
 export class AsyncReadbackManager {
@@ -21,54 +28,97 @@ export class AsyncReadbackManager {
    */
   enqueueMapAsync(
     archetypeId: string,
-    entityIds: number[],
+    entityIds: ArrayLike<number>,
     stagingBuffer: GPUBuffer,
     mapPromise: Promise<void>,
+    byteSize: number,
     timeoutMs = this.defaultTimeoutMs,
+    stride = 1,
+    channels?: Array<{ index: number; property: string }>,
+    leaseId?: number,
   ): void {
-    this.pending.push({
+    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const entry: PendingReadback = {
       archetypeId,
       entityIds,
       stagingBuffer,
       mapPromise,
       timestamp: Date.now(),
       timeoutMs,
-    });
+      byteSize,
+      stride,
+      channels,
+      leaseId,
+      startTime,
+    };
+
+    // Attach settled flag handler
+    (mapPromise as any).settled = false;
+    mapPromise
+      .then(() => {
+        (entry.mapPromise as any).settled = true;
+        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      })
+      .catch(() => {
+        // Ignore map errors here, handled in drain
+        (entry.mapPromise as any).settled = true;
+        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      });
+
+    this.pending.push(entry);
   }
 
   /**
    * Try to resolve pending readbacks; return completed ones
    * Silently discard timeouts to avoid frame drops
+   *
+   * @param timeBudgetMs - Max time to spend processing readbacks (default: 2ms)
    */
-  async drainCompleted(): Promise<
+  async drainCompleted(timeBudgetMs = 2): Promise<
     Array<{
       archetypeId: string;
-      entityIds: number[];
-      values: Float32Array;
+      entityIds: ArrayLike<number>;
+      values?: Float32Array;
       stagingBuffer: GPUBuffer;
+      byteSize: number;
+      stride?: number;
+      channels?: Array<{ index: number; property: string }>;
+      leaseId?: number;
+      syncDurationMs?: number;
+      expired?: boolean;
     }>
   > {
     const results: Array<{
       archetypeId: string;
-      entityIds: number[];
-      values: Float32Array;
+      entityIds: ArrayLike<number>;
+      values?: Float32Array;
       stagingBuffer: GPUBuffer;
+      byteSize: number;
+      stride?: number;
+      channels?: Array<{ index: number; property: string }>;
+      leaseId?: number;
+      syncDurationMs?: number;
+      expired?: boolean;
     }> = [];
     const now = Date.now();
+    const startTime = typeof performance !== 'undefined' ? performance.now() : now;
 
-    // Process in-order; stop at first pending
     const toRemove: number[] = [];
 
     for (let i = 0; i < this.pending.length; i++) {
+      // Check time budget
+      if (typeof performance !== 'undefined') {
+        if (performance.now() - startTime > timeBudgetMs) {
+          break;
+        }
+      }
+
       const p = this.pending[i];
       const elapsed = now - p.timestamp;
 
       // Check timeout
       if (elapsed > p.timeoutMs) {
-        console.warn(
-          `[AsyncReadback] Archetype '${p.archetypeId}' readback timeout after ${elapsed}ms; discarding`,
-        );
-        toRemove.push(i);
+        p.expired = true;
         continue;
       }
 
@@ -76,13 +126,16 @@ export class AsyncReadbackManager {
       try {
         const settled = (p.mapPromise as any).settled ?? false;
         if (!settled) {
-          // Not ready yet; break (maintain order)
-          break;
+          continue;
         }
 
-        // Ready: extract values
-        const view = p.stagingBuffer.getMappedRange();
-        const values = new Float32Array(view.slice(0));
+        const expired = !!p.expired;
+        let values: Float32Array | undefined = undefined;
+
+        if (!expired) {
+          const view = p.stagingBuffer.getMappedRange();
+          values = new Float32Array(view.slice(0));
+        }
         p.stagingBuffer.unmap();
 
         results.push({
@@ -90,10 +143,22 @@ export class AsyncReadbackManager {
           entityIds: p.entityIds,
           values,
           stagingBuffer: p.stagingBuffer,
+          byteSize: p.byteSize,
+          stride: p.stride,
+          channels: p.channels,
+          leaseId: p.leaseId,
+          syncDurationMs: p.resolveTime && p.startTime ? p.resolveTime - p.startTime : undefined,
+          expired,
         });
         toRemove.push(i);
       } catch (e) {
         console.warn(`[AsyncReadback] Extraction failed for '${p.archetypeId}':`, e);
+        // If extraction fails, we should still unmap and remove
+        try {
+          p.stagingBuffer.unmap();
+        } catch {
+          // ignore
+        }
         toRemove.push(i);
       }
     }

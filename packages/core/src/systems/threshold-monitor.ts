@@ -1,7 +1,6 @@
+import type { SystemContext } from '../plugin';
 import { SystemDef } from '../plugin';
-import { WorldProvider } from '../worldProvider';
-import { MotionStatus } from '../components/state';
-import { getGPUMetricsProvider } from '../webgpu/metrics-provider';
+import { getGPUChannelMappingRegistry } from '../webgpu/channel-mapping';
 
 /**
  * Threshold Monitor System
@@ -17,24 +16,40 @@ export const ThresholdMonitorSystem: SystemDef = {
   name: 'ThresholdMonitorSystem',
   order: 1, // Run early, before batch/GPU systems
 
-  update() {
-    const world = WorldProvider.useWorld();
-    const config = world.config;
+  update(_dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
+    const config = ctx?.services.config as any;
+    const metrics = ctx?.services.metrics as any;
+
+    if (!world || !config) {
+      return;
+    }
     const threshold = config.webgpuThreshold ?? 1000;
 
-    // Count active running/paused entities across all archetypes
-    let activeCount = 0;
+    const activeCount = world.getActiveMotionEntityCount();
 
-    for (const archetype of world.getArchetypes()) {
-      const stateBuffer = archetype.getBuffer('MotionState');
-      if (!stateBuffer) continue;
-
-      for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i] as { status: MotionStatus };
-        if (state.status === MotionStatus.Running || state.status === MotionStatus.Paused) {
-          activeCount++;
+    let complexity = activeCount;
+    const sampleEvery = 30;
+    (ThresholdMonitorSystem as any).__counter ??= 0;
+    (ThresholdMonitorSystem as any).__counter++;
+    const doSample = (ThresholdMonitorSystem as any).__counter % sampleEvery === 0;
+    if (doSample) {
+      let total = 0;
+      const registry = getGPUChannelMappingRegistry();
+      for (const archetype of world.getArchetypes()) {
+        const table = registry.getChannels((archetype as any).id);
+        const stride = table?.stride ?? 1;
+        const state = (archetype as any).getBuffer?.('MotionState');
+        if (!state) continue;
+        let act = 0;
+        const typed = (archetype as any).getTypedBuffer?.('MotionState', 'status');
+        for (let i = 0; i < (archetype as any).entityCount; i++) {
+          const s = typed ? typed[i] : (state[i]?.status ?? 0);
+          if (s === 1 || s === 2) act++;
         }
+        total += act * stride;
       }
+      complexity = total > 0 ? total : activeCount;
     }
 
     // Determine GPU eligibility based on config.gpuCompute mode
@@ -46,16 +61,15 @@ export const ThresholdMonitorSystem: SystemDef = {
       // GPU enabled by configuration
       enabled = true;
     } else {
-      // Auto mode: enabled if activeCount >= threshold
-      enabled = activeCount >= threshold;
+      enabled = activeCount >= threshold || complexity >= threshold;
     }
 
     // Update GPU metrics provider with enabled status
-    const provider = getGPUMetricsProvider();
-    provider.updateStatus({
+    ctx.services.metrics.updateStatus({
       activeEntityCount: activeCount,
       threshold,
       enabled,
+      cpuFallbackActive: metrics?.getStatus?.()?.cpuFallbackActive ?? undefined,
     });
   },
 };

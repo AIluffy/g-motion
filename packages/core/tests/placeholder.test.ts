@@ -8,7 +8,7 @@ describe('Core Placeholder', () => {
   });
 
   it('initializes world', () => {
-    const world = World.get();
+    const world = new World();
     expect(world).toBeDefined();
   });
 });
