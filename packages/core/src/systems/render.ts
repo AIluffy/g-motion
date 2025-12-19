@@ -2,20 +2,12 @@ import { SystemDef, SystemContext } from '../index';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
 import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
 import { getRendererName } from '../renderer-code';
+import { getRendererGroupCache } from './renderer-group-cache'; // P2-2: Renderer group cache
 
-import type { RendererBatchContext, RendererDef } from '../plugin';
+import type { RendererBatchContext } from '../plugin';
 
 const missingRendererWarned = new Set<string>();
-
-type RendererGroupScratch = {
-  renderer: RendererDef;
-  entityIds: number[];
-  targets: unknown[];
-  indices: number[];
-};
-
-const byRendererScratch = new Map<string | number, RendererGroupScratch>();
-const rendererGroupPool = new Map<string | number, RendererGroupScratch>();
+const rendererGroupCache = getRendererGroupCache(); // P2-2: Persistent cache
 
 export const RenderSystem: SystemDef = {
   name: 'RenderSystem',
@@ -58,9 +50,11 @@ export const RenderSystem: SystemDef = {
         }
       }
 
-      const byRenderer = byRendererScratch;
-      byRenderer.clear();
-
+      // P2-2: Use persistent renderer group cache
+      const activeGroups = new Map<
+        string | number,
+        ReturnType<typeof rendererGroupCache.getOrCreate>
+      >();
       const typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
 
       for (let i = 0; i < archetype.entityCount; i++) {
@@ -95,50 +89,43 @@ export const RenderSystem: SystemDef = {
         }
 
         const groupKey = rendererCode > 0 ? rendererCode : rendererName;
-        let group = byRenderer.get(groupKey);
+        let group = activeGroups.get(groupKey);
         if (!group) {
-          group = rendererGroupPool.get(groupKey);
-          if (!group) {
-            group = {
-              renderer,
-              entityIds: [],
-              targets: [],
-              indices: [],
-            };
-            rendererGroupPool.set(groupKey, group);
-          }
+          // Get or create cached group with estimated capacity
+          // Ensure capacity is valid (positive integer)
+          const safeCapacity = Math.max(1, Math.floor(archetype.entityCount) || 1);
+          group = rendererGroupCache.getOrCreate(archetype.id, String(groupKey), safeCapacity);
           group.renderer = renderer;
-          group.entityIds.length = 0;
-          group.targets.length = 0;
-          group.indices.length = 0;
-          byRenderer.set(groupKey, group);
+          activeGroups.set(groupKey, group);
         }
 
-        group.entityIds.push(archetype.getEntityId(i));
-        group.targets.push(render.target);
-        group.indices.push(i);
+        rendererGroupCache.addEntity(group, archetype.getEntityId(i), render.target, i);
       }
 
-      for (const group of byRenderer.values()) {
-        if (group.indices.length === 0) continue;
+      // P2-2: Process cached groups
+      for (const group of activeGroups.values()) {
+        if (group.count === 0) continue;
         const renderer = group.renderer;
+        if (!renderer) continue;
+
         const batch = renderer.updateBatch;
         const fast = renderer.updateWithAccessor;
+        const activeData = rendererGroupCache.getActiveData(group);
 
         if (batch) {
           const ctxBatch: RendererBatchContext = {
             world,
             archetypeId: archetype.id,
-            entityIds: group.entityIds,
-            targets: group.targets,
+            entityIds: Array.from(activeData.entityIds),
+            targets: activeData.targets,
             componentBuffers,
             transformTypedBuffers,
           };
           renderer.preFrame?.();
           batch.call(renderer, ctxBatch);
           renderer.postFrame?.();
-          for (let j = 0; j < group.indices.length; j++) {
-            const index = group.indices[j];
+          for (let j = 0; j < group.count; j++) {
+            const index = activeData.indices[j];
             const r = renderBuffer[index] as {
               version?: number;
               renderedVersion?: number;
@@ -159,12 +146,12 @@ export const RenderSystem: SystemDef = {
             : () => undefined;
 
           renderer.preFrame?.();
-          for (let j = 0; j < group.indices.length; j++) {
-            currentIndex = group.indices[j];
+          for (let j = 0; j < group.count; j++) {
+            currentIndex = activeData.indices[j];
             fast.call(
               renderer,
-              group.entityIds[j],
-              group.targets[j],
+              activeData.entityIds[j],
+              activeData.targets[j],
               getComponent,
               getTransformTyped,
             );
@@ -179,8 +166,8 @@ export const RenderSystem: SystemDef = {
         }
 
         renderer.preFrame?.();
-        for (let j = 0; j < group.indices.length; j++) {
-          const index = group.indices[j];
+        for (let j = 0; j < group.count; j++) {
+          const index = activeData.indices[j];
           for (let k = 0; k < componentNamesScratch.length; k++) {
             componentsScratch[componentNamesScratch[k]] = componentBuffersScratch[k][index];
           }
@@ -192,7 +179,7 @@ export const RenderSystem: SystemDef = {
           } else {
             delete componentsScratch.TransformTyped;
           }
-          renderer.update(group.entityIds[j], group.targets[j], componentsScratch);
+          renderer.update(activeData.entityIds[j], activeData.targets[j], componentsScratch);
           const r = renderBuffer[index] as {
             version?: number;
             renderedVersion?: number;
@@ -202,5 +189,8 @@ export const RenderSystem: SystemDef = {
         renderer.postFrame?.();
       }
     }
+
+    // P2-2: Advance frame counter for cache cleanup
+    rendererGroupCache.nextFrame();
   },
 };

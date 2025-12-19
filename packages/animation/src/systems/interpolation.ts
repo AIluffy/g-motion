@@ -158,56 +158,69 @@ export const InterpolationSystem: SystemDef = {
               // In SoA/AoS hybrid, transformBuffer[i] is the object
               const transform = transformBuffer[i] as TransformComponentData;
 
+              // P1-3 Optimization: Prioritize TypedArray writes to avoid redundant operations
               // Special handling for 'scale' - write to both scaleX and scaleY
               if (key === 'scale') {
-                if (!Object.is(transform.scaleX, val)) {
+                // Write to TypedArrays first (if available)
+                let scaleChanged = false;
+                if (typedTransformBuffers.scaleX) {
+                  if (!Object.is(typedTransformBuffers.scaleX[i], val)) {
+                    typedTransformBuffers.scaleX[i] = val;
+                    scaleChanged = true;
+                  }
+                }
+                if (typedTransformBuffers.scaleY) {
+                  if (!Object.is(typedTransformBuffers.scaleY[i], val)) {
+                    typedTransformBuffers.scaleY[i] = val;
+                    scaleChanged = true;
+                  }
+                }
+                if (typedTransformBuffers.scaleZ) {
+                  if (!Object.is(typedTransformBuffers.scaleZ[i], val)) {
+                    typedTransformBuffers.scaleZ[i] = val;
+                    scaleChanged = true;
+                  }
+                }
+
+                // Sync to object only if TypedArrays were updated
+                if (scaleChanged) {
                   transform.scaleX = val;
-                  changed = true;
-                }
-                if (!Object.is(transform.scaleY, val)) {
                   transform.scaleY = val;
+                  if ('scaleZ' in transform) {
+                    (transform as any).scaleZ = val;
+                  }
                   changed = true;
-                }
-                if ('scaleZ' in transform) {
-                  if (!Object.is((transform as any).scaleZ, val)) {
+                } else {
+                  // Fallback: no TypedArrays, write to object directly
+                  if (!Object.is(transform.scaleX, val)) {
+                    transform.scaleX = val;
+                    changed = true;
+                  }
+                  if (!Object.is(transform.scaleY, val)) {
+                    transform.scaleY = val;
+                    changed = true;
+                  }
+                  if ('scaleZ' in transform && !Object.is((transform as any).scaleZ, val)) {
                     (transform as any).scaleZ = val;
                     changed = true;
                   }
                 }
-                // Also write to typed buffers when available
-                if (
-                  typedTransformBuffers.scaleX &&
-                  !Object.is(typedTransformBuffers.scaleX[i], val)
-                ) {
-                  typedTransformBuffers.scaleX[i] = val;
-                  changed = true;
-                }
-                if (
-                  typedTransformBuffers.scaleY &&
-                  !Object.is(typedTransformBuffers.scaleY[i], val)
-                ) {
-                  typedTransformBuffers.scaleY[i] = val;
-                  changed = true;
-                }
-                if (
-                  typedTransformBuffers.scaleZ &&
-                  !Object.is(typedTransformBuffers.scaleZ[i], val)
-                ) {
-                  typedTransformBuffers.scaleZ[i] = val;
-                  changed = true;
-                }
                 handled = true;
               } else if (key in transform) {
-                const obj = transform as Record<string, number>;
-                if (!Object.is(obj[key], val)) {
-                  obj[key] = val;
-                  changed = true;
-                }
-                // Also write to typed buffer for this key when available
+                // P1-3: Prioritize TypedArray write
                 const tbuf = typedTransformBuffers[key];
                 if (tbuf) {
                   if (!Object.is(tbuf[i], val)) {
                     tbuf[i] = val;
+                    // Sync to object (single write)
+                    (transform as Record<string, number>)[key] = val;
+                    changed = true;
+                  }
+                } else {
+                  // Fallback: no TypedArray, write to object only
+                  const obj = transform as Record<string, number>;
+                  if (!Object.is(obj[key], val)) {
+                    obj[key] = val;
                     changed = true;
                   }
                 }
@@ -218,16 +231,21 @@ export const InterpolationSystem: SystemDef = {
             if (!handled && renderBuffer) {
               const r = renderBuffer[i] as RenderComponentData;
               r.props ||= {};
-              const prev = (r.props as any)[key];
-              if (!Object.is(prev, val)) {
-                (r.props as any)[key] = val;
-                changed = true;
-              }
-              // No Transform component present: attempt to map common keys to typed buffers
+
+              // P1-3: Prioritize TypedArray write for common transform keys
               const tbuf = typedTransformBuffers[key];
               if (tbuf) {
                 if (!Object.is(tbuf[i], val)) {
                   tbuf[i] = val;
+                  // Sync to props (single write)
+                  (r.props as any)[key] = val;
+                  changed = true;
+                }
+              } else {
+                // Fallback: no TypedArray, write to props only
+                const prev = (r.props as any)[key];
+                if (!Object.is(prev, val)) {
+                  (r.props as any)[key] = val;
                   changed = true;
                 }
               }

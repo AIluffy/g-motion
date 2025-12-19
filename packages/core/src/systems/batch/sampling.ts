@@ -6,8 +6,10 @@ import { BatchBufferCache } from './buffer-cache';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import type { TimelineData, Track, Keyframe } from '../../types';
 import { getRendererCode } from '../../renderer-code';
+import { getArchetypeBufferCache } from './archetype-buffer-cache'; // P1-2: Buffer cache
 
 const bufferCache = new BatchBufferCache();
+const archetypeBufferCache = getArchetypeBufferCache(); // P1-2: Archetype-level cache
 const MAX_KEYFRAMES_PER_CHANNEL = 4;
 
 const archetypeScratch: any[] = [];
@@ -129,16 +131,62 @@ export const BatchSamplingSystem: SystemDef = {
     }
 
     for (const archetype of toProcess) {
-      const stateBuffer = archetype.getBuffer('MotionState');
-      const timelineBuffer = archetype.getBuffer('Timeline');
-      const renderBuffer = archetype.getBuffer('Render');
-      const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
-      const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
-      const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
-      const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
-      const typedTickInterval = archetype.getTypedBuffer('MotionState', 'tickInterval');
-      const typedTickPhase = archetype.getTypedBuffer('MotionState', 'tickPhase');
-      const typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
+      // P1-2 Optimization: Use cached buffers to avoid repeated Map lookups
+      let cachedBuffers = archetypeBufferCache.getBuffers(archetype);
+
+      let stateBuffer: Array<unknown> | undefined;
+      let timelineBuffer: Array<unknown> | undefined;
+      let renderBuffer: Array<unknown> | undefined;
+      let typedStatus: Float32Array | Float64Array | Int32Array | undefined;
+      let typedStartTime: Float32Array | Float64Array | Int32Array | undefined;
+      let typedCurrentTime: Float32Array | Float64Array | Int32Array | undefined;
+      let typedPlaybackRate: Float32Array | Float64Array | Int32Array | undefined;
+      let typedTickInterval: Float32Array | Float64Array | Int32Array | undefined;
+      let typedTickPhase: Float32Array | Float64Array | Int32Array | undefined;
+      let typedRendererCode: Float32Array | Float64Array | Int32Array | undefined;
+
+      if (cachedBuffers) {
+        // Cache hit: use cached buffers
+        stateBuffer = cachedBuffers.stateBuffer;
+        timelineBuffer = cachedBuffers.timelineBuffer;
+        renderBuffer = cachedBuffers.renderBuffer;
+        typedStatus = cachedBuffers.typedStatus;
+        typedStartTime = cachedBuffers.typedStartTime;
+        typedCurrentTime = cachedBuffers.typedCurrentTime;
+        typedPlaybackRate = cachedBuffers.typedPlaybackRate;
+        typedTickInterval = cachedBuffers.typedTickInterval;
+        typedTickPhase = cachedBuffers.typedTickPhase;
+        typedRendererCode = cachedBuffers.typedRendererCode;
+      } else {
+        // Cache miss: fetch buffers and cache them
+        stateBuffer = archetype.getBuffer('MotionState');
+        timelineBuffer = archetype.getBuffer('Timeline');
+        renderBuffer = archetype.getBuffer('Render');
+        typedStatus = archetype.getTypedBuffer('MotionState', 'status');
+        typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+        typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+        typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+        typedTickInterval = archetype.getTypedBuffer('MotionState', 'tickInterval');
+        typedTickPhase = archetype.getTypedBuffer('MotionState', 'tickPhase');
+        typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
+
+        // Store in cache for next frame
+        archetypeBufferCache.setBuffers(archetype, {
+          stateBuffer,
+          timelineBuffer,
+          renderBuffer,
+          springBuffer: undefined,
+          inertiaBuffer: undefined,
+          typedStatus,
+          typedStartTime,
+          typedCurrentTime,
+          typedPlaybackRate,
+          typedTickInterval,
+          typedTickPhase,
+          typedRendererCode,
+          typedTimelineVersion: archetype.getTypedBuffer('Timeline', 'version'),
+        });
+      }
 
       if (!stateBuffer || !timelineBuffer || !renderBuffer) {
         continue; // Skip archetypes missing animation components
@@ -351,6 +399,7 @@ export const BatchSamplingSystem: SystemDef = {
         }
 
         // Add per-archetype batch with adaptive workgroup hint
+        // P0-2: Pass keyframes version signature for fast change detection
         const batch = processor.addArchetypeBatch(
           archetype.id,
           entityIdsView,
@@ -358,6 +407,7 @@ export const BatchSamplingSystem: SystemDef = {
           lease.leaseId,
           statesData,
           keyframesData,
+          versionSig, // P0-2: Version signature for O(1) change detection
         );
 
         totalEntities += batch.entityCount;
@@ -372,5 +422,8 @@ export const BatchSamplingSystem: SystemDef = {
         archetypeBatchesReady: true,
       });
     }
+
+    // P1-2: Advance frame counter for cache cleanup
+    archetypeBufferCache.nextFrame();
   },
 };

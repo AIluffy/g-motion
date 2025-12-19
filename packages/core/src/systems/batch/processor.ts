@@ -94,6 +94,7 @@ export class ComputeBatchProcessor {
     entityIdsLeaseId: number | undefined,
     statesData: Float32Array,
     keyframesData: Float32Array,
+    keyframesVersion?: number, // P0-2: Version signature for fast change detection
   ): ArchetypeBatchDescriptor {
     if (entityCount === 0) {
       throw new MotionError(
@@ -114,6 +115,7 @@ export class ComputeBatchProcessor {
       entityIdsLeaseId,
       statesData,
       keyframesData,
+      keyframesVersion, // P0-2: Store version signature
       workgroupHint,
       createdAt: Date.now(),
     };

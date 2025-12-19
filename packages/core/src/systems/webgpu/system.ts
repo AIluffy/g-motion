@@ -3,6 +3,12 @@
  *
  * Main entry point for GPU-accelerated animation compute.
  * Orchestrates initialization, pipeline management, and per-archetype dispatch.
+ *
+ * Performance optimizations:
+ * - Persistent GPU buffers (avoid per-frame allocation)
+ * - Incremental updates (upload only changed data)
+ * - Async readback with timeout management
+ * - Buffer pooling and reuse
  */
 
 import type { SystemContext, SystemDef } from '../../plugin';
@@ -17,6 +23,10 @@ import { AsyncReadbackManager } from '../../webgpu/async-readback';
 import { initWebGPUCompute } from './initialization';
 import { cachePipeline } from './pipeline';
 import { dispatchGPUBatch } from './dispatch';
+import {
+  getPersistentGPUBufferManager,
+  resetPersistentGPUBufferManager,
+} from '../../webgpu/persistent-buffer-manager';
 
 // Sentinel value to track initialization
 let bufferManager: WebGPUBufferManager | null = null;
@@ -35,6 +45,7 @@ export function __resetWebGPUComputeSystemForTests(): void {
   timingHelper = null;
   stagingPool = null;
   readbackManager = null;
+  resetPersistentGPUBufferManager();
 }
 
 /**
@@ -79,6 +90,8 @@ export const WebGPUComputeSystem: SystemDef = {
         }
         stagingPool = new StagingBufferPool(device);
         readbackManager = new AsyncReadbackManager();
+        // Initialize persistent buffer manager
+        getPersistentGPUBufferManager(device);
       }
     }
 
@@ -260,5 +273,13 @@ export const WebGPUComputeSystem: SystemDef = {
     }
 
     stagingPool.nextFrame();
+
+    // Advance persistent buffer manager frame (for cleanup)
+    try {
+      const persistentBufferManager = getPersistentGPUBufferManager();
+      persistentBufferManager.nextFrame();
+    } catch {
+      // Not initialized yet, ignore
+    }
   },
 };

@@ -53,7 +53,12 @@ describe('DOMRenderer Logging', () => {
     // Creating renderer should log when debug flag is on
     expect(consoleDebugSpy).toHaveBeenCalledWith(
       expect.stringContaining('[Motion DOMRenderer]'),
-      'created',
+      'created with config:',
+      expect.objectContaining({
+        forceGPUAcceleration: true,
+        enableWillChange: true,
+        useHardwareAcceleration: true,
+      }),
     );
 
     process.env.NODE_ENV = originalEnv;

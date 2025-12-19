@@ -11,6 +11,7 @@ export * from './errors';
 export * from './error-handler';
 export * from './constants';
 export * from './utils';
+export * from './data';
 export * from './components/state';
 export * from './components/timeline';
 export * from './components/render';

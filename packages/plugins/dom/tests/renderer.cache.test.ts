@@ -12,7 +12,7 @@ describe('DOM renderer selector cache', () => {
   it('clears cache on DOM mutation', () => {
     const renderer = createDOMRenderer();
     const comps = {
-      Render: { rendererId: 'dom', target: '#box', props: { x: 10, y: 20 } },
+      Render: { rendererId: 'dom', target: '#box', props: {} },
       Transform: { x: 10, y: 20 },
     } as any;
 

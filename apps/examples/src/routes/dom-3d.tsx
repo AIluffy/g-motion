@@ -30,7 +30,7 @@ function Cube3d() {
         {
           to: {
             rotateX: 360,
-            rotateY: 360,
+            // rotateY: 360,
             x: 199,
           },
           at: 4000,
@@ -38,7 +38,7 @@ function Cube3d() {
         {
           to: {
             rotateX: 0,
-            rotateY: 0,
+            // rotateY: 0,
             x: 0,
           },
           at: 8000,

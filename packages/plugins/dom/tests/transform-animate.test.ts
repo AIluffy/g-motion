@@ -25,8 +25,9 @@ describe('DOM Transform Animation', () => {
     expect(box).toBeTruthy();
 
     // Create animation
+    // Note: Use rotateZ instead of rotate for explicit Z-axis rotation
     const control = motion('#test-box')
-      .mark([{ to: { x: 100, y: 50, scaleX: 1.2, rotate: 45 }, at: 100 }])
+      .mark([{ to: { x: 100, y: 50, scaleX: 1.2, rotateZ: 45 }, at: 100 }])
       .animate();
 
     expect(control).toBeTruthy();
@@ -37,12 +38,13 @@ describe('DOM Transform Animation', () => {
     // Check if transform was applied
     const transform = box.style.transform;
 
-    expect(transform).toContain('translate');
+    // With GPU acceleration enabled by default, should use 3D transforms
+    expect(transform).toContain('translate3d');
     expect(transform).toContain('100px');
     expect(transform).toContain('50px');
-    expect(transform).toContain('rotate');
+    expect(transform).toContain('rotateZ'); // Should use rotateZ in 3D mode
     expect(transform).toContain('45deg');
-    expect(transform).toContain('scale');
+    expect(transform).toMatch(/scale(3d)?/); // Can be scale or scale3d depending on forceGPU
     expect(transform).toContain('1.2');
 
     control.stop();
