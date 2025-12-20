@@ -77,4 +77,5 @@ export * from './api/gpu-status';
 export * from './api/track';
 export * from './api/adjust';
 export * from './systems/gpu/packBuffers';
+export * from './values';
 export { engine } from './engine';

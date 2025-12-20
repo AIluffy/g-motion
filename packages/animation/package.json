@@ -26,6 +26,7 @@
   "devDependencies": {
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
+    "fast-check": "^4.4.0",
     "typescript": "workspace:*",
     "vitest": "workspace:*"
   }
