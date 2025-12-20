@@ -5,7 +5,6 @@ import {
   RenderSystem,
   BatchSamplingSystem,
   WebGPUComputeSystem,
-  ThresholdMonitorSystem,
   GPUResultApplySystem,
   ActiveEntityMonitorSystem,
   getEngineForWorld,
@@ -33,10 +32,12 @@ function initEngine() {
 /**
  * Register animation systems into a specific World instance.
  * This enables per-world system registration for multi-world isolation.
+ *
+ * Note: All animations now default to GPU compute path with CPU fallback.
+ * ThresholdMonitorSystem has been removed - GPU is always attempted first.
  */
 export function registerAnimationSystems(world: World) {
   debug('Registering animation systems for world');
-  world.scheduler.add(ThresholdMonitorSystem);
   world.scheduler.add(TimeSystem);
   world.scheduler.add(TimelineSystem);
   world.scheduler.add(RovingResolverSystem);

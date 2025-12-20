@@ -48,11 +48,11 @@ class EngineConfig {
   /**
    * Force GPU acceleration mode
    * @param mode - GPU compute mode: 'auto' | 'always' | 'never'
-   *   - 'auto': Use GPU when entity count exceeds threshold (default)
-   *   - 'always': Always use GPU regardless of entity count
+   *   - 'auto': Same as 'always' (GPU-first with automatic CPU fallback)
+   *   - 'always': Always attempt GPU compute, fall back to CPU if unavailable (default)
    *   - 'never': Never use GPU, always use CPU
    * @example
-   * engine.forceGpu('always'); // Always use GPU
+   * engine.forceGpu('always'); // Always use GPU (default)
    * engine.forceGpu('never');  // Disable GPU, use CPU only
    */
   forceGpu(mode: 'auto' | 'always' | 'never'): void {
@@ -72,33 +72,29 @@ class EngineConfig {
    */
   getGpuMode(): 'auto' | 'always' | 'never' {
     const world = this.getWorld();
-    return world.config.gpuCompute ?? 'auto';
+    return world.config.gpuCompute ?? 'always';
   }
 
   /**
-   * Set GPU activation threshold (only affects 'auto' mode)
-   * @param threshold - Number of entities before GPU activation (default: 1000)
-   * @example
-   * engine.setGpuThreshold(500); // Activate GPU at 500+ entities
+   * @deprecated GPU threshold is no longer used. GPU is enabled by default.
+   * Use forceGpu('never') to disable GPU acceleration.
    */
   setGpuThreshold(threshold: number): void {
-    if (!Number.isFinite(threshold) || threshold < 0) {
-      throw new Error(
-        `[Motion Engine] GPU threshold must be a non-negative number, got: ${threshold}`,
-      );
-    }
-
+    console.warn(
+      '[Motion Engine] setGpuThreshold is deprecated. GPU is now enabled by default. ' +
+        "Use forceGpu('never') to disable GPU acceleration.",
+    );
+    // Keep for backward compatibility but no-op
     const world = this.getWorld();
     world.config.webgpuThreshold = threshold;
   }
 
   /**
-   * Get GPU activation threshold
-   * @returns Current threshold value
+   * @deprecated GPU threshold is no longer used.
    */
   getGpuThreshold(): number {
     const world = this.getWorld();
-    return world.config.webgpuThreshold ?? 1000;
+    return world.config.webgpuThreshold ?? 0;
   }
 
   /**
@@ -212,7 +208,6 @@ class EngineConfig {
     speed: number;
     fps: number;
     gpuMode: 'auto' | 'always' | 'never';
-    gpuThreshold: number;
     gpuEasing: boolean;
     metricsSamplingRate: number;
     workSlicing: {
@@ -225,7 +220,6 @@ class EngineConfig {
       speed: this.getSpeed(),
       fps: this.getFps(),
       gpuMode: this.getGpuMode(),
-      gpuThreshold: this.getGpuThreshold(),
       gpuEasing: this.getGpuEasing(),
       metricsSamplingRate: this.getMetricsSamplingRate(),
       workSlicing: this.getWorkSlicing(),
@@ -239,8 +233,7 @@ class EngineConfig {
     this.configure({
       speed: 1,
       fps: 60,
-      gpuMode: 'auto',
-      gpuThreshold: 1000,
+      gpuMode: 'always', // GPU-first by default
       gpuEasing: true,
       metricsSamplingRate: 1,
       workSlicing: {

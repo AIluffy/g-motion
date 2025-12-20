@@ -7,7 +7,6 @@ import {
   getRendererCode,
   MotionStateComponent,
   MotionStatus,
-  ThresholdMonitorSystem,
 } from '../src';
 
 /**
@@ -384,21 +383,6 @@ describe('Engine Hot Path Performance', () => {
 
     expect(avg).toBeLessThan(50);
     expect(max).toBeLessThan(200);
-
-    const metrics = { updateStatus: (_s: any) => {}, getStatus: () => ({ enabled: true }) } as any;
-    const services = { world, config: world.config, metrics } as any;
-    const tmTimes: number[] = [];
-    for (let i = 0; i < 200; i++) {
-      const t0 = performance.now();
-      ThresholdMonitorSystem.update(0, { services, dt: 0 } as any);
-      tmTimes.push(performance.now() - t0);
-    }
-    const tmAvg = tmTimes.reduce((a, b) => a + b, 0) / tmTimes.length;
-    const tmMax = Math.max(...tmTimes);
-
-    console.log(`ThresholdMonitorSystem avg: ${tmAvg.toFixed(4)}ms, max: ${tmMax.toFixed(4)}ms`);
-    expect(tmAvg).toBeLessThan(1);
-    expect(tmMax).toBeLessThan(5);
   });
 });
 

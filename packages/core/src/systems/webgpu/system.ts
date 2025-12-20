@@ -4,6 +4,11 @@
  * Main entry point for GPU-accelerated animation compute.
  * Orchestrates initialization, pipeline management, and per-archetype dispatch.
  *
+ * GPU-First Architecture:
+ * - All animations attempt GPU compute by default
+ * - Automatic CPU fallback when WebGPU is unavailable
+ * - config.gpuCompute='never' explicitly disables GPU path
+ *
  * Performance optimizations:
  * - Persistent GPU buffers (avoid per-frame allocation)
  * - Incremental updates (upload only changed data)
@@ -37,6 +42,9 @@ let timingHelper: TimingHelper | null = null;
 let stagingPool: StagingBufferPool | null = null;
 let readbackManager: AsyncReadbackManager | null = null;
 
+// Track if we've logged the fallback message
+let cpuFallbackLogged = false;
+
 export function __resetWebGPUComputeSystemForTests(): void {
   bufferManager = null;
   isInitialized = false;
@@ -45,14 +53,17 @@ export function __resetWebGPUComputeSystemForTests(): void {
   timingHelper = null;
   stagingPool = null;
   readbackManager = null;
+  cpuFallbackLogged = false;
   resetPersistentGPUBufferManager();
 }
 
 /**
  * WebGPU Compute System with Per-Archetype Dispatch
  *
- * Processes archetype-segmented batches through GPU compute shaders
- * with adaptive workgroup sizing and multiple dispatches.
+ * GPU-First Architecture:
+ * - Attempts GPU compute for all animations by default
+ * - Falls back to CPU (InterpolationSystem) when GPU unavailable
+ * - No threshold checks - GPU is always preferred when available
  *
  * This system:
  * 1. Receives per-archetype batches from BatchSamplingSystem
@@ -70,6 +81,14 @@ export const WebGPUComputeSystem: SystemDef = {
     const config = ctx?.services.config as any;
 
     if (!metricsProvider || !processor || !config) {
+      return;
+    }
+
+    // Explicit GPU disable check
+    const gpuMode = config.gpuCompute ?? 'auto';
+    if (gpuMode === 'never') {
+      // CPU fallback is handled by InterpolationSystem
+      metricsProvider.updateStatus({ cpuFallbackActive: true, enabled: false });
       return;
     }
 
@@ -92,15 +111,40 @@ export const WebGPUComputeSystem: SystemDef = {
         readbackManager = new AsyncReadbackManager();
         // Initialize persistent buffer manager
         getPersistentGPUBufferManager(device);
+
+        // Update metrics to indicate GPU is available and enabled
+        metricsProvider.updateStatus({
+          webgpuAvailable: true,
+          gpuInitialized: true,
+          enabled: true,
+          cpuFallbackActive: false,
+        });
+      } else {
+        // GPU not available - CPU fallback will be used
+        if (!cpuFallbackLogged) {
+          console.info('[Motion] WebGPU not available, using CPU fallback for animations');
+          cpuFallbackLogged = true;
+        }
+        metricsProvider.updateStatus({
+          webgpuAvailable: false,
+          gpuInitialized: false,
+          enabled: false,
+          cpuFallbackActive: true,
+        });
       }
     }
 
-    if (!isInitialized || !bufferManager || !deviceAvailable) {
+    // GPU not available - InterpolationSystem handles CPU fallback
+    if (!bufferManager || !deviceAvailable) {
       return;
     }
 
     const device = bufferManager.getDevice();
-    if (!device) return;
+    if (!device) {
+      metricsProvider.updateStatus({ cpuFallbackActive: true });
+      return;
+    }
+
     // Rebuild pipeline if custom easing set changed
     const currentVersion = getCustomEasingVersion();
     if (currentVersion !== shaderVersion) {
@@ -135,31 +179,9 @@ export const WebGPUComputeSystem: SystemDef = {
       }
     }
 
-    // Adaptive threshold check with frame budget monitoring
-    const status = metricsProvider.getStatus();
-
-    const gpuMode = config.gpuCompute ?? 'auto';
-    if (gpuMode === 'never') {
-      return;
-    }
-
-    let belowThreshold = false;
-    if (gpuMode === 'auto') {
-      const dynamicThreshold = metricsProvider.calculateDynamicThreshold(status.threshold, 16);
-      belowThreshold = status.activeEntityCount < dynamicThreshold;
-    }
-
-    if (!status.enabled || belowThreshold) {
-      if (status.frameTimeMs && status.frameTimeMs > 12) {
-        metricsProvider.updateStatus({ cpuFallbackActive: true });
-      }
-      return;
-    }
-
-    // Clear fallback flag when GPU processing proceeds
-    if (status.cpuFallbackActive) {
-      metricsProvider.updateStatus({ cpuFallbackActive: false });
-    }
+    // GPU-First: Always process batches when GPU is available
+    // No threshold checks - GPU is preferred for all animations
+    metricsProvider.updateStatus({ enabled: true, cpuFallbackActive: false });
 
     // Get all per-archetype batches prepared by BatchSamplingSystem
     const archetypeBatches = processor.getArchetypeBatches();

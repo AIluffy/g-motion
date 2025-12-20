@@ -44,17 +44,17 @@ export interface RendererDef {
  */
 export interface MotionAppConfig {
   /**
-   * Entity count threshold at which to enable GPU batch processing.
-   * Default: 1000. Set to Infinity to disable GPU acceleration.
+   * @deprecated No longer used. GPU is now enabled by default for all animations.
+   * Use gpuCompute='never' to disable GPU acceleration.
    */
   webgpuThreshold?: number;
 
   /**
-   * GPU compute mode for easing calculations.
-   * 'auto': Use GPU if available and entity count exceeds threshold
-   * 'always': Always use GPU compute for easing
-   * 'never': Always use CPU for easing
-   * Default: 'auto'
+   * GPU compute mode for animation calculations.
+   * 'auto': Same as 'always' (GPU-first with automatic CPU fallback)
+   * 'always': Always attempt GPU compute, fall back to CPU if unavailable (default)
+   * 'never': Always use CPU for animations
+   * Default: 'always'
    */
   gpuCompute?: GPUComputeMode;
 

@@ -21,7 +21,92 @@ export type { SyncEvent, PerformanceMetrics } from './sync-manager';
 // Development tools (benchmark, profiler) are not exported for production use
 // Import directly from './benchmark' in benchmark files if needed
 
-export { INTERPOLATION_SHADER } from './shader';
+// Main interpolation shader with Bezier support (Phase 1.1)
+export {
+  INTERPOLATION_SHADER,
+  buildInterpolationShader,
+  EASING_MODE,
+  KEYFRAME_STRIDE,
+  packKeyframeForGPU,
+} from './shader';
+
+// Transform matrix shaders (Phase 1.2)
+export {
+  TRANSFORM_2D_SHADER,
+  TRANSFORM_3D_SHADER,
+  TRANSFORM_COMBINED_SHADER,
+  TRANSFORM_2D_STRIDE,
+  TRANSFORM_3D_STRIDE,
+  MATRIX_3X3_STRIDE,
+  MATRIX_4X4_STRIDE,
+  packTransform2D,
+  packTransform3D,
+  unpackMatrix3x3,
+  unpackMatrix4x4,
+} from './transform-shader';
+export type { Transform2DData, Transform3DData } from './transform-shader';
+
+// Culling shaders (Phase 1.3)
+export {
+  CULLING_SHADER,
+  ADVANCED_CULLING_SHADER,
+  COMPACTION_SHADER,
+  RENDER_STATE_STRIDE,
+  CULL_RESULT_STRIDE,
+  packRenderStates,
+  unpackCullResults,
+  getVisibleEntityIds,
+  groupByRenderer,
+} from './culling-shader';
+export type { RenderStateData, RenderStateExData, CullResultData } from './culling-shader';
+
+// Physics shaders (Phase 2.1)
+export {
+  SPRING_SHADER,
+  INERTIA_SHADER,
+  PHYSICS_COMBINED_SHADER,
+  SPRING_STATE_STRIDE,
+  INERTIA_STATE_STRIDE,
+  PHYSICS_STATE_STRIDE,
+  packSpringStates,
+  packInertiaStates,
+  packSimParams,
+  unpackSpringStates,
+  calculateCriticalDamping,
+  SPRING_PRESETS,
+} from './physics-shader';
+export type { SpringStateData, InertiaStateData, PhysicsSimParams } from './physics-shader';
+
+// Output format shaders (Phase 2.2)
+export {
+  OUTPUT_FORMAT_SHADER,
+  BATCH_OUTPUT_SHADER,
+  SOA_OUTPUT_SHADER,
+  OUTPUT_FORMAT,
+  OUTPUT_CHANNEL_STRIDE,
+  INTERLEAVED_OUTPUT_STRIDE,
+  packOutputChannels,
+  unpackInterleavedOutputs,
+  packedRGBAToCSS,
+  createStandardChannelMapping,
+} from './output-format-shader';
+export type { OutputChannelDesc, InterleavedOutputData } from './output-format-shader';
+
+// Keyframe preprocessing shaders (Phase 3.1)
+export {
+  KEYFRAME_PREPROCESS_SHADER,
+  KEYFRAME_SEARCH_SHADER,
+  EASING_TYPE,
+  RAW_KEYFRAME_STRIDE,
+  PACKED_KEYFRAME_STRIDE,
+  CHANNEL_MAP_STRIDE,
+  packRawKeyframes,
+  packChannelMaps,
+  hashPropertyName,
+  PROPERTY_HASHES,
+  easingStringToType,
+} from './keyframe-preprocess-shader';
+export type { RawKeyframeData, ChannelMapData } from './keyframe-preprocess-shader';
 
 export { TimingHelper, NonNegativeRollingAverage } from './timing-helper';
 

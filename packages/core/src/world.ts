@@ -182,8 +182,8 @@ export class World {
     }
 
     return {
-      webgpuThreshold: 1000,
-      gpuCompute: 'auto',
+      // GPU-First: Default to 'always' - GPU is preferred, CPU fallback automatic
+      gpuCompute: 'always',
       gpuEasing: true,
       ...config,
     };

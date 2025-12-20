@@ -17,7 +17,6 @@ export * from './components/timeline';
 export * from './components/render';
 export * from './systems/batch';
 export * from './systems/time';
-export * from './systems/threshold-monitor';
 export * from './systems/active-entity-monitor';
 export * from './systems/webgpu';
 export * from './systems/easing-registry';

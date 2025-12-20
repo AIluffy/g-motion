@@ -11,6 +11,7 @@ import {
   getErrorHandler,
   getGPUChannelMappingRegistry,
   createBatchChannelTable,
+  KEYFRAME_STRIDE,
 } from '../src';
 import { ComputeBatchProcessor } from '../src/systems/batch';
 
@@ -104,17 +105,23 @@ describe('BatchSamplingSystem multi-channel keyframes packing', () => {
     expect(batch.entityIds[0]).toBe(entityId);
 
     const keyframes = batch.keyframesData;
-    expect(keyframes.length).toBe(2 * 4 * 5);
-    const kfX = keyframes.subarray(0, 5);
-    const kfY = keyframes.subarray(4 * 5, 4 * 5 + 5);
+    // Updated: 2 channels * 4 keyframes per channel * KEYFRAME_STRIDE (10) floats per keyframe
+    expect(keyframes.length).toBe(2 * 4 * KEYFRAME_STRIDE);
 
-    expect(kfX[0]).toBe(0);
-    expect(kfX[1]).toBe(100);
-    expect(kfX[2]).toBe(0);
-    expect(kfX[3]).toBe(10);
-    expect(kfY[0]).toBe(0);
-    expect(kfY[1]).toBe(200);
-    expect(kfY[2]).toBe(5);
-    expect(kfY[3]).toBe(15);
+    // Extract keyframe data using new stride
+    const kfX = keyframes.subarray(0, KEYFRAME_STRIDE);
+    const kfY = keyframes.subarray(4 * KEYFRAME_STRIDE, 4 * KEYFRAME_STRIDE + KEYFRAME_STRIDE);
+
+    // Verify X channel keyframe
+    expect(kfX[0]).toBe(0); // startTime
+    expect(kfX[1]).toBe(100); // duration
+    expect(kfX[2]).toBe(0); // startValue
+    expect(kfX[3]).toBe(10); // endValue
+
+    // Verify Y channel keyframe
+    expect(kfY[0]).toBe(0); // startTime
+    expect(kfY[1]).toBe(200); // duration
+    expect(kfY[2]).toBe(5); // startValue
+    expect(kfY[3]).toBe(15); // endValue
   });
 });

@@ -1,17 +1,30 @@
 import { CustomGpuEasing } from './custom-easing';
 
 // T031: Built-in WGSL Shader for Interpolation
+// Extended with Bezier curve support (Phase 1.1)
 
 const BASE_INTERPOLATION_SHADER = `
 const MAX_KEYFRAMES_PER_CHANNEL: u32 = 4u;
 
-// Keyframe structure for animation data
+// Easing mode constants
+const EASING_MODE_STANDARD: f32 = 0.0;  // Use easingId for standard easing
+const EASING_MODE_BEZIER: f32 = 1.0;    // Use bezier control points
+const EASING_MODE_HOLD: f32 = 2.0;      // Hold at end value (step)
+
+// Keyframe structure for animation data (extended with Bezier support)
 struct Keyframe {
     startTime: f32,
     duration: f32,
     startValue: f32,
     endValue: f32,
     easingId: f32,
+    // Bezier control points (cx1, cy1, cx2, cy2) - used when easingMode == BEZIER
+    bezierCx1: f32,
+    bezierCy1: f32,
+    bezierCx2: f32,
+    bezierCy2: f32,
+    // Easing mode: 0=standard, 1=bezier, 2=hold
+    easingMode: f32,
 }
 
 // Entity animation state
@@ -27,7 +40,70 @@ struct EntityState {
 @group(0) @binding(1) var<storage, read> keyframes: array<Keyframe>;
 @group(0) @binding(2) var<storage, read_write> outputs: array<f32>;
 
-// Easing functions - ID 0-30
+// ============================================================================
+// Bezier Curve Evaluation (Phase 1.1)
+// ============================================================================
+
+// Newton-Raphson iteration to solve for t given x on cubic bezier
+// This is needed because bezier curves are parametric - we need to find
+// the parameter t that gives us the desired x coordinate
+fn solveBezierT(x: f32, cx1: f32, cx2: f32) -> f32 {
+    // For x-axis: B(t) = 3(1-t)²t·cx1 + 3(1-t)t²·cx2 + t³
+    // We need to find t such that B(t) = x
+
+    var t = x; // Initial guess
+
+    // Newton-Raphson iterations (4 iterations is usually sufficient)
+    for (var i = 0; i < 4; i = i + 1) {
+        let t2 = t * t;
+        let t3 = t2 * t;
+        let mt = 1.0 - t;
+        let mt2 = mt * mt;
+
+        // B(t) for x-axis
+        let bx = 3.0 * mt2 * t * cx1 + 3.0 * mt * t2 * cx2 + t3;
+
+        // B'(t) derivative for x-axis
+        let dbx = 3.0 * mt2 * cx1 + 6.0 * mt * t * (cx2 - cx1) + 3.0 * t2 * (1.0 - cx2);
+
+        if (abs(dbx) < 0.000001) {
+            break;
+        }
+
+        t = t - (bx - x) / dbx;
+        t = clamp(t, 0.0, 1.0);
+    }
+
+    return t;
+}
+
+// Evaluate cubic bezier curve at parameter t for y-axis
+fn evaluateBezierY(t: f32, cy1: f32, cy2: f32) -> f32 {
+    let mt = 1.0 - t;
+    let mt2 = mt * mt;
+    let t2 = t * t;
+
+    // B(t) = 3(1-t)²t·cy1 + 3(1-t)t²·cy2 + t³
+    return 3.0 * mt2 * t * cy1 + 3.0 * mt * t2 * cy2 + t * t2;
+}
+
+// Main bezier easing function: given progress x in [0,1], return eased y in [0,1]
+fn evaluateCubicBezier(x: f32, cx1: f32, cy1: f32, cx2: f32, cy2: f32) -> f32 {
+    // Handle edge cases
+    if (x <= 0.0) { return 0.0; }
+    if (x >= 1.0) { return 1.0; }
+
+    // Find parameter t for given x
+    let t = solveBezierT(x, cx1, cx2);
+
+    // Evaluate y at parameter t
+    return evaluateBezierY(t, cy1, cy2);
+}
+
+// ============================================================================
+// Standard Easing Functions (ID 0-30)
+// ============================================================================
+
 fn easeLinear(t: f32) -> f32 {
     return t;
 }
@@ -347,7 +423,24 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         var progress = (adjustedElapsedTime - activeKf.startTime) / activeKf.duration;
         progress = clamp(progress, 0.0, 1.0);
 
-        let easedProgress = applyEasing(progress, activeKf.easingId);
+        // Apply easing based on easing mode (Phase 1.1: Bezier support)
+        var easedProgress: f32;
+        if (activeKf.easingMode == EASING_MODE_HOLD) {
+            // Hold mode: jump to end value
+            easedProgress = 1.0;
+        } else if (activeKf.easingMode == EASING_MODE_BEZIER) {
+            // Bezier mode: use cubic bezier curve
+            easedProgress = evaluateCubicBezier(
+                progress,
+                activeKf.bezierCx1,
+                activeKf.bezierCy1,
+                activeKf.bezierCx2,
+                activeKf.bezierCy2
+            );
+        } else {
+            // Standard mode: use easing function by ID
+            easedProgress = applyEasing(progress, activeKf.easingId);
+        }
 
         let interpolatedValue = activeKf.startValue + (activeKf.endValue - activeKf.startValue) * easedProgress;
 
@@ -379,3 +472,40 @@ export function buildInterpolationShader(customEasings: CustomGpuEasing[]): stri
 }
 
 export const INTERPOLATION_SHADER = BASE_INTERPOLATION_SHADER;
+
+// Easing mode constants for CPU-side usage
+export const EASING_MODE = {
+  STANDARD: 0,
+  BEZIER: 1,
+  HOLD: 2,
+} as const;
+
+// Keyframe data layout (10 floats per keyframe)
+export const KEYFRAME_STRIDE = 10;
+
+/**
+ * Pack keyframe data for GPU upload
+ * Layout: [startTime, duration, startValue, endValue, easingId, cx1, cy1, cx2, cy2, easingMode]
+ */
+export function packKeyframeForGPU(
+  startTime: number,
+  duration: number,
+  startValue: number,
+  endValue: number,
+  easingId: number,
+  bezier?: { cx1: number; cy1: number; cx2: number; cy2: number },
+  easingMode: number = EASING_MODE.STANDARD,
+): Float32Array {
+  const data = new Float32Array(KEYFRAME_STRIDE);
+  data[0] = startTime;
+  data[1] = duration;
+  data[2] = startValue;
+  data[3] = endValue;
+  data[4] = easingId;
+  data[5] = bezier?.cx1 ?? 0;
+  data[6] = bezier?.cy1 ?? 0;
+  data[7] = bezier?.cx2 ?? 1;
+  data[8] = bezier?.cy2 ?? 1;
+  data[9] = easingMode;
+  return data;
+}

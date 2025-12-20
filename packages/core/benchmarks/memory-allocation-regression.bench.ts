@@ -5,7 +5,7 @@ import { MotionStateComponent } from '../src/components/state';
 import { TimelineComponent, findActiveKeyframe } from '../src/components/timeline';
 import { RenderComponent } from '../src/components/render';
 import { TimeSystem } from '../src/systems/time';
-import { ThresholdMonitorSystem } from '../src/systems/threshold-monitor';
+
 import { BatchSamplingSystem, ComputeBatchProcessor } from '../src/systems/batch';
 import {
   WebGPUComputeSystem,
@@ -210,8 +210,7 @@ describe('Timeline System Allocation', () => {
       app: {} as any,
       config: {
         ...world.config,
-        webgpuThreshold: 1000,
-        gpuCompute: 'auto',
+        gpuCompute: 'always',
       },
       batchProcessor,
       metrics,
@@ -220,7 +219,6 @@ describe('Timeline System Allocation', () => {
     };
     world.scheduler.setServices(services);
     world.scheduler.add(TimeSystem);
-    world.scheduler.add(ThresholdMonitorSystem);
   });
 
   bench('Timeline system allocation - 500 entities', () => {
@@ -378,8 +376,7 @@ describe('Batch Sampling Allocation', () => {
       app: {} as any,
       config: {
         ...world.config,
-        gpuCompute: 'auto',
-        webgpuThreshold: 1000,
+        gpuCompute: 'always',
       },
       batchProcessor,
       metrics,
@@ -388,7 +385,6 @@ describe('Batch Sampling Allocation', () => {
     };
     world.scheduler.setServices(services);
     world.scheduler.add(TimeSystem);
-    world.scheduler.add(ThresholdMonitorSystem);
     world.scheduler.add(BatchSamplingSystem);
   });
 
@@ -418,7 +414,6 @@ describe('Batch Sampling Allocation', () => {
     const initialHeap = process.memoryUsage().heapUsed;
     for (let i = 0; i < 500; i++) {
       TimeSystem.update(16, { services, dt: 16 });
-      ThresholdMonitorSystem.update(16, { services, dt: 16 });
       BatchSamplingSystem.update(16, { services, dt: 16 });
       await WebGPUComputeSystem.update(16, { services, dt: 16 });
     }

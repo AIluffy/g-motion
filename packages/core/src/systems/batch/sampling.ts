@@ -7,10 +7,19 @@ import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import type { TimelineData, Track, Keyframe } from '../../types';
 import { getRendererCode } from '../../renderer-code';
 import { getArchetypeBufferCache } from './archetype-buffer-cache'; // P1-2: Buffer cache
+import { KEYFRAME_STRIDE } from '../../webgpu/shader'; // Phase 1.1: Extended keyframe support
+
+// Easing mode constants (matching shader EASING_MODE)
+const EASING_MODE_STANDARD = 0;
+const EASING_MODE_BEZIER = 1;
+const EASING_MODE_HOLD = 2;
 
 const bufferCache = new BatchBufferCache();
 const archetypeBufferCache = getArchetypeBufferCache(); // P1-2: Archetype-level cache
 const MAX_KEYFRAMES_PER_CHANNEL = 4;
+
+// Use extended keyframe stride (10 floats) for Bezier support
+const KEYFRAME_FLOATS = KEYFRAME_STRIDE; // 10 floats per keyframe
 
 const archetypeScratch: any[] = [];
 const pickedArchetypesScratch: any[] = [];
@@ -38,7 +47,12 @@ function hashEntityIndices(buf: Int32Array, len: number): number {
  * Batch Sampling System
  *
  * Gathers animation data from entity components and prepares them for batch processing.
- * This system identifies GPU-eligible entities and prepares their data for WebGPU compute pipeline.
+ * This system prepares data for WebGPU compute pipeline by default.
+ *
+ * GPU-First Architecture:
+ * - All animations are prepared for GPU compute by default
+ * - CPU fallback is handled by InterpolationSystem when GPU is unavailable
+ * - config.gpuCompute='never' explicitly disables GPU path
  *
  * Performance optimizations:
  * - Reuses Float32Array buffers via BatchBufferCache (eliminates per-frame allocations)
@@ -78,25 +92,14 @@ export const BatchSamplingSystem: SystemDef = {
     const channelRegistry = getGPUChannelMappingRegistry();
     const callbackCode = getRendererCode('callback');
 
-    // Determine GPU eligibility based on config.gpuCompute mode
-    let gpuEnabled: boolean;
+    // GPU-First: Only skip if explicitly disabled
     if (config.gpuCompute === 'never') {
-      // Skip GPU processing if explicitly disabled
       processor.clearArchetypeBatches();
       return;
-    } else if (config.gpuCompute === 'always') {
-      // Always use GPU if available
-      gpuEnabled = true;
-    } else {
-      // Auto mode: check threshold
-      gpuEnabled = metrics.getStatus().enabled;
     }
 
-    // Skip batch processing if GPU is disabled
-    if (!gpuEnabled) {
-      processor.clearArchetypeBatches();
-      return;
-    }
+    // Always prepare batches for GPU (GPU-first architecture)
+    // CPU fallback is handled by InterpolationSystem when GPU unavailable
 
     // Clear previous archetype batches (per-frame refresh)
     processor.clearArchetypeBatches();
@@ -288,7 +291,7 @@ export const BatchSamplingSystem: SystemDef = {
         const entitySig = hashEntityIndices(entityIndicesBuf, entityCount);
 
         if (channelCount > 0) {
-          const required = entityCount * channelCount * MAX_KEYFRAMES_PER_CHANNEL * 5;
+          const required = entityCount * channelCount * MAX_KEYFRAMES_PER_CHANNEL * KEYFRAME_FLOATS;
           const cached = keyframesPackedCache.get(archetype.id);
           const canReuse =
             cached &&
@@ -315,22 +318,39 @@ export const BatchSamplingSystem: SystemDef = {
                     (eIndex * channelCount * MAX_KEYFRAMES_PER_CHANNEL +
                       cIndex * MAX_KEYFRAMES_PER_CHANNEL +
                       kIndex) *
-                    5;
+                    KEYFRAME_FLOATS;
 
                   if (track && kIndex < count) {
-                    const kf = track[kIndex] as Keyframe;
+                    const kf = track[kIndex] as Keyframe & {
+                      bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
+                      interpMode?: string;
+                    };
                     const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+
+                    // Determine easing mode (Phase 1.1: Bezier support)
+                    let easingMode = EASING_MODE_STANDARD;
+                    if (kf.interpMode === 'hold') {
+                      easingMode = EASING_MODE_HOLD;
+                    } else if (kf.bezier || kf.interpMode === 'bezier') {
+                      easingMode = EASING_MODE_BEZIER;
+                    }
+
                     keyframesData[globalIndex] = kf.startTime;
                     keyframesData[globalIndex + 1] = kf.time - kf.startTime;
                     keyframesData[globalIndex + 2] = kf.startValue;
                     keyframesData[globalIndex + 3] = kf.endValue;
                     keyframesData[globalIndex + 4] = easingId;
+                    // Bezier control points (default to linear if not specified)
+                    keyframesData[globalIndex + 5] = kf.bezier?.cx1 ?? 0;
+                    keyframesData[globalIndex + 6] = kf.bezier?.cy1 ?? 0;
+                    keyframesData[globalIndex + 7] = kf.bezier?.cx2 ?? 1;
+                    keyframesData[globalIndex + 8] = kf.bezier?.cy2 ?? 1;
+                    keyframesData[globalIndex + 9] = easingMode;
                   } else {
-                    keyframesData[globalIndex] = 0;
-                    keyframesData[globalIndex + 1] = 0;
-                    keyframesData[globalIndex + 2] = 0;
-                    keyframesData[globalIndex + 3] = 0;
-                    keyframesData[globalIndex + 4] = 0;
+                    // Zero out unused keyframe slots
+                    for (let f = 0; f < KEYFRAME_FLOATS; f++) {
+                      keyframesData[globalIndex + f] = 0;
+                    }
                   }
                 }
               }
@@ -354,7 +374,7 @@ export const BatchSamplingSystem: SystemDef = {
             }
           }
 
-          const size = Math.max(5, totalKeyframes * 5);
+          const size = Math.max(KEYFRAME_FLOATS, totalKeyframes * KEYFRAME_FLOATS);
           const cached = keyframesPackedCache.get(archetype.id);
           const canReuse =
             cached &&
@@ -375,14 +395,31 @@ export const BatchSamplingSystem: SystemDef = {
               for (const [, track] of tracks) {
                 if (!Array.isArray(track) || track.length === 0) continue;
                 for (let kIndex = 0; kIndex < track.length; kIndex++) {
-                  const kf = track[kIndex] as Keyframe;
+                  const kf = track[kIndex] as Keyframe & {
+                    bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
+                    interpMode?: string;
+                  };
                   const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+
+                  // Determine easing mode (Phase 1.1: Bezier support)
+                  let easingMode = EASING_MODE_STANDARD;
+                  if (kf.interpMode === 'hold') {
+                    easingMode = EASING_MODE_HOLD;
+                  } else if (kf.bezier || kf.interpMode === 'bezier') {
+                    easingMode = EASING_MODE_BEZIER;
+                  }
+
                   keyframesData[w] = kf.startTime;
                   keyframesData[w + 1] = kf.time - kf.startTime;
                   keyframesData[w + 2] = kf.startValue;
                   keyframesData[w + 3] = kf.endValue;
                   keyframesData[w + 4] = easingId;
-                  w += 5;
+                  keyframesData[w + 5] = kf.bezier?.cx1 ?? 0;
+                  keyframesData[w + 6] = kf.bezier?.cy1 ?? 0;
+                  keyframesData[w + 7] = kf.bezier?.cx2 ?? 1;
+                  keyframesData[w + 8] = kf.bezier?.cy2 ?? 1;
+                  keyframesData[w + 9] = easingMode;
+                  w += KEYFRAME_FLOATS;
                 }
               }
             }
