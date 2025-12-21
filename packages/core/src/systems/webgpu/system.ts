@@ -17,21 +17,21 @@
  */
 
 import type { SystemContext, SystemDef } from '../../plugin';
-import { getWebGPUBufferManager, WebGPUBufferManager } from '../../webgpu/buffer';
-import { buildInterpolationShader } from '../../webgpu/shader';
-import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
-import { getTimingHelper, TimingHelper } from '../../webgpu/timing-helper';
-import { enqueueGPUResults } from '../../webgpu/sync-manager';
-import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
-import { StagingBufferPool } from '../../webgpu/staging-pool';
 import { AsyncReadbackManager } from '../../webgpu/async-readback';
-import { initWebGPUCompute } from './initialization';
-import { cachePipeline } from './pipeline';
-import { dispatchGPUBatch } from './dispatch';
+import { getWebGPUBufferManager, WebGPUBufferManager } from '../../webgpu/buffer';
+import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
+import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
 import {
   getPersistentGPUBufferManager,
   resetPersistentGPUBufferManager,
 } from '../../webgpu/persistent-buffer-manager';
+import { buildInterpolationShader } from '../../webgpu/shader';
+import { StagingBufferPool } from '../../webgpu/staging-pool';
+import { enqueueGPUResults } from '../../webgpu/sync-manager';
+import { getTimingHelper, TimingHelper } from '../../webgpu/timing-helper';
+import { dispatchGPUBatch } from './dispatch';
+import { initWebGPUCompute } from './initialization';
+import { cachePipeline } from './pipeline';
 
 // Sentinel value to track initialization
 let bufferManager: WebGPUBufferManager | null = null;
@@ -140,6 +140,7 @@ export const WebGPUComputeSystem: SystemDef = {
     }
 
     const device = bufferManager.getDevice();
+
     if (!device) {
       metricsProvider.updateStatus({ cpuFallbackActive: true });
       return;
@@ -147,6 +148,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     // Rebuild pipeline if custom easing set changed
     const currentVersion = getCustomEasingVersion();
+
     if (currentVersion !== shaderVersion) {
       const bindGroupLayoutEntries = [
         {
@@ -170,6 +172,7 @@ export const WebGPUComputeSystem: SystemDef = {
         shaderCode: buildInterpolationShader(getCustomGpuEasings()),
         bindGroupLayoutEntries,
       });
+
       if (success) {
         const pipeline = (bufferManager as any).computePipeline;
         if (pipeline) {
@@ -177,6 +180,46 @@ export const WebGPUComputeSystem: SystemDef = {
         }
         shaderVersion = currentVersion;
       }
+    }
+
+    // Process completed readbacks
+    if (readbackManager) {
+      // Limit readback processing to 2ms per frame to prevent blocking
+      readbackManager.drainCompleted(2).then((results) => {
+        for (const res of results) {
+          const values = res.values;
+          const shouldApply = !res.expired && values;
+          if (shouldApply) {
+            enqueueGPUResults({
+              archetypeId: res.archetypeId,
+              entityIds: res.entityIds,
+              values,
+              stride: res.stride,
+              channels: res.channels,
+            });
+          }
+
+          try {
+            metricsProvider.recordMetric({
+              batchId: `${res.archetypeId}-sync`,
+              entityCount: res.entityIds.length,
+              timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+              gpu: true,
+              syncPerformed: true,
+              syncDurationMs: res.syncDurationMs ?? 0,
+              syncDataSize: res.byteSize,
+            });
+          } catch {
+            // ignore
+          }
+
+          stagingPool!.markAvailable(res.stagingBuffer);
+
+          if (typeof res.leaseId === 'number') {
+            processor.releaseEntityIds(res.leaseId);
+          }
+        }
+      });
     }
 
     // GPU-First: Always process batches when GPU is available
@@ -251,47 +294,12 @@ export const WebGPUComputeSystem: SystemDef = {
         if (typeof leaseId === 'number') {
           processor.releaseEntityIds(leaseId);
         }
+        console.warn('[Motion][WebGPUComputeSystem] dispatchGPUBatch failed', {
+          archetypeId,
+          entityCount: batch.entityCount,
+          channelCount,
+        });
       }
-    }
-
-    // Process completed readbacks
-    if (readbackManager) {
-      // Limit readback processing to 2ms per frame to prevent blocking
-      readbackManager.drainCompleted(2).then((results) => {
-        for (const res of results) {
-          const values = res.values;
-          const shouldApply = !res.expired && values;
-          if (shouldApply) {
-            enqueueGPUResults({
-              archetypeId: res.archetypeId,
-              entityIds: res.entityIds,
-              values,
-              stride: res.stride,
-              channels: res.channels,
-            });
-          }
-
-          try {
-            metricsProvider.recordMetric({
-              batchId: `${res.archetypeId}-sync`,
-              entityCount: res.entityIds.length,
-              timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
-              gpu: true,
-              syncPerformed: true,
-              syncDurationMs: res.syncDurationMs ?? 0,
-              syncDataSize: res.byteSize,
-            });
-          } catch {
-            // ignore
-          }
-
-          stagingPool!.markAvailable(res.stagingBuffer);
-
-          if (typeof res.leaseId === 'number') {
-            processor.releaseEntityIds(res.leaseId);
-          }
-        }
-      });
     }
 
     stagingPool.nextFrame();

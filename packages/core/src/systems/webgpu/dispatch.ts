@@ -61,13 +61,20 @@ export async function dispatchGPUBatch(
     {
       label: `keyframes-${archetypeId}`,
       allowGrowth: true,
-      contentVersion: batch.keyframesVersion, // Use version signature for O(1) change detection
+      contentVersion: batch.keyframesVersion,
     },
   );
 
-  // Output buffer (always recreated as it changes every frame)
+  const stateBufferSize = (stateGPUBuffer as any).size as number | undefined;
+  const floatsPerState = 4;
+  const bytesPerState = floatsPerState * 4;
+  const entityCapacity =
+    stateBufferSize && stateBufferSize > 0
+      ? Math.max(batch.entityCount, Math.floor(stateBufferSize / bytesPerState))
+      : batch.entityCount;
+
   const outputBuffer = device.createBuffer({
-    size: batch.entityCount * Math.max(channelCount, 1) * 4,
+    size: entityCapacity * Math.max(channelCount, 1) * 4,
     usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as any,
     label: `output-${archetypeId}`,
   });

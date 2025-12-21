@@ -29,8 +29,15 @@ export const InterpolationSystem: SystemDef = {
     if (!world) {
       return;
     }
-    const frame = frameId++;
     const config = (ctx?.services.config ?? world.config) as any;
+
+    // Explicit GPU disable check
+    const gpuMode = config.gpuCompute ?? 'auto';
+    if (gpuMode === 'always') {
+      return;
+    }
+
+    const frame = frameId++;
     const slice = config?.workSlicing as
       | { enabled?: boolean; interpolationArchetypesPerFrame?: number }
       | undefined;

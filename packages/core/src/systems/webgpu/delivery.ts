@@ -4,6 +4,7 @@ import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import type { ChannelMapping } from '../../webgpu/channel-mapping';
 import { isDev } from '@g-motion/utils';
 import { getRendererCode } from '../../renderer-code';
+import { MotionStatus } from '../../components/state';
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
@@ -47,10 +48,6 @@ export const GPUResultApplySystem: SystemDef = {
           ];
           channelsResolved = defaultChannels;
           // eslint-disable-next-line no-console
-          console.warn(
-            '[GPUResultApplySystem] No channel mapping for archetype, using default mapping in dev',
-            p.archetypeId,
-          );
         } else {
           channelsResolved = [];
         }
@@ -139,15 +136,48 @@ export const GPUResultApplySystem: SystemDef = {
           ? typedRendererCode[index]
           : (render.rendererCode ?? 0);
 
+        const stateBuffer = archetype.getBuffer?.('MotionState');
+        const typedStatus = archetype.getTypedBuffer?.('MotionState', 'status');
+        const timelineBuffer = archetype.getBuffer?.('Timeline');
+        let finishedOverrides: Record<string, number> | undefined;
+
+        if (stateBuffer && timelineBuffer && index !== undefined) {
+          const state = stateBuffer[index] as { status?: MotionStatus };
+          const status = typedStatus
+            ? (typedStatus[index] as unknown as MotionStatus)
+            : (state.status as MotionStatus | undefined);
+          if (status === MotionStatus.Finished) {
+            const timeline = timelineBuffer[index] as { tracks?: Map<string, any> } | undefined;
+            const tracks = timeline?.tracks;
+            if (tracks && tracks.size > 0) {
+              finishedOverrides = {};
+              for (const [prop, track] of tracks) {
+                const arr = track as Array<{ endValue: number }> | undefined;
+                if (!arr || arr.length === 0) continue;
+                const last = arr[arr.length - 1];
+                finishedOverrides[prop] = last.endValue;
+              }
+            }
+          }
+        }
+
         let changed = false;
         if (!render.props) {
           render.props = {};
           changed = true;
         }
 
-        // Handle primitive renderer (single channel)
+        const transformBuffer = archetype.getBuffer?.('Transform');
+        const typedTransformBuffers: Record<
+          string,
+          Float32Array | Float64Array | Int32Array | undefined
+        > = {};
+
         const base = i * stride;
-        if (rendererCode === primitiveCode || render.rendererId === 'primitive' || stride === 1) {
+        if (
+          (rendererCode === primitiveCode || render.rendererId === 'primitive' || stride === 1) &&
+          !channelsResolved.some((c) => c.property !== '__primitive')
+        ) {
           const next = values[base];
           if (!Object.is(render.props.__primitive, next)) {
             render.props.__primitive = next;
@@ -159,21 +189,60 @@ export const GPUResultApplySystem: SystemDef = {
           continue;
         }
 
-        // DOM/Object: apply channel mapping
         for (const channelMap of channelsResolved) {
           const valueIndex = base + channelMap.index;
           if (valueIndex < valuesLen) {
             let value = values[valueIndex];
-            // Apply optional transform when provided by packet or registry
             if (typeof channelMap.transform === 'function') {
               try {
                 value = channelMap.transform(value);
               } catch (e) {
-                // Swallow transform errors to avoid breaking delivery path
-                // eslint-disable-next-line no-console
                 console.warn('[GPUResultApplySystem] Channel transform error', e);
               }
             }
+            if (
+              finishedOverrides &&
+              Object.prototype.hasOwnProperty.call(finishedOverrides, channelMap.property)
+            ) {
+              value = finishedOverrides[channelMap.property];
+            }
+            const writeTransform = (prop: string) => {
+              if (transformBuffer && index !== undefined) {
+                const t = transformBuffer[index] as any;
+                if (t && !Object.is(t[prop], value)) {
+                  t[prop] = value;
+                }
+              }
+              let tbuf = typedTransformBuffers[prop];
+              if (tbuf === undefined) {
+                tbuf = archetype.getTypedBuffer?.('Transform', prop) as
+                  | Float32Array
+                  | Float64Array
+                  | Int32Array
+                  | undefined;
+                typedTransformBuffers[prop] = tbuf;
+              }
+              if (tbuf && index !== undefined) {
+                tbuf[index] = value;
+              }
+            };
+
+            writeTransform(channelMap.property);
+
+            if (channelMap.property === 'translateX') {
+              writeTransform('x');
+            } else if (channelMap.property === 'translateY') {
+              writeTransform('y');
+            } else if (channelMap.property === 'translateZ') {
+              writeTransform('z');
+            } else if (channelMap.property === 'scale') {
+              writeTransform('scaleX');
+              writeTransform('scaleY');
+              writeTransform('scaleZ');
+            } else if (channelMap.property === 'rotate') {
+              writeTransform('rotateZ');
+            }
+
             const prev = render.props[channelMap.property];
             if (!Object.is(prev, value)) {
               render.props[channelMap.property] = value;

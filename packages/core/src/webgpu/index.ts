@@ -15,8 +15,13 @@ export {
   type ComputeShaderConfig,
 } from './shader-interface';
 
-export { SyncManager, DataTransferOptimizer, ComputeOrchestrator } from './sync-manager';
-export type { SyncEvent, PerformanceMetrics } from './sync-manager';
+export {
+  SyncManager,
+  DataTransferOptimizer,
+  ComputeOrchestrator,
+  drainGPUResults,
+} from './sync-manager';
+export type { SyncEvent, PerformanceMetrics, GPUResultPacket } from './sync-manager';
 
 // Development tools (benchmark, profiler) are not exported for production use
 // Import directly from './benchmark' in benchmark files if needed

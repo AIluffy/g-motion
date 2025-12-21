@@ -121,6 +121,10 @@ export class Archetype implements ArchetypeInternal {
     return buffer[index];
   }
 
+  getEntityIndex(entityId: number): number | undefined {
+    return this.entityIndices.get(entityId);
+  }
+
   getEntityId(index: number): number {
     const entityId = this.indicesMap.get(index);
     return entityId !== undefined ? entityId : -1;

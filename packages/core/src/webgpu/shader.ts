@@ -380,7 +380,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    let elapsedTime = state.currentTime - state.startTime;
+    let elapsedTime = state.currentTime;
     let adjustedElapsedTime = elapsedTime * state.playbackRate;
 
     for (var c: u32 = 0u; c < channelCount; c = c + 1u) {

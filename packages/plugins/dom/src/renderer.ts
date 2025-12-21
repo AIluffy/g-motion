@@ -270,6 +270,7 @@ export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
     const transform = (getComponent('Transform') as any) || props;
 
     const tt = getTransformTyped?.();
+    console.log(tt, transform, 'transform xxxxxx');
     if (transform || tt) {
       const idx = tt?.index ?? -1;
       const b = tt?.buffers;
@@ -524,6 +525,35 @@ export const DOMRenderSystem: SystemDef = {
       const renderBuffer = archetype.getBuffer('Render');
       if (!renderBuffer) continue;
 
+      const transformTypedBuffers: Record<
+        string,
+        Float32Array | Float64Array | Int32Array | undefined
+      > = {
+        x: (archetype as any).getTypedBuffer?.('Transform', 'x'),
+        y: (archetype as any).getTypedBuffer?.('Transform', 'y'),
+        z: (archetype as any).getTypedBuffer?.('Transform', 'z'),
+        translateX: (archetype as any).getTypedBuffer?.('Transform', 'translateX'),
+        translateY: (archetype as any).getTypedBuffer?.('Transform', 'translateY'),
+        translateZ: (archetype as any).getTypedBuffer?.('Transform', 'translateZ'),
+        rotate: (archetype as any).getTypedBuffer?.('Transform', 'rotate'),
+        rotateX: (archetype as any).getTypedBuffer?.('Transform', 'rotateX'),
+        rotateY: (archetype as any).getTypedBuffer?.('Transform', 'rotateY'),
+        rotateZ: (archetype as any).getTypedBuffer?.('Transform', 'rotateZ'),
+        scale: (archetype as any).getTypedBuffer?.('Transform', 'scale'),
+        scaleX: (archetype as any).getTypedBuffer?.('Transform', 'scaleX'),
+        scaleY: (archetype as any).getTypedBuffer?.('Transform', 'scaleY'),
+        scaleZ: (archetype as any).getTypedBuffer?.('Transform', 'scaleZ'),
+        perspective: (archetype as any).getTypedBuffer?.('Transform', 'perspective'),
+      };
+
+      let hasAnyTransformTyped = false;
+      for (const k in transformTypedBuffers) {
+        if (transformTypedBuffers[k]) {
+          hasAnyTransformTyped = true;
+          break;
+        }
+      }
+
       for (let i = 0; i < archetype.entityCount; i++) {
         const render = renderBuffer[i] as {
           rendererId: string;
@@ -531,13 +561,19 @@ export const DOMRenderSystem: SystemDef = {
         };
         if (render.rendererId !== 'dom') continue;
 
-        // Collect components
         const components: Record<string, any> = {};
         for (const name of archetype.componentNames) {
           const buffer = archetype.getBuffer(name);
           if (buffer) {
             components[name] = buffer[i];
           }
+        }
+
+        if (hasAnyTransformTyped) {
+          components.TransformTyped = {
+            index: i,
+            buffers: transformTypedBuffers,
+          };
         }
 
         renderer.update(archetype.getEntityId(i), render.target, components);

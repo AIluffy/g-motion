@@ -279,9 +279,8 @@ function TimelineCard() {
     controlRef.current?.stop();
 
     const control = motion(`#${timelineBoxId}`)
-      .mark([{ to: { x: 140, y: 0, scaleX: 1.05, rotate: 12 }, at: 600 }])
-      .mark([{ to: { x: 0, y: 0, scaleX: 1, rotate: 0 }, at: 1200 }])
-      .animate({ repeat: 1 });
+      .mark([{ to: { x: 140, y: 140, rotate: 360, scale: 2 }, at: 600 }])
+      .animate();
 
     controlRef.current = control;
     setIsRunning(true);

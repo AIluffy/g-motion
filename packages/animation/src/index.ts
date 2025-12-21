@@ -42,12 +42,10 @@ export function registerAnimationSystems(world: World) {
   world.scheduler.add(TimelineSystem);
   world.scheduler.add(RovingResolverSystem);
   world.scheduler.add(InterpolationSystem);
-  world.scheduler.add(GPUResultApplySystem);
   world.scheduler.add(BatchSamplingSystem);
   world.scheduler.add(WebGPUComputeSystem);
-  if ((ActiveEntityMonitorSystem as any)?.update) {
-    world.scheduler.add(ActiveEntityMonitorSystem);
-  }
+  world.scheduler.add(GPUResultApplySystem);
+  world.scheduler.add(ActiveEntityMonitorSystem);
   world.scheduler.add(RenderSystem);
 }
 
@@ -76,6 +74,5 @@ export * from './api/builder';
 export * from './api/gpu-status';
 export * from './api/track';
 export * from './api/adjust';
-export * from './systems/gpu/packBuffers';
 export * from './values';
 export { engine } from './engine';

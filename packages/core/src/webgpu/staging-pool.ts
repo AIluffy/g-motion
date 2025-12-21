@@ -15,7 +15,7 @@ export class StagingBufferPool {
   private pools = new Map<string, StagingBufferEntry[]>();
   private device: GPUDevice;
   private currentFrame = 0;
-  private readonly initialSize = 4096; // 4KB default
+  private readonly initialSize = 1024; // 4KB default
   private readonly maxPoolPerArchetype = 8;
   private readonly frameThreshold = 5; // reclaim if unused for N frames
 

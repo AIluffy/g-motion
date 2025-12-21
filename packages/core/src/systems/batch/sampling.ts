@@ -257,14 +257,20 @@ export const BatchSamplingSystem: SystemDef = {
         for (let eIndex = 0; eIndex < entityCount; eIndex++) {
           entityIdsView[eIndex] = archetype.getEntityId(entityIndicesBuf[eIndex]);
         }
-        // Pack entity states using cached buffer (eliminates per-frame allocation)
         const statesData = bufferCache.getStatesBuffer(archetype.id, entityCount * 4);
+        let runningCount = 0;
+        let pausedCount = 0;
         for (let eIndex = 0; eIndex < entityCount; eIndex++) {
           const i = entityIndicesBuf[eIndex];
           const stateObj = stateBuffer[i] as any;
           const status = typedStatus
             ? (typedStatus[i] as unknown as MotionStatus)
             : (stateObj.status as MotionStatus);
+          if (status === MotionStatus.Running) {
+            runningCount++;
+          } else if (status === MotionStatus.Paused) {
+            pausedCount++;
+          }
           const offset = eIndex * 4;
           statesData[offset] = typedStartTime ? typedStartTime[i] : Number(stateObj.startTime ?? 0);
           statesData[offset + 1] = typedCurrentTime
@@ -355,6 +361,7 @@ export const BatchSamplingSystem: SystemDef = {
                 }
               }
             }
+
             keyframesPackedCache.set(archetype.id, {
               versionSig,
               entitySig,

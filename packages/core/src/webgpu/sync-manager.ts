@@ -334,6 +334,7 @@ export type GPUResultPacket = {
 const _resultQueue: GPUResultPacket[] = [];
 
 export function enqueueGPUResults(p: GPUResultPacket): void {
+  console.log(p, 'enqueueGPUResults');
   _resultQueue.push(p);
 }
 
