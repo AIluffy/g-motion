@@ -25,11 +25,12 @@ describe('GPU regression: CPU vs GPU modes', () => {
       let last = 0;
       const control = motion(0)
         .mark([{ to: 100, at: 100 }])
-        .animate({
+        .option({
           onUpdate: (v: number) => {
             last = v;
           },
-        });
+        })
+        .play();
 
       expect(control).toBeDefined();
       await wait(160);
@@ -51,7 +52,7 @@ describe('GPU regression: CPU vs GPU modes', () => {
       const target: Target = { x: 0, y: 0, opacity: 0 };
       const control = motion(target)
         .mark([{ to: { x: 100, y: 50, opacity: 1 }, at: 120 }])
-        .animate();
+        .play();
 
       expect(control).toBeDefined();
       await wait(180);

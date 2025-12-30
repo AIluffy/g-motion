@@ -27,7 +27,7 @@ import {
 } from '../../webgpu/persistent-buffer-manager';
 import { buildInterpolationShader } from '../../webgpu/shader';
 import { StagingBufferPool } from '../../webgpu/staging-pool';
-import { enqueueGPUResults } from '../../webgpu/sync-manager';
+import { enqueueGPUResults, setPendingReadbackCount } from '../../webgpu/sync-manager';
 import { getTimingHelper, TimingHelper } from '../../webgpu/timing-helper';
 import { dispatchGPUBatch } from './dispatch';
 import { initWebGPUCompute } from './initialization';
@@ -55,6 +55,7 @@ export function __resetWebGPUComputeSystemForTests(): void {
   readbackManager = null;
   cpuFallbackLogged = false;
   resetPersistentGPUBufferManager();
+  setPendingReadbackCount(0);
 }
 
 /**
@@ -89,6 +90,7 @@ export const WebGPUComputeSystem: SystemDef = {
     if (gpuMode === 'never') {
       // CPU fallback is handled by InterpolationSystem
       metricsProvider.updateStatus({ cpuFallbackActive: true, enabled: false });
+      setPendingReadbackCount(0);
       return;
     }
 
@@ -136,6 +138,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     // GPU not available - InterpolationSystem handles CPU fallback
     if (!bufferManager || !deviceAvailable) {
+      setPendingReadbackCount(0);
       return;
     }
 
@@ -143,6 +146,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     if (!device) {
       metricsProvider.updateStatus({ cpuFallbackActive: true });
+      setPendingReadbackCount(0);
       return;
     }
 
@@ -184,12 +188,12 @@ export const WebGPUComputeSystem: SystemDef = {
 
     // Process completed readbacks
     if (readbackManager) {
+      const rb = readbackManager;
       // Limit readback processing to 2ms per frame to prevent blocking
-      readbackManager.drainCompleted(2).then((results) => {
+      rb.drainCompleted(2).then((results) => {
         for (const res of results) {
           const values = res.values;
-          const shouldApply = !res.expired && values;
-          if (shouldApply) {
+          if (values && values.length) {
             enqueueGPUResults({
               archetypeId: res.archetypeId,
               entityIds: res.entityIds,
@@ -219,7 +223,9 @@ export const WebGPUComputeSystem: SystemDef = {
             processor.releaseEntityIds(res.leaseId);
           }
         }
+        setPendingReadbackCount(rb.getPendingCount());
       });
+      setPendingReadbackCount(rb.getPendingCount());
     }
 
     // GPU-First: Always process batches when GPU is available
@@ -289,6 +295,7 @@ export const WebGPUComputeSystem: SystemDef = {
             channels.length ? channels : undefined,
             leaseId,
           );
+          setPendingReadbackCount(readbackManager.getPendingCount());
         }
       } catch {
         if (typeof leaseId === 'number') {

@@ -18,7 +18,8 @@ describe('Number Animation', () => {
     // .animate(...) -> starts and returns control
     const control = motion(0)
       .mark([{ to: 100, at: 50 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     // Sanity check immediate start
     expect(control).toBeDefined();

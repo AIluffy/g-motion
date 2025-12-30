@@ -15,7 +15,8 @@ describe('Chained Animation', () => {
     motion(0)
       .mark([{ to: 100, at: 50 }])
       .mark([{ to: 200, at: 100 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     // Wait for first part to finish (50ms) + partial second
     await new Promise((resolve) => setTimeout(resolve, 75));

@@ -126,10 +126,11 @@ function ParticlesFpsPage() {
             at: duration * 2,
           },
         ])
-        .animate({
+        .option({
           repeat: Infinity,
           delay,
-        });
+        })
+        .play();
     });
   }, [fps, isReady, isPlaying]);
 

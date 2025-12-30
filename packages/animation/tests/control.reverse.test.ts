@@ -5,7 +5,7 @@ describe('AnimationControl.reverse()', () => {
   it('sets negative playbackRate and isReversed() becomes true', () => {
     const ctrl = motion(0)
       .mark([{ to: 100, at: 500 }])
-      .animate();
+      .play();
 
     // Initially not reversed
     expect(ctrl.isReversed()).toBe(false);

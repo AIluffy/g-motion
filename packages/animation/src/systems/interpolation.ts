@@ -5,8 +5,11 @@ import {
   findActiveKeyframe,
   resolveEasing,
   extractTransformTypedBuffers,
+  getGPUChannelMappingRegistry,
+  type GPUComputeMode,
 } from '@g-motion/core';
 import { getProgress, resolveInterpMode } from '../api/timeline';
+import { defaultRegistry } from '../values/registry';
 import type {
   MotionStateComponentData,
   TimelineComponentData,
@@ -30,12 +33,21 @@ export const InterpolationSystem: SystemDef = {
       return;
     }
     const config = (ctx?.services.config ?? world.config) as any;
+    const metrics = ctx?.services.metrics;
+    const gpuMode = (config?.gpuCompute ?? 'always') as GPUComputeMode;
 
-    // Explicit GPU disable check
-    const gpuMode = config.gpuCompute ?? 'auto';
-    if (gpuMode === 'always') {
+    let gpuActive = false;
+    if (gpuMode !== 'never' && metrics) {
+      const status = metrics.getStatus();
+      gpuActive = !!status.enabled && !!status.gpuInitialized && !status.cpuFallbackActive;
+    }
+
+    const gpuOnlyInterpolation = gpuActive && config?.gpuOnlyInterpolation === true;
+    if (gpuOnlyInterpolation) {
       return;
     }
+
+    const channelRegistry = gpuActive ? getGPUChannelMappingRegistry() : null;
 
     const frame = frameId++;
     const slice = config?.workSlicing as
@@ -70,8 +82,6 @@ export const InterpolationSystem: SystemDef = {
       const renderBuffer = archetype.getBuffer('Render');
       const transformBuffer = archetype.getBuffer('Transform');
 
-      // Pre-fetch typed buffers for Transform numeric fields (SoA) to avoid repeated lookups
-      // Note: typed buffers exist only when Transform schema declares numeric types
       const typedTransformBuffers = extractTransformTypedBuffers(archetype);
       const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
       const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
@@ -80,6 +90,17 @@ export const InterpolationSystem: SystemDef = {
       const typedTickPhase = archetype.getTypedBuffer('MotionState', 'tickPhase');
 
       if (!stateBuffer || !timelineBuffer) continue;
+
+      let gpuPropsForArchetype: Set<string> | null = null;
+      if (channelRegistry) {
+        const table = channelRegistry.getChannels(archetype.id);
+        if (table && table.channels && table.channels.length > 0) {
+          gpuPropsForArchetype = new Set<string>();
+          for (const ch of table.channels) {
+            gpuPropsForArchetype.add(ch.property);
+          }
+        }
+      }
 
       for (let i = 0; i < archetype.entityCount; i++) {
         // Skip entities with SpringComponent or InertiaComponent; physics systems own them
@@ -120,19 +141,26 @@ export const InterpolationSystem: SystemDef = {
 
         const t = typedCurrentTime ? typedCurrentTime[i] : state.currentTime;
 
-        // timeline.tracks is a Map<string, Track>
         for (const [key, track] of timeline.tracks) {
-          // Use binary search to find active keyframe (O(log n) instead of O(n))
-          const activeKf = findActiveKeyframe(track as any, t);
+          if (gpuPropsForArchetype && gpuPropsForArchetype.has(key)) {
+            continue;
+          }
+          const activeKf = findActiveKeyframe(track as any, t) as any;
 
           if (activeKf) {
-            let val: number;
+            let val: any;
 
             const mode = resolveInterpMode(activeKf);
             const { progress } = getProgress(t, activeKf);
 
             if (mode === 'hold') {
-              val = activeKf.endValue;
+              if (activeKf.__valueInterp === 'registry') {
+                const fromRaw = activeKf.__from ?? activeKf.startValue;
+                const toRaw = activeKf.__to ?? activeKf.endValue;
+                val = defaultRegistry.interpolate(fromRaw, toRaw, progress);
+              } else {
+                val = activeKf.endValue;
+              }
             } else {
               let eased = progress;
 
@@ -152,9 +180,16 @@ export const InterpolationSystem: SystemDef = {
                 eased = easingFn(progress);
               }
 
-              // For spring/inertia we currently fall back to linear interpolation in this system;
-              // dedicated physics systems handle those components when present.
-              val = activeKf.startValue + (activeKf.endValue - activeKf.startValue) * eased;
+              const numericVal =
+                activeKf.startValue + (activeKf.endValue - activeKf.startValue) * eased;
+
+              if (activeKf.__valueInterp === 'registry') {
+                const fromRaw = activeKf.__from ?? activeKf.startValue;
+                const toRaw = activeKf.__to ?? activeKf.endValue;
+                val = defaultRegistry.interpolate(fromRaw, toRaw, eased);
+              } else {
+                val = numericVal;
+              }
             }
 
             // Write Output

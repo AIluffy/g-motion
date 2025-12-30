@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion, engine } from '../src';
+import type { Keyframe } from '@g-motion/core';
+import { getProgress } from '../src/api/timeline';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,7 +26,8 @@ describe('GPU time semantics vs CPU', () => {
 
       motion(0)
         .mark([{ to: 10, at: 50 }])
-        .animate({ onUpdate, delay: 40 });
+        .option({ onUpdate, delay: 40 })
+        .play();
 
       await wait(30);
       expect(onUpdate).not.toHaveBeenCalled();
@@ -42,7 +45,8 @@ describe('GPU time semantics vs CPU', () => {
 
       motion(0)
         .mark([{ to: 20, at: 30 }])
-        .animate({ onUpdate, repeat: 1 });
+        .option({ onUpdate, repeat: 1 })
+        .play();
 
       await wait(90);
 
@@ -58,7 +62,7 @@ describe('GPU time semantics vs CPU', () => {
       const ctrl = motion(0)
         .mark([{ to: 100, duration: 500 }])
         .mark([{ to: 200, duration: 500 }])
-        .animate();
+        .play();
 
       expect(ctrl.getDuration()).toBe(1000);
 
@@ -70,6 +74,37 @@ describe('GPU time semantics vs CPU', () => {
 
       ctrl.seek(-10);
       expect(ctrl.getCurrentTime()).toBe(0);
+    }
+  });
+
+  it('matches CPU vs GPU-style timeline output including end behavior', () => {
+    const kf: Keyframe = {
+      startTime: 0,
+      time: 100,
+      startValue: 0,
+      endValue: 100,
+      easing: 'linear',
+    } as any;
+
+    const samples = [0, 25, 50, 75, 100, 150];
+    const cpuValues: number[] = [];
+    const gpuValues: number[] = [];
+
+    for (const t of samples) {
+      const { progress } = getProgress(t, kf);
+      const cpu = kf.startValue + (kf.endValue - kf.startValue) * progress;
+      cpuValues.push(cpu);
+
+      const duration = Math.max(0, kf.time - kf.startTime);
+      const raw = duration === 0 ? 1 : (t - kf.startTime) / duration;
+      const clamped = Math.min(1, Math.max(0, raw));
+      const gpu = kf.startValue + (kf.endValue - kf.startValue) * clamped;
+      gpuValues.push(gpu);
+    }
+
+    expect(cpuValues.length).toBe(gpuValues.length);
+    for (let i = 0; i < cpuValues.length; i++) {
+      expect(gpuValues[i]).toBeCloseTo(cpuValues[i], 5);
     }
   });
 });

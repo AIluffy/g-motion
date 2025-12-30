@@ -3,6 +3,13 @@ import { WorldProvider } from './worldProvider';
 import { SCHEDULER_LIMITS } from './constants';
 import { getErrorHandler } from './context';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors';
+import {
+  getGPUResultQueueLength,
+  getPendingReadbackCount,
+  setGPUResultWakeup,
+} from './webgpu/sync-manager';
+
+const GPU_TAIL_KEEP_ALIVE_MS = 250;
 
 export class SystemScheduler {
   private systems: SystemDef[] = [];
@@ -11,15 +18,18 @@ export class SystemScheduler {
   private frameId = 0;
   private activeEntityCount = 0;
   private metricsCounter = 0;
+  private keepAliveUntil = 0;
 
   private services?: EngineServices;
 
   setServices(services: EngineServices): void {
     this.services = services;
+    setGPUResultWakeup(this.wakeForGPUResults);
   }
 
   clearServices(): void {
     this.services = undefined;
+    setGPUResultWakeup(undefined);
   }
 
   private getWorld() {
@@ -54,7 +64,8 @@ export class SystemScheduler {
     }
     // Auto-stop if no active entities and scheduler is running
     else if (count === 0 && this.isRunning) {
-      this.stop();
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      this.keepAliveUntil = Math.max(this.keepAliveUntil, now + GPU_TAIL_KEEP_ALIVE_MS);
     }
   }
 
@@ -85,10 +96,22 @@ export class SystemScheduler {
 
   stop(): void {
     this.isRunning = false;
+    this.keepAliveUntil = 0;
     if (this.frameId) {
       cancelAnimationFrame(this.frameId);
     }
   }
+
+  private wakeForGPUResults = (): void => {
+    if (!this.services) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this.keepAliveUntil = Math.max(this.keepAliveUntil, now + GPU_TAIL_KEEP_ALIVE_MS);
+    if (!this.isRunning) {
+      this.isRunning = true;
+      this.lastTime = typeof performance !== 'undefined' ? performance.now() : now;
+      this.loop();
+    }
+  };
 
   private loop = (): void => {
     if (!this.isRunning) return;
@@ -104,6 +127,7 @@ export class SystemScheduler {
     const frameDuration =
       (this.services?.config as any)?.frameDuration ??
       (this.getWorld()?.config as any)?.frameDuration;
+
     if (frameDuration && dt < frameDuration) {
       this.frameId = requestAnimationFrame(this.loop);
       return; // Skip frame if not enough time has passed
@@ -134,6 +158,7 @@ export class SystemScheduler {
           {
             systemName: system.name,
             originalError: e instanceof Error ? e.message : String(e),
+            dt: safeDt,
           },
         );
         (this.services?.errorHandler ?? getErrorHandler()).handle(error);
@@ -153,6 +178,16 @@ export class SystemScheduler {
     try {
       this.services.metrics.updateStatus({ frameTimeMs: frameDurationMs });
     } catch {}
+
+    const now = performance.now();
+    const hasPendingGPUWork = getPendingReadbackCount() > 0 || getGPUResultQueueLength() > 0;
+    const shouldContinue =
+      this.activeEntityCount > 0 || hasPendingGPUWork || now < this.keepAliveUntil;
+
+    if (!shouldContinue) {
+      this.isRunning = false;
+      return;
+    }
 
     this.frameId = requestAnimationFrame(this.loop);
   };

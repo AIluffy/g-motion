@@ -60,6 +60,7 @@ export const TimeSystem: SystemDef = {
 
           const nextTime = currentTime + adjustedDt * playbackRate;
           state.currentTime = nextTime;
+
           if (typedCurrentTime) typedCurrentTime[i] = nextTime;
         }
       }

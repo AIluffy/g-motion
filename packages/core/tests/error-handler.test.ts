@@ -124,19 +124,19 @@ describe('ErrorHandler', () => {
     });
 
     it('should return correct listener count', () => {
-      expect(handler.getListenerCount()).toBe(0);
+      expect(handler.getListenerCount()).toBe(1);
 
       const listener1 = vi.fn();
       const listener2 = vi.fn();
 
       handler.addListener(listener1);
-      expect(handler.getListenerCount()).toBe(1);
-
-      handler.addListener(listener2);
       expect(handler.getListenerCount()).toBe(2);
 
+      handler.addListener(listener2);
+      expect(handler.getListenerCount()).toBe(3);
+
       handler.removeListener(listener1);
-      expect(handler.getListenerCount()).toBe(1);
+      expect(handler.getListenerCount()).toBe(2);
     });
   });
 
@@ -378,6 +378,10 @@ describe('ErrorHandler', () => {
         ErrorCode.SYSTEM_UPDATE_FAILED,
         ErrorCode.RENDERER_NOT_FOUND,
         ErrorCode.READBACK_FAILED,
+        ErrorCode.TARGETS_EMPTY,
+        ErrorCode.TARGET_NULL,
+        ErrorCode.DOM_ENV_MISSING,
+        ErrorCode.INVALID_SELECTOR,
       ];
 
       systemCodes.forEach((code) => {

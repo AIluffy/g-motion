@@ -96,7 +96,8 @@ function CustomEasingDemo() {
     const control = motion(`#${boxId}`)
       .mark([{ to: { x: 220, y: 0, rotate: 10 }, at: 800, ease: cubicBezierEase }])
       .mark([{ to: { x: 0, y: 0, rotate: 0 }, at: 1400, ease: cubicBezierEase }])
-      .animate({ repeat: 0 });
+      .option({ repeat: 0 })
+      .play();
     controlRef.current = control;
     setIsRunning(true);
     window.setTimeout(() => setIsRunning(false), 1500);

@@ -68,7 +68,8 @@ function WebgpuPage() {
         const control = motion(`#wg-box-${i}`)
           .mark([{ to: { x: dx, y: dy, rotate: spin }, at: d1 }])
           .mark([{ to: { x: -dx * 0.2, y: -dy * 0.2, rotate: 0 }, at: d1 + d2 }])
-          .animate({ repeat: 1 });
+          .option({ repeat: 1 })
+          .play();
 
         controlsRef.current.push(control);
       }

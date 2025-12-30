@@ -44,12 +44,13 @@ function Cube3d() {
           at: 8000,
         },
       ])
-      .animate({
+      .option({
         repeat: Infinity,
         onUpdate: () => {
           frameCount++;
         },
-      });
+      })
+      .play();
 
     cubeControlRef.current = control;
 

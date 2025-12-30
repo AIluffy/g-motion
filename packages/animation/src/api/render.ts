@@ -1,5 +1,7 @@
 import { World, getRendererCode } from '@g-motion/core';
 import { TargetType } from './mark';
+import type { VisualTarget } from './visualTarget';
+import { getOrCreateVisualTarget } from './visualTarget';
 
 export function buildRenderComponent(
   target: any,
@@ -8,12 +10,13 @@ export function buildRenderComponent(
   onUpdate?: (val: any) => void,
 ): { Render?: any; Transform?: any } {
   if (targetType === TargetType.DOM) {
+    const visualTarget: VisualTarget = getOrCreateVisualTarget(target, targetType);
     const hasTransform = world.registry.get('Transform');
     const result: { Render: any; Transform?: any } = {
       Render: {
         rendererId: 'dom',
         rendererCode: getRendererCode('dom'),
-        target,
+        target: visualTarget,
         onUpdate,
         version: 0,
         renderedVersion: -1,
@@ -63,16 +66,18 @@ export function buildRenderComponent(
           renderedVersion: -1,
         },
       };
-    case TargetType.Object:
+    case TargetType.Object: {
+      const visualTarget: VisualTarget = getOrCreateVisualTarget(target, targetType);
       return {
         Render: {
           rendererId: 'object',
           rendererCode: getRendererCode('object'),
-          target,
+          target: visualTarget,
           version: 0,
           renderedVersion: -1,
         },
       };
+    }
     default:
       return {};
   }

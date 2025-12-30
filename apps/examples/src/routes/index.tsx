@@ -41,6 +41,9 @@ function Hub() {
             <Link to="/object" className={linkButtonClass('ghost')}>
               Open callback demo
             </Link>
+            <Link to={'/animate' as any} className={linkButtonClass('ghost')}>
+              Open animate() demo
+            </Link>
             <Link to="/webgpu" className={linkButtonClass('ghost')}>
               GPU stress test
             </Link>
@@ -62,8 +65,14 @@ function Hub() {
             <Link to="/gpu-delivery-demo" className={linkButtonClass('ghost')}>
               GPU Delivery (new)
             </Link>
+            <Link to="/gpu-only-interpolation" className={linkButtonClass('ghost')}>
+              GPU-only interpolation
+            </Link>
             <Link to="/engine-config" className={linkButtonClass('ghost')}>
               Engine Configuration
+            </Link>
+            <Link to={'/dev-debug' as any} className={linkButtonClass('ghost')}>
+              Dev debug panel
             </Link>
           </div>
         </header>
@@ -83,6 +92,23 @@ function Hub() {
                 Uses the DOM plugin automatically when targeting an element.
               </div>
               <Link to="/dom" className={linkButtonClass('primary')}>
+                View demo
+              </Link>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>animate() only demo</CardTitle>
+              <CardDescription>
+                Focused page showing one-shot animate() for DOM and plain objects.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="justify-between">
+              <div className="text-sm text-slate-300">
+                Uses animate() directly instead of the chainable motion() builder.
+              </div>
+              <Link to={'/animate' as any} className={linkButtonClass('ghost')}>
                 View demo
               </Link>
             </CardFooter>
@@ -244,6 +270,23 @@ function Hub() {
 
           <Card>
             <CardHeader>
+              <CardTitle>GPU-only interpolation</CardTitle>
+              <CardDescription>
+                Skip the CPU InterpolationSystem completely while GPU compute is healthy.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="justify-between">
+              <div className="text-sm text-slate-300">
+                Demonstrates gpuOnlyInterpolation with automatic CPU fallback on GPU errors.
+              </div>
+              <Link to="/gpu-only-interpolation" className={linkButtonClass('ghost')}>
+                View demo
+              </Link>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Engine Configuration</CardTitle>
               <CardDescription>
                 Global engine control for animation speed, FPS limiting, and GPU mode configuration.
@@ -258,6 +301,23 @@ function Hub() {
               </Link>
             </CardFooter>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Dev error debug panel</CardTitle>
+              <CardDescription>
+                Inspect MotionError events captured by the global ErrorHandler in development.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="justify-between">
+              <div className="text-sm text-slate-300">
+                Shows strict target resolution errors and selector warnings in real time.
+              </div>
+              <Link to={'/dev-debug' as any} className={linkButtonClass('ghost')}>
+                View demo
+              </Link>
+            </CardFooter>
+          </Card>
         </div>
       </div>
     </div>
@@ -267,6 +327,13 @@ function Hub() {
 function TimelineCard() {
   const controlRef = useRef<AnimationControl | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [debugInfo, setDebugInfo] = useState({
+    currentTime: 0,
+    x: 0,
+    y: 0,
+    rotate: 0,
+    scale: 1,
+  });
 
   const resetBox = () => {
     const el = document.getElementById(timelineBoxId);
@@ -280,7 +347,7 @@ function TimelineCard() {
 
     const control = motion(`#${timelineBoxId}`)
       .mark([{ to: { x: 140, y: 140, rotate: 360, scale: 2 }, at: 600 }])
-      .animate();
+      .play();
 
     controlRef.current = control;
     setIsRunning(true);
@@ -290,6 +357,13 @@ function TimelineCard() {
     controlRef.current?.stop();
     setIsRunning(false);
     resetBox();
+    setDebugInfo({
+      currentTime: 0,
+      x: 0,
+      y: 0,
+      rotate: 0,
+      scale: 1,
+    });
   };
 
   useEffect(() => {
@@ -297,6 +371,53 @@ function TimelineCard() {
       controlRef.current?.stop();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isRunning) {
+      return;
+    }
+
+    let frameId: number | null = null;
+
+    const loop = () => {
+      if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+        const el = document.getElementById(timelineBoxId);
+        const control = controlRef.current;
+
+        if (el && control) {
+          const currentTime = control.getCurrentTime();
+          const computedStyle = window.getComputedStyle(el);
+          const transform = computedStyle.transform;
+
+          if (transform && transform !== 'none') {
+            const matrix = new DOMMatrix(transform);
+            const x = matrix.e;
+            const y = matrix.f;
+            const scale = Math.hypot(matrix.a, matrix.b);
+            const rotate = (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+
+            setDebugInfo({
+              currentTime,
+              x,
+              y,
+              rotate,
+              scale,
+            });
+          }
+        }
+      }
+
+      frameId = requestAnimationFrame(loop);
+    };
+
+    frameId = requestAnimationFrame(loop);
+
+    return () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isRunning]);
 
   return (
     <Card>
@@ -314,13 +435,51 @@ function TimelineCard() {
               className="absolute left-6 top-6 h-16 w-16 rounded-lg bg-sky-500 shadow-lg shadow-sky-800/50"
             />
           </div>
-          <div className="flex gap-3">
-            <Button onClick={start} disabled={isRunning}>
-              {isRunning ? 'Running…' : 'Start'}
-            </Button>
-            <Button variant="ghost" onClick={stop}>
-              Reset
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <Button onClick={start} disabled={isRunning}>
+                {isRunning ? 'Running…' : 'Start'}
+              </Button>
+              <Button variant="ghost" onClick={stop}>
+                Reset
+              </Button>
+            </div>
+            <div className="rounded-md border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-200">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Debug timeline state
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <div>
+                  <span className="text-slate-400">currentTime</span>{' '}
+                  <span className="font-mono">
+                    {debugInfo.currentTime.toFixed(1)}
+                    ms
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">x</span>{' '}
+                  <span className="font-mono">
+                    {debugInfo.x.toFixed(1)}
+                    px
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">y</span>{' '}
+                  <span className="font-mono">
+                    {debugInfo.y.toFixed(1)}
+                    px
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">rotate</span>{' '}
+                  <span className="font-mono">{debugInfo.rotate.toFixed(1)}°</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">scale</span>{' '}
+                  <span className="font-mono">{debugInfo.scale.toFixed(3)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>

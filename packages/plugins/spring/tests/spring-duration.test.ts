@@ -21,7 +21,7 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 100,
-          at: 50, // Very short time
+          at: 50,
           spring: {
             stiffness: 100,
             damping: 10,
@@ -30,7 +30,8 @@ describe('Spring Duration Behavior', () => {
           },
         },
       ])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     // Wait past the specified time
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -59,16 +60,16 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 10,
-          at: 100, // This time is ignored
+          at: 100,
           spring: {
-            stiffness: 1000, // Very stiff
-            damping: 100, // High damping
-            restSpeed: 50, // Loose threshold for quick completion
-            restDelta: 2, // Loose threshold
+            stiffness: 1000,
+            damping: 100,
+            restSpeed: 50,
+            restDelta: 2,
           },
         },
       ])
-      .animate();
+      .play();
 
     // Wait for spring to settle
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -100,10 +101,11 @@ describe('Spring Duration Behavior', () => {
           spring: { stiffness: 100, damping: 10 },
         },
       ])
-      .animate({
-        repeat: 2, // This should not cause time-based repeats
+      .option({
+        repeat: 2,
         onUpdate,
-      });
+      })
+      .play();
 
     await new Promise((resolve) => setTimeout(resolve, 200));
 
@@ -120,16 +122,16 @@ describe('Spring Duration Behavior', () => {
       .mark([
         {
           to: 100,
-          at: 100, // Short duration
+          at: 100,
           spring: {
-            stiffness: 50, // Slow spring
-            damping: 5, // Low damping = bouncy/slow
+            stiffness: 50,
+            damping: 5,
             restSpeed: 1,
             restDelta: 0.1,
           },
         },
       ])
-      .animate();
+      .play();
 
     // Wait past the specified duration
     await new Promise((resolve) => setTimeout(resolve, 150));

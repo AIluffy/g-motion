@@ -259,7 +259,13 @@ export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
         }
       | undefined,
   ) => {
-    const el = resolveCachedElement(_target);
+    const rawTarget =
+      _target &&
+      typeof _target === 'object' &&
+      typeof (_target as any).getNativeTarget === 'function'
+        ? (_target as any).getNativeTarget()
+        : _target;
+    const el = resolveCachedElement(rawTarget);
     if (!el) return;
 
     // Initialize element for GPU acceleration on first use
@@ -270,7 +276,7 @@ export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
     const transform = (getComponent('Transform') as any) || props;
 
     const tt = getTransformTyped?.();
-    console.log(tt, transform, 'transform xxxxxx');
+
     if (transform || tt) {
       const idx = tt?.index ?? -1;
       const b = tt?.buffers;

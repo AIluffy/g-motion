@@ -6,7 +6,7 @@ describe('Unified Motion API', () => {
     const obj = { value: 0 };
     const control = motion(obj)
       .mark([{ to: { value: 100 }, at: 1000 }])
-      .animate();
+      .play();
 
     expect(control).toBeDefined();
     expect(control.getCount()).toBe(1);
@@ -16,7 +16,7 @@ describe('Unified Motion API', () => {
     const objects = [{ x: 0 }, { x: 0 }, { x: 0 }];
     const control = motion(objects)
       .mark([{ to: { x: 100 }, at: 1000 }])
-      .animate();
+      .play();
 
     expect(control).toBeDefined();
     expect(control.getCount()).toBe(3);
@@ -32,7 +32,7 @@ describe('Unified Motion API', () => {
           at: 1000,
         },
       ])
-      .animate();
+      .play();
 
     expect(control).toBeDefined();
     expect(control.getCount()).toBe(3);
@@ -45,10 +45,10 @@ describe('Unified Motion API', () => {
         {
           to: { x: 100 },
           at: 1000,
-          stagger: 100, // 100ms between each entity
+          stagger: 100,
         },
       ])
-      .animate();
+      .play();
 
     expect(control).toBeDefined();
     expect(control.getCount()).toBe(3);
@@ -58,7 +58,7 @@ describe('Unified Motion API', () => {
     const objects = [{ x: 0 }, { x: 0 }];
     const control = motion(objects)
       .mark([{ to: { x: 100 }, at: 1000 }])
-      .animate();
+      .play();
 
     expect(typeof control.play).toBe('function');
     expect(typeof control.pause).toBe('function');
@@ -77,7 +77,7 @@ describe('Unified Motion API', () => {
           at: 1000,
         },
       ])
-      .animate();
+      .play();
 
     expect(control).toBeDefined();
     expect(control.getCount()).toBe(1);

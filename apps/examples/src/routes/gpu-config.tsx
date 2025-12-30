@@ -127,7 +127,8 @@ function GPUConfigPage() {
               ease: easing,
             },
           ])
-          .animate({ repeat: 1 });
+          .option({ repeat: 1 })
+          .play();
 
         controlsRef.current.push(control);
       }

@@ -28,7 +28,7 @@ describe('DOM Transform Animation', () => {
     // Note: Use rotateZ instead of rotate for explicit Z-axis rotation
     const control = motion('#test-box')
       .mark([{ to: { x: 100, y: 50, scaleX: 1.2, rotateZ: 45 }, at: 100 }])
-      .animate();
+      .play();
 
     expect(control).toBeTruthy();
 
@@ -73,7 +73,7 @@ describe('DOM Transform Animation', () => {
           at: 120,
         },
       ])
-      .animate();
+      .play();
 
     expect(control).toBeTruthy();
 

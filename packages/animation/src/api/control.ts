@@ -2,6 +2,9 @@ import { World, MotionStatus, WorldProvider } from '@g-motion/core';
 import type { MotionStateComponentData, TimelineComponentData } from '../component-types';
 
 export class AnimationControl {
+  private static entityToControl = new Map<number, AnimationControl>();
+  private static controlOnComplete = new WeakMap<AnimationControl, () => void>();
+  private static controlFinishedEntities = new WeakMap<AnimationControl, Set<number>>();
   private entityIds: number[];
   private controls: AnimationControl[];
   private isBatch: boolean;
@@ -301,5 +304,111 @@ export class AnimationControl {
     // Clear references
     this.controls.length = 0;
     this.entityIds.length = 0;
+  }
+
+  static registerOnComplete(control: AnimationControl, onComplete?: () => void): void {
+    if (!onComplete) return;
+    this.controlOnComplete.set(control, onComplete);
+    const ids = control.getEntityIds();
+    for (const id of ids) {
+      this.entityToControl.set(id, control);
+    }
+    this.controlFinishedEntities.set(control, new Set());
+  }
+
+  static clearCompletionForControl(control: AnimationControl): void {
+    this.controlOnComplete.delete(control);
+    this.controlFinishedEntities.delete(control);
+    const ids = control.getEntityIds();
+    for (const id of ids) {
+      this.entityToControl.delete(id);
+    }
+  }
+
+  static handleMotionStatusChange(
+    entityId: number,
+    prevStatus: MotionStatus | undefined,
+    nextStatus: MotionStatus,
+  ): void {
+    if (nextStatus !== MotionStatus.Finished || prevStatus === MotionStatus.Finished) {
+      return;
+    }
+    const control = this.entityToControl.get(entityId);
+    if (!control) return;
+    const onComplete = this.controlOnComplete.get(control);
+    if (!onComplete) return;
+    let finished = this.controlFinishedEntities.get(control);
+    if (!finished) {
+      finished = new Set<number>();
+      this.controlFinishedEntities.set(control, finished);
+    }
+    finished.add(entityId);
+    if (finished.size >= control.getCount()) {
+      this.clearCompletionForControl(control);
+      detachControlFromScopes(control);
+      try {
+        onComplete();
+      } catch {}
+    }
+  }
+}
+
+export type DomAnimationScope = {
+  root: Element;
+  animations: AnimationControl[];
+};
+
+function detachControlFromScopes(control: AnimationControl): void {
+  const anyControl = control as any;
+  const scopes: Set<DomAnimationScope> | undefined = anyControl.__domScopes;
+  if (!scopes) return;
+  for (const s of scopes) {
+    const idx = s.animations.indexOf(control);
+    if (idx !== -1) {
+      s.animations.splice(idx, 1);
+    }
+  }
+  scopes.clear();
+}
+
+export function registerControlWithScope(
+  scope: DomAnimationScope,
+  control: AnimationControl,
+): void {
+  if (!scope.animations.includes(control)) {
+    scope.animations.push(control);
+  }
+  const anyControl = control as any;
+  if (!anyControl.__domScopes) {
+    anyControl.__domScopes = new Set<DomAnimationScope>();
+    const originalDestroy = control.destroy.bind(control);
+    anyControl.destroy = (removeEntities?: boolean) => {
+      detachControlFromScopes(control);
+      AnimationControl.clearCompletionForControl(control);
+      return originalDestroy(removeEntities);
+    };
+  }
+  anyControl.__domScopes.add(scope);
+}
+
+export function disposeScope(scope: DomAnimationScope): void {
+  const animations = [...scope.animations];
+  scope.animations.length = 0;
+  for (const control of animations) {
+    try {
+      AnimationControl.clearCompletionForControl(control);
+      control.stop();
+    } catch {}
+  }
+}
+
+export function disposeScopeHard(scope: DomAnimationScope, removeEntities = true): void {
+  const animations = [...scope.animations];
+  scope.animations.length = 0;
+  for (const control of animations) {
+    try {
+      AnimationControl.clearCompletionForControl(control);
+      control.destroy(removeEntities);
+    } catch {}
   }
 }

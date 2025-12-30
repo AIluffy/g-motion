@@ -144,12 +144,20 @@ class BurstManager {
   }
 }
 
+export type MotionStatusListener = (params: {
+  world: World;
+  entityId: number;
+  prevStatus?: number;
+  nextStatus: number;
+}) => void;
+
 export class World {
   readonly registry = new ComponentRegistry();
   readonly entityManager = new EntityManager();
   readonly scheduler = new SystemScheduler();
   config: MotionAppConfig;
   private activeMotionEntityCount = 0;
+  private motionStatusListeners?: Set<MotionStatusListener>;
 
   // Map Archetype ID (string signature) to Archetype instance
   private archetypes = new Map<string, Archetype>();
@@ -169,6 +177,17 @@ export class World {
     this.entityManager.setOffset(namespaceOffset);
 
     this.config = World.normalizeConfig(config);
+  }
+
+  addMotionStatusListener(listener: MotionStatusListener): void {
+    if (!this.motionStatusListeners) {
+      this.motionStatusListeners = new Set();
+    }
+    this.motionStatusListeners.add(listener);
+  }
+
+  removeMotionStatusListener(listener: MotionStatusListener): void {
+    this.motionStatusListeners?.delete(listener);
   }
 
   private static normalizeConfig(config?: MotionAppConfig): MotionAppConfig {
@@ -228,6 +247,21 @@ export class World {
     const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
     if (typedStatus) typedStatus[index] = nextStatus;
     this.applyActiveMotionDelta(prevStatus, nextStatus);
+    if (this.motionStatusListeners && prevStatus !== nextStatus) {
+      const internal = archetype as ArchetypeInternal;
+      const indicesMap = internal.getInternalIndicesMap();
+      const entityId = indicesMap.get(index);
+      if (entityId !== undefined) {
+        for (const listener of this.motionStatusListeners) {
+          listener({
+            world: this,
+            entityId,
+            prevStatus,
+            nextStatus,
+          });
+        }
+      }
+    }
   }
 
   private isActiveMotionStatus(status: number | undefined): boolean {

@@ -46,12 +46,13 @@ function DemoBox() {
           at: 3000,
         },
       ])
-      .animate({
+      .option({
         repeat: Infinity,
         onUpdate: () => {
           // Optional: track frame updates
         },
-      });
+      })
+      .play();
 
     controlRef.current = control;
     setIsAnimating(true);

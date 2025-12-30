@@ -14,7 +14,8 @@ describe('Delay and Repeat Handling', () => {
 
     motion(0)
       .mark([{ to: 10, at: 50 }])
-      .animate({ onUpdate, delay: 40 });
+      .option({ onUpdate, delay: 40 })
+      .play();
 
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(onUpdate).not.toHaveBeenCalled();
@@ -31,7 +32,8 @@ describe('Delay and Repeat Handling', () => {
 
     motion(0)
       .mark([{ to: 20, at: 30 }])
-      .animate({ onUpdate, repeat: 1 });
+      .option({ onUpdate, repeat: 1 })
+      .play();
 
     await new Promise((resolve) => setTimeout(resolve, 90));
 

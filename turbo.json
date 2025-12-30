@@ -13,7 +13,7 @@
       "cache": false
     },
     "test": {
-      "outputs": ["coverage/**"],
+      "outputs": [],
       "cache": true
     },
     "type-check": {

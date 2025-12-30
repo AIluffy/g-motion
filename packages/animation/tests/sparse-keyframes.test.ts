@@ -17,15 +17,16 @@ describe('Sparse Keyframe Interpolation', () => {
     motion(target)
       .mark([
         { to: { x: 0, y: 0, scale: 0 }, at: 0 },
-        { to: { scale: 1 }, at: 50 }, // No x, y here - they should interpolate from 0 to 100 over full duration
+        { to: { scale: 1 }, at: 50 },
         { to: { x: 100, y: 100, scale: 0 }, at: 100 },
       ])
-      .animate({
+      .option({
         onUpdate: (val) => {
           Object.assign(target, val);
           updateValues.push({ x: target.x, y: target.y, scale: target.scale });
         },
-      });
+      })
+      .play();
 
     // Wait for animation to complete
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -51,10 +52,10 @@ describe('Sparse Keyframe Interpolation', () => {
     const control = motion(mockElement)
       .mark([
         { to: { x: 0, y: 0, scale: 0 }, at: 0 },
-        { to: { scale: 1 }, at: 50 }, // No x, y - should interpolate over full duration
+        { to: { scale: 1 }, at: 50 },
         { to: { x: 100, y: 100, scale: 0 }, at: 100 },
       ])
-      .animate();
+      .play();
 
     // Wait for animation to complete
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -76,7 +77,8 @@ describe('Sparse Keyframe Interpolation', () => {
         { to: 0, at: 0 },
         { to: 100, at: 100 },
       ])
-      .animate({ onUpdate: (val) => (value = val) });
+      .option({ onUpdate: (val) => (value = val) })
+      .play();
 
     // Wait for animation to complete
     await new Promise((resolve) => setTimeout(resolve, 200));

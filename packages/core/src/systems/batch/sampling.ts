@@ -6,7 +6,7 @@ import { BatchBufferCache } from './buffer-cache';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import type { TimelineData, Track, Keyframe } from '../../types';
 import { getRendererCode } from '../../renderer-code';
-import { getArchetypeBufferCache } from './archetype-buffer-cache'; // P1-2: Buffer cache
+import { getArchetypeBufferCache, resetArchetypeBufferCache } from './archetype-buffer-cache'; // P1-2: Buffer cache
 import { KEYFRAME_STRIDE } from '../../webgpu/shader'; // Phase 1.1: Extended keyframe support
 
 // Easing mode constants (matching shader EASING_MODE)
@@ -15,7 +15,6 @@ const EASING_MODE_BEZIER = 1;
 const EASING_MODE_HOLD = 2;
 
 const bufferCache = new BatchBufferCache();
-const archetypeBufferCache = getArchetypeBufferCache(); // P1-2: Archetype-level cache
 const MAX_KEYFRAMES_PER_CHANNEL = 4;
 
 // Use extended keyframe stride (10 floats) for Bezier support
@@ -33,6 +32,20 @@ const keyframesPackedCache = new Map<
   string,
   { versionSig: number; entitySig: number; channelCount: number; buffer: Float32Array }
 >();
+
+/**
+ * Clear all internal caches. Useful for testing.
+ */
+export function __resetBatchSamplingCachesForTests(): void {
+  keyframesPackedCache.clear();
+  entityIndicesScratchByArchetype.clear();
+  archetypeScratch.length = 0;
+  pickedArchetypesScratch.length = 0;
+  archetypeCursor = 0;
+  frameId = 0;
+  bufferCache.clear();
+  resetArchetypeBufferCache();
+}
 
 function hashEntityIndices(buf: Int32Array, len: number): number {
   let h = 2166136261 >>> 0;
@@ -135,6 +148,7 @@ export const BatchSamplingSystem: SystemDef = {
 
     for (const archetype of toProcess) {
       // P1-2 Optimization: Use cached buffers to avoid repeated Map lookups
+      const archetypeBufferCache = getArchetypeBufferCache();
       let cachedBuffers = archetypeBufferCache.getBuffers(archetype);
 
       let stateBuffer: Array<unknown> | undefined;
@@ -144,9 +158,11 @@ export const BatchSamplingSystem: SystemDef = {
       let typedStartTime: Float32Array | Float64Array | Int32Array | undefined;
       let typedCurrentTime: Float32Array | Float64Array | Int32Array | undefined;
       let typedPlaybackRate: Float32Array | Float64Array | Int32Array | undefined;
+      let typedIteration: Float32Array | Float64Array | Int32Array | undefined;
       let typedTickInterval: Float32Array | Float64Array | Int32Array | undefined;
       let typedTickPhase: Float32Array | Float64Array | Int32Array | undefined;
       let typedRendererCode: Float32Array | Float64Array | Int32Array | undefined;
+      let springBuffer: Array<unknown> | undefined;
 
       if (cachedBuffers) {
         // Cache hit: use cached buffers
@@ -157,18 +173,22 @@ export const BatchSamplingSystem: SystemDef = {
         typedStartTime = cachedBuffers.typedStartTime;
         typedCurrentTime = cachedBuffers.typedCurrentTime;
         typedPlaybackRate = cachedBuffers.typedPlaybackRate;
+        typedIteration = cachedBuffers.typedIteration;
         typedTickInterval = cachedBuffers.typedTickInterval;
         typedTickPhase = cachedBuffers.typedTickPhase;
         typedRendererCode = cachedBuffers.typedRendererCode;
+        springBuffer = cachedBuffers.springBuffer;
       } else {
         // Cache miss: fetch buffers and cache them
         stateBuffer = archetype.getBuffer('MotionState');
         timelineBuffer = archetype.getBuffer('Timeline');
         renderBuffer = archetype.getBuffer('Render');
+        springBuffer = archetype.getBuffer?.('Spring');
         typedStatus = archetype.getTypedBuffer('MotionState', 'status');
         typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
         typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
         typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+        typedIteration = archetype.getTypedBuffer('MotionState', 'iteration');
         typedTickInterval = archetype.getTypedBuffer('MotionState', 'tickInterval');
         typedTickPhase = archetype.getTypedBuffer('MotionState', 'tickPhase');
         typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
@@ -178,12 +198,13 @@ export const BatchSamplingSystem: SystemDef = {
           stateBuffer,
           timelineBuffer,
           renderBuffer,
-          springBuffer: undefined,
+          springBuffer,
           inertiaBuffer: undefined,
           typedStatus,
           typedStartTime,
           typedCurrentTime,
           typedPlaybackRate,
+          typedIteration,
           typedTickInterval,
           typedTickPhase,
           typedRendererCode,
@@ -218,11 +239,11 @@ export const BatchSamplingSystem: SystemDef = {
           continue;
         }
 
-        // Only include running/paused animations
+        // Only include running animations
         const status = typedStatus
           ? (typedStatus[i] as unknown as MotionStatus)
           : ((stateBuffer[i] as any).status as MotionStatus);
-        if (status !== MotionStatus.Running && status !== MotionStatus.Paused) {
+        if (status !== MotionStatus.Running) {
           continue;
         }
 
@@ -273,9 +294,26 @@ export const BatchSamplingSystem: SystemDef = {
           }
           const offset = eIndex * 4;
           statesData[offset] = typedStartTime ? typedStartTime[i] : Number(stateObj.startTime ?? 0);
-          statesData[offset + 1] = typedCurrentTime
+          let currentTime = typedCurrentTime
             ? typedCurrentTime[i]
             : Number(stateObj.currentTime ?? 0);
+          const timeline = timelineBuffer[i] as {
+            duration?: number;
+            repeat?: number;
+            loop?: boolean;
+          };
+          const duration = Number(timeline?.duration ?? 0);
+          const hasSpring = !!(springBuffer && (springBuffer as any)[i]);
+          if (!hasSpring && duration > 0 && currentTime >= duration) {
+            const maxRepeat = timeline?.repeat ?? (timeline?.loop ? -1 : 0);
+            const iteration = typedIteration ? typedIteration[i] : Number(stateObj.iteration ?? 0);
+            if (maxRepeat === -1 || iteration < maxRepeat) {
+              currentTime = currentTime % duration;
+            } else {
+              currentTime = duration;
+            }
+          }
+          statesData[offset + 1] = currentTime;
           statesData[offset + 2] = typedPlaybackRate
             ? typedPlaybackRate[i]
             : Number(stateObj.playbackRate ?? 0);
@@ -329,15 +367,14 @@ export const BatchSamplingSystem: SystemDef = {
                   if (track && kIndex < count) {
                     const kf = track[kIndex] as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
-                      interpMode?: string;
                     };
                     const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
 
                     // Determine easing mode (Phase 1.1: Bezier support)
                     let easingMode = EASING_MODE_STANDARD;
-                    if (kf.interpMode === 'hold') {
+                    if (kf.interp === 'hold') {
                       easingMode = EASING_MODE_HOLD;
-                    } else if (kf.bezier || kf.interpMode === 'bezier') {
+                    } else if (kf.bezier || kf.interp === 'bezier') {
                       easingMode = EASING_MODE_BEZIER;
                     }
 
@@ -404,15 +441,14 @@ export const BatchSamplingSystem: SystemDef = {
                 for (let kIndex = 0; kIndex < track.length; kIndex++) {
                   const kf = track[kIndex] as Keyframe & {
                     bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
-                    interpMode?: string;
                   };
                   const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
 
                   // Determine easing mode (Phase 1.1: Bezier support)
                   let easingMode = EASING_MODE_STANDARD;
-                  if (kf.interpMode === 'hold') {
+                  if (kf.interp === 'hold') {
                     easingMode = EASING_MODE_HOLD;
-                  } else if (kf.bezier || kf.interpMode === 'bezier') {
+                  } else if (kf.bezier || kf.interp === 'bezier') {
                     easingMode = EASING_MODE_BEZIER;
                   }
 
@@ -468,6 +504,6 @@ export const BatchSamplingSystem: SystemDef = {
     }
 
     // P1-2: Advance frame counter for cache cleanup
-    archetypeBufferCache.nextFrame();
+    getArchetypeBufferCache().nextFrame();
   },
 };

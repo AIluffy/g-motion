@@ -332,10 +332,32 @@ export type GPUResultPacket = {
 };
 
 const _resultQueue: GPUResultPacket[] = [];
+let _pendingReadbackCount = 0;
+let _wakeup: (() => void) | undefined;
+
+export function setGPUResultWakeup(fn: (() => void) | undefined): void {
+  _wakeup = fn;
+}
+
+export function setPendingReadbackCount(count: number): void {
+  _pendingReadbackCount = Math.max(0, Number.isFinite(count) ? Math.floor(count) : 0);
+}
+
+export function getPendingReadbackCount(): number {
+  return _pendingReadbackCount;
+}
+
+export function getGPUResultQueueLength(): number {
+  return _resultQueue.length;
+}
 
 export function enqueueGPUResults(p: GPUResultPacket): void {
-  console.log(p, 'enqueueGPUResults');
   _resultQueue.push(p);
+  try {
+    _wakeup?.();
+  } catch {
+    // ignore
+  }
 }
 
 export function drainGPUResults(): GPUResultPacket[] {

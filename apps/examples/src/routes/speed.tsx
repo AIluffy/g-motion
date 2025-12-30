@@ -307,7 +307,7 @@ strong { color: #fff; }
         wrapped.control = motion(state)
           .mark([{ to: from, at: 0 }])
           .mark([{ to, at: s.duration }])
-          .animate({
+          .option({
             delay,
             repeat: Infinity,
             onUpdate: (state) => {
@@ -319,7 +319,8 @@ strong { color: #fff; }
             onComplete: () => {
               tests.gmotion.tween(wrapped);
             },
-          });
+          })
+          .play();
       },
       stop: (wrapped: { control: AnimationControl | null }) => {
         wrapped.control?.stop?.();
@@ -776,12 +777,13 @@ strong { color: #fff; }
           const control = motion(dot)
             .mark([{ to: { x: 0, y: 0, scale: 0.06 }, at: 0 }])
             .mark([{ to: { x: dx, y: dy, scale: 2 }, at: s.duration }])
-            .animate({
+            .option({
               repeat: Infinity,
               onComplete: () => {
                 tests.gmotiontransform.tween(dot);
               },
-            });
+            })
+            .play();
           dot._animation = control;
         }, delay);
       },

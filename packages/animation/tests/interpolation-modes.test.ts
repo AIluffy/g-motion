@@ -21,7 +21,8 @@ describe('Interpolation Modes', () => {
 
     motion(0)
       .mark([{ to: 50, at: 40, interp: 'hold' }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     await wait(60);
 
@@ -41,7 +42,8 @@ describe('Interpolation Modes', () => {
           bezier: { cx1: 0.42, cy1: 0, cx2: 0.58, cy2: 1 },
         },
       ])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     await wait(120);
 
@@ -54,7 +56,8 @@ describe('Interpolation Modes', () => {
 
     motion(0)
       .mark([{ to: 75, at: 60, interp: 'autoBezier' }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     await wait(100);
 

@@ -151,7 +151,8 @@ function EngineConfigDemo() {
       .mark([{ to: { x: 200, y: 120 }, at: 2000 }])
       .mark([{ to: { x: 0, y: 120 }, at: 3000 }])
       .mark([{ to: { x: 0, y: 0 }, at: 4000 }])
-      .animate({ repeat: -1 });
+      .option({ repeat: -1 })
+      .play();
 
     controlRef.current = control;
     setIsRunning(true);

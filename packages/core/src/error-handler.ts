@@ -4,10 +4,156 @@ import { ErrorCode, ErrorSeverity, MotionError } from './errors.js';
 
 const debug = createDebugger('ErrorHandler');
 
-/**
- * Listener function type for error events
- */
 export type ErrorListener = (error: MotionError) => void;
+
+export type ErrorScope = 'gpu' | 'batch' | 'system' | 'animation' | 'config' | 'unknown';
+
+export interface ErrorMonitorEvent {
+  code: ErrorCode;
+  severity: ErrorSeverity;
+  message: string;
+  scope: ErrorScope;
+  timestamp: number;
+  context?: Record<string, unknown>;
+}
+
+export type ErrorMonitorSink = (event: ErrorMonitorEvent) => void;
+
+export interface ErrorAggregate {
+  scope: ErrorScope;
+  code: ErrorCode;
+  severity: ErrorSeverity;
+  count: number;
+  firstTimestamp: number;
+  lastTimestamp: number;
+}
+
+function inferErrorScope(code: ErrorCode): ErrorScope {
+  if (code.startsWith('GPU_')) return 'gpu';
+  if (
+    code === ErrorCode.BATCH_EMPTY ||
+    code === ErrorCode.BATCH_NOT_FOUND ||
+    code === ErrorCode.BATCH_VALIDATION_FAILED
+  ) {
+    return 'batch';
+  }
+  if (
+    code === ErrorCode.SYSTEM_UPDATE_FAILED ||
+    code === ErrorCode.RENDERER_NOT_FOUND ||
+    code === ErrorCode.READBACK_FAILED ||
+    code === ErrorCode.TARGETS_EMPTY ||
+    code === ErrorCode.TARGET_NULL ||
+    code === ErrorCode.DOM_ENV_MISSING ||
+    code === ErrorCode.INVALID_SELECTOR
+  ) {
+    return 'system';
+  }
+  if (
+    code === ErrorCode.INVALID_MARK_OPTIONS ||
+    code === ErrorCode.INVALID_DURATION ||
+    code === ErrorCode.INVALID_EASING ||
+    code === ErrorCode.INVALID_BEZIER_POINTS
+  ) {
+    return 'animation';
+  }
+  if (
+    code === ErrorCode.INVALID_CONFIG ||
+    code === ErrorCode.INVALID_PARAMETER ||
+    code === ErrorCode.INVALID_GPU_MODE ||
+    code === ErrorCode.COMPONENT_NOT_REGISTERED ||
+    code === ErrorCode.DUPLICATE_REGISTRATION ||
+    code === ErrorCode.INVALID_COMPONENT_NAME
+  ) {
+    return 'config';
+  }
+  return 'unknown';
+}
+
+export function createErrorMonitorListener(sink: ErrorMonitorSink): ErrorListener {
+  return (error: MotionError) => {
+    const event: ErrorMonitorEvent = {
+      code: error.code,
+      severity: error.severity,
+      message: error.message,
+      scope: inferErrorScope(error.code),
+      timestamp: Date.now(),
+      context: error.context,
+    };
+    sink(event);
+  };
+}
+
+class InMemoryErrorMonitor {
+  private events: ErrorMonitorEvent[] = [];
+  private aggregates = new Map<string, ErrorAggregate>();
+  private maxEvents: number;
+
+  constructor(maxEvents = 200) {
+    this.maxEvents = maxEvents;
+  }
+
+  record(event: ErrorMonitorEvent): void {
+    this.events.push(event);
+    if (this.events.length > this.maxEvents) {
+      this.events.shift();
+    }
+    const key = `${event.scope}:${event.code}:${event.severity}`;
+    const prev = this.aggregates.get(key);
+    if (!prev) {
+      this.aggregates.set(key, {
+        scope: event.scope,
+        code: event.code,
+        severity: event.severity,
+        count: 1,
+        firstTimestamp: event.timestamp,
+        lastTimestamp: event.timestamp,
+      });
+    } else {
+      prev.count += 1;
+      prev.lastTimestamp = event.timestamp;
+    }
+    this.syncToGlobal(event);
+  }
+
+  getEvents(): ErrorMonitorEvent[] {
+    return [...this.events];
+  }
+
+  getAggregates(): ErrorAggregate[] {
+    return Array.from(this.aggregates.values());
+  }
+
+  clear(): void {
+    this.events = [];
+    this.aggregates.clear();
+  }
+
+  private syncToGlobal(event: ErrorMonitorEvent): void {
+    if (typeof globalThis === 'undefined') return;
+    const g = globalThis as any;
+    if (!Array.isArray(g.__motionErrors)) {
+      g.__motionErrors = [];
+    }
+    g.__motionErrors.push(event);
+    const limit = this.maxEvents;
+    if (g.__motionErrors.length > limit) {
+      g.__motionErrors.splice(0, g.__motionErrors.length - limit);
+    }
+  }
+}
+
+let errorMonitor: InMemoryErrorMonitor | null = null;
+
+export function getErrorMonitor(): InMemoryErrorMonitor {
+  if (!errorMonitor) {
+    errorMonitor = new InMemoryErrorMonitor();
+  }
+  return errorMonitor;
+}
+
+export function __resetErrorMonitorForTests(): void {
+  errorMonitor = null;
+}
 
 /**
  * Centralized error handling for Motion animation engine
@@ -23,6 +169,13 @@ export class ErrorHandler {
 
   constructor(context: AppContext) {
     this.context = context;
+    try {
+      const monitor = getErrorMonitor();
+      const listener = createErrorMonitorListener((event) => {
+        monitor.record(event);
+      });
+      this.addListener(listener);
+    } catch {}
   }
 
   /**

@@ -52,7 +52,7 @@ function SpringDemo() {
           spring: springConfig,
         },
       ])
-      .animate();
+      .play();
 
     controlsRef.current.set(boxId, control);
     setRunningAnimations((prev) => new Set(prev).add(boxId));

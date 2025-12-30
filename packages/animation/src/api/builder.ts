@@ -28,6 +28,15 @@ import {
 import { addKeyframesForTarget } from './keyframes';
 import { analyzeSpringTracks, analyzeInertiaTracks, buildInertiaComponent } from './physics';
 import { buildRenderComponent } from './render';
+import type { VisualTarget } from './visualTarget';
+import { getOrCreateVisualTarget } from './visualTarget';
+
+type PlayOptions = {
+  onUpdate?: (val: any) => void;
+  delay?: number;
+  repeat?: number;
+  onComplete?: () => void;
+};
 
 /**
  * Creates a new animation builder for the given target.
@@ -50,6 +59,9 @@ export class MotionBuilder {
   // Precompiled batch templates: static marks resolved once
   private batchTemplates: BatchTemplate[] = [];
   private timelineVersion = 0;
+  private playOptions: PlayOptions | undefined;
+  private visualTarget?: VisualTarget;
+  private cachedTargetType?: TargetType;
 
   constructor(target: any, opts?: { world?: World }) {
     // Normalize to array for unified handling
@@ -67,6 +79,15 @@ export class MotionBuilder {
   /** For compatibility - get the primary target */
   private get target(): any {
     return this.targets[0];
+  }
+
+  private getVisualTarget(): VisualTarget {
+    if (this.visualTarget) return this.visualTarget;
+    const type = getTargetType(this.target);
+    this.cachedTargetType = type;
+    const vt = getOrCreateVisualTarget(this.target, type);
+    this.visualTarget = vt;
+    return vt;
   }
 
   track(prop: string): TrackBuilder {
@@ -122,20 +143,20 @@ export class MotionBuilder {
     return this;
   }
 
-  /**
-   * Starts the animation.
-   * @param options - Playback options like delay, repeat count, or update callback.
-   * @returns An AnimationControl to stop/pause the animation (supports batch operations).
-   */
-  animate(options?: {
-    onUpdate?: (val: any) => void;
-    delay?: number;
-    repeat?: number;
-    onComplete?: () => void;
-  }): AnimationControl {
+  option(options: PlayOptions): this {
+    this.playOptions = { ...(this.playOptions ?? {}), ...options };
+    return this;
+  }
+
+  play(options?: PlayOptions): AnimationControl {
     if (this.isBatch) {
-      return this.animateBatch(options);
+      return this.playBatch(options);
     }
+
+    const resolvedOptions: PlayOptions = {
+      ...(this.playOptions ?? {}),
+      ...(options ?? {}),
+    };
 
     const injectedWorld = (this as any)._world as World | undefined;
     const world = injectedWorld ?? WorldProvider.useWorld();
@@ -146,7 +167,8 @@ export class MotionBuilder {
     }
     this.registerCoreComponents(world);
 
-    const targetType = getTargetType(this.target);
+    const visualTarget = this.getVisualTarget();
+    const targetType = this.cachedTargetType ?? getTargetType(this.target);
     const { hasSpring, springConfig, springVelocities } = analyzeSpringTracks(this.tracks);
     const { hasInertia, inertiaConfig, inertiaVelocities } = analyzeInertiaTracks(
       this.tracks,
@@ -156,8 +178,8 @@ export class MotionBuilder {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const components: any = {
       MotionState: {
-        delay: options?.delay ?? 0,
-        startTime: performance.now() + (options?.delay ?? 0),
+        delay: resolvedOptions.delay ?? 0,
+        startTime: performance.now() + (resolvedOptions.delay ?? 0),
         pausedAt: 0,
         currentTime: 0,
         playbackRate: 1,
@@ -168,7 +190,7 @@ export class MotionBuilder {
         tracks: this.tracks,
         duration: this.currentTime,
         loop: Infinity,
-        repeat: options?.repeat ?? 0,
+        repeat: resolvedOptions.repeat ?? 0,
         version: this.timelineVersion,
         rovingApplied: 0,
       },
@@ -191,7 +213,12 @@ export class MotionBuilder {
       components.Inertia = buildInertiaComponent(inertiaConfig, inertiaVelocities);
     }
 
-    const renderData = buildRenderComponent(this.target, targetType, world, options?.onUpdate);
+    const renderData = buildRenderComponent(
+      this.target,
+      targetType,
+      world,
+      resolvedOptions.onUpdate,
+    );
     if (renderData.Transform) {
       components.Transform = renderData.Transform;
     }
@@ -209,38 +236,36 @@ export class MotionBuilder {
         properties.push(key);
       }
       if (properties.length) {
+        const gpuProps = properties.filter((prop) => visualTarget.canUseGPU(prop));
+        const selected = gpuProps.length ? gpuProps : properties;
         const componentNames = Object.keys(components).sort();
         const archetypeId = componentNames.join('|');
         const registry = getGPUChannelMappingRegistry();
-        const table = createBatchChannelTable(archetypeId, 1, properties);
+        const table = createBatchChannelTable(archetypeId, selected.length, selected);
         registry.registerBatchChannels(table);
       }
     }
 
     const entityId = world.createEntity(components);
-    // Auto-start only when using default world; respect explicit world scopes
-    if (!injectedWorld) {
+    if (!injectedWorld && typeof (globalThis as any).requestAnimationFrame === 'function') {
       world.scheduler.start();
     }
 
-    return new AnimationControl(entityId, undefined, false, world);
+    const control = new AnimationControl(entityId, undefined, false, world);
+    AnimationControl.registerOnComplete(control, resolvedOptions.onComplete);
+    return control;
   }
 
-  /**
-   * Animate multiple entities with per-entity parameter resolution
-   * @private
-   */
-  private animateBatch(options?: {
-    onUpdate?: (val: any) => void;
-    delay?: number;
-    repeat?: number;
-    onComplete?: () => void;
-  }): AnimationControl {
+  private playBatch(options?: PlayOptions): AnimationControl {
+    const resolvedOptions: PlayOptions = {
+      ...(this.playOptions ?? {}),
+      ...(options ?? {}),
+    };
     const injectedWorld = (this as any)._world as World | undefined;
     return runBatchAnimation({
       targets: this.targets,
       templates: this.batchTemplates,
-      options,
+      options: resolvedOptions,
       injectedWorld,
       createBuilder: (target) => new MotionBuilder(target, { world: injectedWorld }),
     });
@@ -289,11 +314,12 @@ export class MotionBuilder {
       ...(rawOptions as any),
       time: (rawOptions as any).time ?? rawOptions.at,
     });
+    const visualTarget = this.getVisualTarget();
     const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
 
-    const targetType = getTargetType(this.target);
+    const targetType = this.cachedTargetType ?? getTargetType(this.target);
     const easing = resolved.ease;
-    addKeyframesForTarget(this.tracks, this.target, targetType, resolved, easing);
+    addKeyframesForTarget(this.tracks, visualTarget, targetType, resolved, easing);
     this.currentTime = resolved.time;
     this.timelineVersion++;
   }
@@ -302,8 +328,9 @@ export class MotionBuilder {
   addResolvedMark(resolved: ResolvedMarkOptions): void {
     validateMarkOptions(resolved);
     const easing = resolved.ease;
-    const targetType = getTargetType(this.target);
-    addKeyframesForTarget(this.tracks, this.target, targetType, resolved, easing);
+    const visualTarget = this.getVisualTarget();
+    const targetType = this.cachedTargetType ?? getTargetType(this.target);
+    addKeyframesForTarget(this.tracks, visualTarget, targetType, resolved, easing);
     this.currentTime = resolved.time;
     this.timelineVersion++;
   }

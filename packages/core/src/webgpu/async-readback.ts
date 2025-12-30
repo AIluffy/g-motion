@@ -1,7 +1,5 @@
-/**
- * Async Readback Manager
- * Handles double/triple-buffered GPU→CPU data transfer with timeout & graceful degradation.
- */
+import { getErrorHandler } from '../context';
+import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
 
 export interface PendingReadback {
   archetypeId: string;
@@ -119,7 +117,6 @@ export class AsyncReadbackManager {
       // Check timeout
       if (elapsed > p.timeoutMs) {
         p.expired = true;
-        continue;
       }
 
       // Try to resolve (non-blocking check)
@@ -130,12 +127,8 @@ export class AsyncReadbackManager {
         }
 
         const expired = !!p.expired;
-        let values: Float32Array | undefined = undefined;
-
-        if (!expired) {
-          const view = p.stagingBuffer.getMappedRange();
-          values = new Float32Array(view.slice(0));
-        }
+        const view = p.stagingBuffer.getMappedRange();
+        const values = new Float32Array(view.slice(0));
         p.stagingBuffer.unmap();
 
         results.push({
@@ -152,13 +145,27 @@ export class AsyncReadbackManager {
         });
         toRemove.push(i);
       } catch (e) {
-        console.warn(`[AsyncReadback] Extraction failed for '${p.archetypeId}':`, e);
-        // If extraction fails, we should still unmap and remove
+        try {
+          const error = new MotionError(
+            `[AsyncReadback] Extraction failed for '${p.archetypeId}'`,
+            ErrorCode.READBACK_FAILED,
+            ErrorSeverity.WARNING,
+            {
+              archetypeId: p.archetypeId,
+              byteSize: p.byteSize,
+              stride: p.stride,
+              hasChannels: !!p.channels,
+              entityCount: (p.entityIds as any).length,
+              originalError: e instanceof Error ? e.message : String(e),
+            },
+          );
+          getErrorHandler().handle(error);
+        } catch {}
+
         try {
           p.stagingBuffer.unmap();
-        } catch {
-          // ignore
-        }
+        } catch {}
+
         toRemove.push(i);
       }
     }

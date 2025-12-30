@@ -8,6 +8,12 @@ import { SystemDef } from '../src/plugin';
 import { WorldProvider } from '../src/worldProvider';
 import { World } from '../src/world';
 import { AppContext } from '../src/context';
+import {
+  drainGPUResults,
+  enqueueGPUResults,
+  setPendingReadbackCount,
+} from '../src/webgpu/sync-manager';
+import { AsyncReadbackManager } from '../src/webgpu/async-readback';
 
 describe('SystemScheduler Logging', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
@@ -228,5 +234,109 @@ describe('SystemScheduler Logging', () => {
         resolve();
       }, 50);
     });
+  });
+
+  test('should keep running to apply late GPU results after finishing', () => {
+    const scheduler = new SystemScheduler();
+    scheduler.setServices({
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor: AppContext.getInstance().getBatchProcessor(),
+      metrics: {} as any,
+      errorHandler: AppContext.getInstance().getErrorHandler(),
+      appContext: AppContext.getInstance(),
+    });
+
+    let zeroed = false;
+    let updatesAfterZero = 0;
+    let applied = false;
+
+    const endSystem: SystemDef = {
+      name: 'EndSystem',
+      order: 1,
+      update: () => {
+        if (!zeroed) {
+          zeroed = true;
+          scheduler.setActiveEntityCount(0);
+          setPendingReadbackCount(1);
+          return;
+        }
+        updatesAfterZero++;
+      },
+    };
+
+    const drainSystem: SystemDef = {
+      name: 'DrainSystem',
+      order: 2,
+      update: () => {
+        const packets = drainGPUResults();
+        if (packets.length) {
+          applied = true;
+        }
+      },
+    };
+
+    scheduler.add(endSystem);
+    scheduler.add(drainSystem);
+
+    scheduler.start();
+    scheduler.setActiveEntityCount(1);
+
+    setTimeout(() => {
+      enqueueGPUResults({
+        archetypeId: 'test',
+        entityIds: new Int32Array([1]),
+        values: new Float32Array([123]),
+      });
+      setPendingReadbackCount(0);
+    }, 20);
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        scheduler.stop();
+        setPendingReadbackCount(0);
+
+        expect(updatesAfterZero).toBeGreaterThan(0);
+        expect(applied).toBe(true);
+
+        resolve();
+      }, 120);
+    });
+  });
+
+  test('should drain timed-out readbacks once settled', async () => {
+    const manager = new AsyncReadbackManager();
+
+    let now = 0;
+    const dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+    const mapped = new Float32Array([42]).buffer;
+    let unmapped = false;
+    const buffer = {
+      getMappedRange() {
+        return mapped;
+      },
+      unmap() {
+        unmapped = true;
+      },
+    } as any;
+
+    manager.enqueueMapAsync('a', [1], buffer, Promise.resolve(), 4, 50);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    now = 1000;
+    const results = await manager.drainCompleted(10);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].values?.[0]).toBe(42);
+    expect(results[0].expired).toBe(true);
+    expect(unmapped).toBe(true);
+    expect(manager.getPendingCount()).toBe(0);
+
+    dateNowSpy.mockRestore();
   });
 });

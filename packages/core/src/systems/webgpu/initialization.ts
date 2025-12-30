@@ -39,7 +39,12 @@ export async function initWebGPUCompute(
       'WebGPU not available; GPU batch processing disabled. CPU path will be used.',
       ErrorCode.GPU_DEVICE_UNAVAILABLE,
       ErrorSeverity.WARNING,
-      { initOk, hasDevice: !!device },
+      {
+        initOk,
+        hasDevice: !!device,
+        stage: 'device',
+        source: 'initWebGPUCompute',
+      },
     );
     getErrorHandler().handle(error);
     return { success: false, deviceAvailable: false, shaderVersion: -1 };
@@ -64,7 +69,11 @@ export async function initWebGPUCompute(
       'WebGPU compute pipeline initialization failed; GPU batch processing disabled.',
       ErrorCode.GPU_PIPELINE_FAILED,
       ErrorSeverity.WARNING,
-      { shaderVersion },
+      {
+        shaderVersion,
+        stage: 'pipeline',
+        source: 'initWebGPUCompute',
+      },
     );
     getErrorHandler().handle(error);
   }

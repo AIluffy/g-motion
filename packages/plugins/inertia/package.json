@@ -15,7 +15,7 @@
   "scripts": {
     "build": "rslib build",
     "dev": "rslib build --watch",
-    "test": "vitest run"
+    "test": "vitest run --pool=threads --maxWorkers=1"
   },
   "dependencies": {
     "@g-motion/animation": "workspace:*",

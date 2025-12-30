@@ -4,7 +4,6 @@ import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import type { ChannelMapping } from '../../webgpu/channel-mapping';
 import { isDev } from '@g-motion/utils';
 import { getRendererCode } from '../../renderer-code';
-import { MotionStatus } from '../../components/state';
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
@@ -136,31 +135,6 @@ export const GPUResultApplySystem: SystemDef = {
           ? typedRendererCode[index]
           : (render.rendererCode ?? 0);
 
-        const stateBuffer = archetype.getBuffer?.('MotionState');
-        const typedStatus = archetype.getTypedBuffer?.('MotionState', 'status');
-        const timelineBuffer = archetype.getBuffer?.('Timeline');
-        let finishedOverrides: Record<string, number> | undefined;
-
-        if (stateBuffer && timelineBuffer && index !== undefined) {
-          const state = stateBuffer[index] as { status?: MotionStatus };
-          const status = typedStatus
-            ? (typedStatus[index] as unknown as MotionStatus)
-            : (state.status as MotionStatus | undefined);
-          if (status === MotionStatus.Finished) {
-            const timeline = timelineBuffer[index] as { tracks?: Map<string, any> } | undefined;
-            const tracks = timeline?.tracks;
-            if (tracks && tracks.size > 0) {
-              finishedOverrides = {};
-              for (const [prop, track] of tracks) {
-                const arr = track as Array<{ endValue: number }> | undefined;
-                if (!arr || arr.length === 0) continue;
-                const last = arr[arr.length - 1];
-                finishedOverrides[prop] = last.endValue;
-              }
-            }
-          }
-        }
-
         let changed = false;
         if (!render.props) {
           render.props = {};
@@ -199,12 +173,6 @@ export const GPUResultApplySystem: SystemDef = {
               } catch (e) {
                 console.warn('[GPUResultApplySystem] Channel transform error', e);
               }
-            }
-            if (
-              finishedOverrides &&
-              Object.prototype.hasOwnProperty.call(finishedOverrides, channelMap.property)
-            ) {
-              value = finishedOverrides[channelMap.property];
             }
             const writeTransform = (prop: string) => {
               if (transformBuffer && index !== undefined) {

@@ -25,6 +25,7 @@ export interface CachedArchetypeBuffers {
   typedStartTime: Float32Array | Float64Array | Int32Array | undefined;
   typedCurrentTime: Float32Array | Float64Array | Int32Array | undefined;
   typedPlaybackRate: Float32Array | Float64Array | Int32Array | undefined;
+  typedIteration: Float32Array | Float64Array | Int32Array | undefined;
   typedTickInterval: Float32Array | Float64Array | Int32Array | undefined;
   typedTickPhase: Float32Array | Float64Array | Int32Array | undefined;
   typedRendererCode: Float32Array | Float64Array | Int32Array | undefined;

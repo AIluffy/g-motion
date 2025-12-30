@@ -3,6 +3,7 @@ import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
 import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
 import { getRendererName } from '../renderer-code';
 import { getRendererGroupCache } from './renderer-group-cache'; // P2-2: Renderer group cache
+import { isDev } from '@g-motion/utils';
 
 import type { RendererBatchContext } from '../plugin';
 
@@ -80,7 +81,7 @@ export const RenderSystem: SystemDef = {
             const error = new MotionError(
               `Renderer '${rendererName}' not found; skipping updates.`,
               ErrorCode.RENDERER_NOT_FOUND,
-              ErrorSeverity.WARNING,
+              isDev() ? ErrorSeverity.FATAL : ErrorSeverity.WARNING,
               { rendererId: rendererName, archetypeId: archetype.id },
             );
             errorHandler.handle(error);

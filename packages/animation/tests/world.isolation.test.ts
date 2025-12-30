@@ -26,14 +26,14 @@ describe('WorldProvider multi-world isolation', () => {
     const ctrl1 = WorldProvider.withWorld(world1, () => {
       return motion(0, { world: world1 as any })
         .mark([{ to: 100, at: 500 }])
-        .animate();
+        .play();
     });
 
     // Animate in world2
     const ctrl2 = WorldProvider.withWorld(world2, () => {
       return motion(0, { world: world2 as any })
         .mark([{ to: 200, at: 800 }])
-        .animate();
+        .play();
     });
 
     // Verify entities are in different worlds
@@ -61,13 +61,15 @@ describe('WorldProvider multi-world isolation', () => {
     WorldProvider.withWorld(world1, () => {
       motion(0, { world: world1 as any })
         .mark([{ to: 100, at: 500 }])
-        .animate({ onUpdate: () => world1Updates++ });
+        .option({ onUpdate: () => world1Updates++ })
+        .play();
     });
 
     WorldProvider.withWorld(world2, () => {
       motion(0, { world: world2 as any })
         .mark([{ to: 200, at: 800 }])
-        .animate({ onUpdate: () => world2Updates++ });
+        .option({ onUpdate: () => world2Updates++ })
+        .play();
     });
 
     // Attach engine to world1 only and start its scheduler
@@ -102,7 +104,7 @@ describe('WorldProvider multi-world isolation', () => {
     const ctrl = WorldProvider.withWorld(world1, () => {
       return motion(targets, { world: world1 as any })
         .mark([{ to: 100, at: 500, stagger: 50 }])
-        .animate();
+        .play();
     });
 
     expect(ctrl.isBatchAnimation()).toBe(true);

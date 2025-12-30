@@ -62,10 +62,19 @@ export class WebGPUBufferManager {
 
     this.initPromise = (async () => {
       if (typeof navigator === 'undefined' || !(navigator as any).gpu) {
+        const userAgent =
+          typeof navigator !== 'undefined' && (navigator as any).userAgent
+            ? String((navigator as any).userAgent)
+            : undefined;
         const error = new MotionError(
           'navigator.gpu not available; WebGPU disabled.',
           ErrorCode.GPU_ADAPTER_UNAVAILABLE,
           ErrorSeverity.WARNING,
+          {
+            env: typeof navigator === 'undefined' ? 'no-navigator' : 'navigator-no-gpu',
+            userAgent,
+            source: 'WebGPUBufferManager.init',
+          },
         );
         getErrorHandler().handle(error);
         return false;
@@ -82,6 +91,10 @@ export class WebGPUBufferManager {
             'requestAdapter returned null; WebGPU disabled.',
             ErrorCode.GPU_ADAPTER_UNAVAILABLE,
             ErrorSeverity.WARNING,
+            {
+              stage: 'adapter',
+              source: 'WebGPUBufferManager.init',
+            },
           );
           getErrorHandler().handle(error);
           return false;
@@ -98,6 +111,10 @@ export class WebGPUBufferManager {
             'requestDevice returned null; WebGPU disabled.',
             ErrorCode.GPU_DEVICE_UNAVAILABLE,
             ErrorSeverity.WARNING,
+            {
+              stage: 'device',
+              source: 'WebGPUBufferManager.init',
+            },
           );
           getErrorHandler().handle(error);
           return false;
@@ -110,7 +127,11 @@ export class WebGPUBufferManager {
           'Failed to initialize WebGPU device',
           ErrorCode.GPU_INIT_FAILED,
           ErrorSeverity.WARNING,
-          { originalError: error instanceof Error ? error.message : String(error) },
+          {
+            stage: 'device',
+            source: 'WebGPUBufferManager.init',
+            originalError: error instanceof Error ? error.message : String(error),
+          },
         );
         getErrorHandler().handle(motionError);
         this.device = null;
@@ -163,7 +184,11 @@ export class WebGPUBufferManager {
         'Buffer write failed',
         ErrorCode.GPU_BUFFER_WRITE_FAILED,
         ErrorSeverity.ERROR,
-        { originalError: error instanceof Error ? error.message : String(error) },
+        {
+          stage: 'writeBuffer',
+          source: 'WebGPUBufferManager.writeBuffer',
+          originalError: error instanceof Error ? error.message : String(error),
+        },
       );
       getErrorHandler().handle(motionError);
       return false;
@@ -200,7 +225,11 @@ export class WebGPUBufferManager {
         'Failed to initialize compute pipeline',
         ErrorCode.GPU_PIPELINE_FAILED,
         ErrorSeverity.ERROR,
-        { originalError: error instanceof Error ? error.message : String(error) },
+        {
+          stage: 'pipeline',
+          source: 'WebGPUBufferManager.initComputePipeline',
+          originalError: error instanceof Error ? error.message : String(error),
+        },
       );
       getErrorHandler().handle(motionError);
       return false;
@@ -256,7 +285,11 @@ export class WebGPUBufferManager {
         'Compute dispatch failed',
         ErrorCode.GPU_PIPELINE_FAILED,
         ErrorSeverity.ERROR,
-        { originalError: error instanceof Error ? error.message : String(error) },
+        {
+          stage: 'dispatch',
+          source: 'WebGPUBufferManager.executeCompute',
+          originalError: error instanceof Error ? error.message : String(error),
+        },
       );
       getErrorHandler().handle(motionError);
       return false;

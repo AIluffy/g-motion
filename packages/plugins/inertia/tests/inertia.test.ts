@@ -18,7 +18,7 @@ describe('Inertia Physics Plugin', () => {
 
     motion(0)
       .mark([{ inertia: { velocity: 500 } }])
-      .animate();
+      .play();
 
     // Check that Inertia component was registered
     const inertiaComponent = world.registry.get('Inertia');
@@ -30,7 +30,7 @@ describe('Inertia Physics Plugin', () => {
 
     motion(0)
       .mark([{ inertia: { velocity: 800 } }])
-      .animate();
+      .play();
 
     // Find entity with Inertia component
     let foundInertia = false;
@@ -70,7 +70,7 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate();
+      .play();
 
     // Find entity with Inertia component
     let foundInertia = false;
@@ -103,7 +103,7 @@ describe('Inertia Physics Plugin', () => {
           inertia: { velocity: 750 },
         },
       ])
-      .animate();
+      .play();
 
     // Velocity should be initialized in the builder
     // Find entity with Inertia component
@@ -132,7 +132,7 @@ describe('Inertia Physics Plugin', () => {
           inertia: { velocity: () => velocityValue },
         },
       ])
-      .animate();
+      .play();
 
     // Velocity function is resolved in builder when creating component
     // Find entity with Inertia component
@@ -166,7 +166,7 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate();
+      .play();
 
     for (const archetype of world.getArchetypes()) {
       const inertiaBuffer = archetype.getBuffer('Inertia');
@@ -185,7 +185,7 @@ describe('Inertia Physics Plugin', () => {
 
     motion(0)
       .mark([{ inertia: { velocity: 500, bounds: { min: -50, max: 50 }, clamp: true } }])
-      .animate();
+      .play();
 
     for (const archetype of world.getArchetypes()) {
       const inertiaBuffer = archetype.getBuffer('Inertia');
@@ -204,7 +204,7 @@ describe('Inertia Physics Plugin', () => {
 
     motion(0)
       .mark([{ inertia: { velocity: 300, snap: 20, bounce: false } }])
-      .animate();
+      .play();
 
     for (const archetype of world.getArchetypes()) {
       const inertiaBuffer = archetype.getBuffer('Inertia');
@@ -222,7 +222,7 @@ describe('Inertia Physics Plugin', () => {
 
     motion(0)
       .mark([{ inertia: { velocity: 400, handoff: { type: 'spring', to: 120 } } }])
-      .animate();
+      .play();
 
     for (const archetype of world.getArchetypes()) {
       const inertiaBuffer = archetype.getBuffer('Inertia');
@@ -244,7 +244,7 @@ describe('Inertia Physics Plugin', () => {
             inertia: { velocity: 500 },
           },
         ])
-        .animate();
+        .play();
     }).toThrow(/cannot use both spring and inertia/i);
   });
 
@@ -260,7 +260,7 @@ describe('Inertia Physics Plugin', () => {
           inertia: { velocity: 800 },
         },
       ])
-      .animate();
+      .play();
 
     // Should create Inertia component
     let foundInertia = false;
@@ -288,11 +288,12 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate({
+      .option({
         onUpdate: () => {
           values.push(obj.value);
         },
-      });
+      })
+      .play();
 
     await new Promise((resolve) => setTimeout(resolve, 150));
 
@@ -313,7 +314,7 @@ describe('Inertia Physics Plugin', () => {
           inertia: { velocity: 800 }, // Positive velocity, so 'to' becomes max
         },
       ])
-      .animate();
+      .play();
 
     // The boundary inference happens in InertiaSystem at runtime
     // Here we just verify the entity was created with expected config
@@ -345,7 +346,7 @@ describe('Inertia Physics Plugin', () => {
           inertia: { velocity: 500, min: 0, max: 100 },
         },
       ])
-      .animate();
+      .play();
 
     for (const archetype of world.getArchetypes()) {
       const inertiaBuffer = archetype.getBuffer('Inertia');
@@ -372,7 +373,7 @@ describe('Inertia Physics Plugin', () => {
           inertia: { velocity: 700, max: 300 },
         },
       ])
-      .animate();
+      .play();
 
     // Cleanup
     document.body.removeChild(testDiv);
@@ -391,7 +392,8 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -411,7 +413,7 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate();
+      .play();
 
     // Verify InertiaComponent has end parameter set
     let foundInertia = false;
@@ -441,7 +443,7 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate();
+      .play();
 
     // Verify InertiaComponent has end array set
     let foundInertia = false;
@@ -473,7 +475,7 @@ describe('Inertia Physics Plugin', () => {
           },
         },
       ])
-      .animate();
+      .play();
 
     // Verify InertiaComponent has end function set
     let foundInertia = false;

@@ -74,6 +74,8 @@ export interface MotionAppConfig {
    * Default: true
    */
   gpuEasing?: boolean;
+
+  gpuOnlyInterpolation?: boolean;
 }
 
 export interface EngineServices {

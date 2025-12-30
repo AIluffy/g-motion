@@ -6,7 +6,8 @@ describe('Object Tween Tests', () => {
     const onUpdate = vi.fn();
     const control = motion(0)
       .mark([{ to: 100, at: 50 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -21,7 +22,8 @@ describe('Object Tween Tests', () => {
     // Direct number animation: motion(20).mark([{ to: 30 }])
     const control = motion(20)
       .mark([{ to: 50, at: 50 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -37,7 +39,8 @@ describe('Object Tween Tests', () => {
 
     const control = motion(target)
       .mark([{ to: { value: 100 }, at: 50 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -54,7 +57,8 @@ describe('Object Tween Tests', () => {
 
     const control = motion(target)
       .mark([{ to: { x: 100, y: 50 }, at: 50 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -70,7 +74,7 @@ describe('Object Tween Tests', () => {
 
     const control = motion(target)
       .mark([{ to: { value: 100 }, at: 50 }])
-      .animate();
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -86,7 +90,8 @@ describe('Object Tween Tests', () => {
     const control = motion(target)
       .mark([{ to: { count: 100 }, at: 50 }])
       .mark([{ to: { count: 200 }, at: 100 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 250));
@@ -102,7 +107,8 @@ describe('Object Tween Tests', () => {
 
     const control = motion(0)
       .mark([{ to: 50, at: 50 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -118,7 +124,8 @@ describe('Object Tween Tests', () => {
     const control = motion(0)
       .mark([{ to: 100, at: 50 }])
       .mark([{ to: 50, at: 100 }])
-      .animate({ onUpdate });
+      .option({ onUpdate })
+      .play();
 
     expect(control).toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 250));

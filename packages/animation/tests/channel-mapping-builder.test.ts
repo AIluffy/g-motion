@@ -26,7 +26,7 @@ describe('GPU channel mapping bound to timeline tracks', () => {
         { to: { y: 200 }, at: 1000 },
         { to: { opacity: 1 }, at: 1000 },
       ])
-      .animate();
+      .play();
 
     const archetypes = Array.from(world.getArchetypes());
     expect(archetypes.length).toBe(1);

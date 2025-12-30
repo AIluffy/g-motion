@@ -69,3 +69,4 @@ tsconfig.tsbuildinfo
 .turbo/
 .next/
 dist/
+reference/

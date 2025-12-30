@@ -42,8 +42,13 @@ export class TrackBuilder {
     return this.parent.adjust(params);
   }
 
-  animate(options?: Parameters<MotionBuilder['animate']>[0]) {
-    return this.parent.animate(options);
+  option(options: Parameters<MotionBuilder['option']>[0]) {
+    this.parent.option(options);
+    return this;
+  }
+
+  play(options?: Parameters<MotionBuilder['play']>[0]) {
+    return this.parent.play(options);
   }
 }
 

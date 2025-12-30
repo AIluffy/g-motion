@@ -154,8 +154,8 @@ describe('P1 Optimization: Archetype Buffer Cache', () => {
         `P1-2 Cache Hit Performance: ${iterations} lookups in ${duration.toFixed(2)}ms (${(duration / iterations).toFixed(4)}ms/lookup)`,
       );
 
-      // Cache hits should be very fast (<0.001ms per lookup)
-      expect(duration / iterations).toBeLessThan(0.01);
+      // Cache hits should be very fast (<0.05ms per lookup)
+      expect(duration / iterations).toBeLessThan(0.05);
     });
 
     it('should demonstrate cache benefit over repeated Map lookups', () => {

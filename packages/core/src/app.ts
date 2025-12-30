@@ -165,14 +165,36 @@ export function registerBuiltInRenderers(app: App): void {
       const props = components.Render?.props;
       if (!props) return;
 
-      Object.assign(target, props);
+      if (
+        target &&
+        typeof target === 'object' &&
+        typeof (target as any).set === 'function' &&
+        typeof (target as any).get === 'function'
+      ) {
+        for (const [key, value] of Object.entries(props)) {
+          (target as any).set(key, value as any);
+        }
+      } else {
+        Object.assign(target, props);
+      }
     },
     updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
       const renderComp = getComponent('Render') as { props?: Record<string, any> } | undefined;
       const props = renderComp?.props;
       if (!props) return;
 
-      Object.assign(target, props);
+      if (
+        target &&
+        typeof target === 'object' &&
+        typeof (target as any).set === 'function' &&
+        typeof (target as any).get === 'function'
+      ) {
+        for (const [key, value] of Object.entries(props)) {
+          (target as any).set(key, value as any);
+        }
+      } else {
+        Object.assign(target, props);
+      }
     },
   });
 }

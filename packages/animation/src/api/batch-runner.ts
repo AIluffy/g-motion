@@ -6,7 +6,13 @@ export type BatchTemplate = { staticResolved: ResolvedMarkOptions[]; dynamic: Ma
 export interface BuilderAdapter {
   addResolvedMark(resolved: ResolvedMarkOptions): void;
   mark(options: MarkOptions | MarkOptions[]): BuilderAdapter;
-  animate(options?: {
+  option(options: {
+    onUpdate?: (val: any) => void;
+    delay?: number;
+    repeat?: number;
+    onComplete?: () => void;
+  }): BuilderAdapter;
+  play(options?: {
     onUpdate?: (val: any) => void;
     delay?: number;
     repeat?: number;
@@ -82,11 +88,13 @@ export function runBatchAnimation(params: {
       }
     }
 
-    const control = builder.animate({
-      delay: (params.options?.delay ?? 0) + totalStagger,
-      onUpdate: params.options?.onUpdate,
-      repeat: params.options?.repeat,
-    });
+    const control = builder
+      .option({
+        delay: (params.options?.delay ?? 0) + totalStagger,
+        onUpdate: params.options?.onUpdate,
+        repeat: params.options?.repeat,
+      })
+      .play();
 
     controls.push(control);
     const entityId = (control as any).entityId;
@@ -99,5 +107,9 @@ export function runBatchAnimation(params: {
     }
   });
 
-  return new AnimationControl(entityIds, controls, true, params.injectedWorld);
+  const batchControl = new AnimationControl(entityIds, controls, true, params.injectedWorld);
+  if (params.options?.onComplete) {
+    AnimationControl.registerOnComplete(batchControl, params.options.onComplete);
+  }
+  return batchControl;
 }

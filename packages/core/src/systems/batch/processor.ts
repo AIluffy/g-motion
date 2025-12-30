@@ -4,6 +4,7 @@ import { ArchetypeBatchDescriptor } from '../../types';
 import { BatchEntity, BatchKeyframe, BatchResult, BatchMetadata, GPUBatchConfig } from './types';
 import { DEFAULT_MAX_BATCH_SIZE } from './config';
 import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
+import { getErrorHandler } from '../../context';
 
 /**
  * Compute Batch Processor
@@ -223,7 +224,15 @@ export class ComputeBatchProcessor {
   getEntityBufferData(batchId: string): Float32Array | null {
     const entities = this.entityBatches.get(batchId);
     if (!entities) {
-      console.error(`[Batch] Batch '${batchId}' not found`);
+      try {
+        const error = new MotionError(
+          `Batch '${batchId}' not found`,
+          ErrorCode.BATCH_NOT_FOUND,
+          ErrorSeverity.WARNING,
+          { batchId },
+        );
+        getErrorHandler().handle(error);
+      } catch {}
       return null;
     }
 
@@ -335,7 +344,14 @@ export class ComputeBatchProcessor {
 
     const entities = this.entityBatches.get(batchId);
     if (!entities) {
-      errors.push(`Batch '${batchId}' not found`);
+      const message = `Batch '${batchId}' not found`;
+      errors.push(message);
+      try {
+        const error = new MotionError(message, ErrorCode.BATCH_NOT_FOUND, ErrorSeverity.FATAL, {
+          batchId,
+        });
+        getErrorHandler().handle(error);
+      } catch {}
       return { valid: false, errors };
     }
 
@@ -346,6 +362,23 @@ export class ComputeBatchProcessor {
       errors.push(
         `Entity count (${entities.length}) does not match keyframe count (${keyframes.length})`,
       );
+    }
+
+    if (errors.length > 0) {
+      try {
+        const error = new MotionError(
+          'Batch validation failed',
+          ErrorCode.BATCH_VALIDATION_FAILED,
+          ErrorSeverity.FATAL,
+          {
+            batchId,
+            entityCount: entities.length,
+            keyframeCount: this.keyframeBatches.get(batchId)?.length ?? 0,
+            errors: [...errors],
+          },
+        );
+        getErrorHandler().handle(error);
+      } catch {}
     }
 
     return {
