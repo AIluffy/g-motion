@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { getGPUMetrics, getSystemTimings } from '@g-motion/animation';
 import { getGPUChannelMappingRegistry } from '@g-motion/core';
 import { useSetAtom } from 'jotai';
@@ -127,6 +127,12 @@ export function PerfMonitor() {
   const rafIdRef = useRef<number | null>(null);
   const setEngineMetrics = useSetAtom(engineMetricsAtom);
   const setActiveEntityCount = useSetAtom(activeEntityCountAtom);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const draggingRef = useRef(false);
+  const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => ({ x: 0, y: 0 }));
   const [snapshot, setSnapshot] = useState<PerfSnapshot>({
     fps: 0,
     frameMs: 0,
@@ -339,6 +345,85 @@ export function PerfMonitor() {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const margin = 10;
+    const rect = el.getBoundingClientRect();
+    const x = Math.max(margin, Math.round(window.innerWidth - rect.width - margin));
+    const y = margin;
+    setPos((p) => (p.x === 0 && p.y === 0 ? { x, y } : p));
+  }, []);
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const margin = 10;
+    const clamp = () => {
+      const rect = el.getBoundingClientRect();
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const maxX = Math.max(margin, w - rect.width - margin);
+      const maxY = Math.max(margin, h - rect.height - margin);
+      setPos((p) => ({
+        x: Math.min(Math.max(margin, p.x), maxX),
+        y: Math.min(Math.max(margin, p.y), maxY),
+      }));
+    };
+    clamp();
+    window.addEventListener('resize', clamp);
+    return () => {
+      window.removeEventListener('resize', clamp);
+    };
+  }, [isCollapsed]);
+
+  const onHeaderPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button')) return;
+    const el = panelRef.current;
+    if (!el) return;
+
+    draggingRef.current = true;
+    setIsDragging(true);
+    const rect = el.getBoundingClientRect();
+    dragOffsetRef.current = {
+      dx: e.clientX - rect.left,
+      dy: e.clientY - rect.top,
+    };
+
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    e.preventDefault();
+  };
+
+  const onHeaderPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const el = panelRef.current;
+    if (!el) return;
+    const margin = 10;
+    const rect = el.getBoundingClientRect();
+    const { dx, dy } = dragOffsetRef.current;
+    const nextX = e.clientX - dx;
+    const nextY = e.clientY - dy;
+    const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+    setPos({
+      x: Math.min(Math.max(margin, nextX), maxX),
+      y: Math.min(Math.max(margin, nextY), maxY),
+    });
+  };
+
+  const onHeaderPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    setIsDragging(false);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
   const panels: Array<{ config: PanelConfig; value: number }> = [
     {
       config: {
@@ -398,160 +483,183 @@ export function PerfMonitor() {
   ];
 
   return (
-    <div className="perf-monitor">
+    <div ref={panelRef} className="perf-monitor" style={{ left: `${pos.x}px`, top: `${pos.y}px` }}>
       <div className="perf-monitor-content">
-        <div className="perf-panel-row">
-          {panels.map(({ config, value }) => (
-            <CanvasPanel
-              key={config.id}
-              id={config.id}
-              label={config.label}
-              unit={config.unit}
-              fg={config.fg}
-              bg={config.bg}
-              maxValue={config.maxValue}
-              value={value}
-            />
-          ))}
+        <div
+          className={`perf-monitor-header${isDragging ? ' dragging' : ''}`}
+          onPointerDown={onHeaderPointerDown}
+          onPointerMove={onHeaderPointerMove}
+          onPointerUp={onHeaderPointerUp}
+          onPointerCancel={onHeaderPointerUp}
+        >
+          <div className="perf-monitor-title">Perf</div>
+          <button
+            type="button"
+            className="perf-monitor-toggle"
+            onClick={() => setIsCollapsed((v) => !v)}
+          >
+            {isCollapsed ? '展开' : '收起'}
+          </button>
         </div>
-        <div className="perf-debug">
-          <div className="perf-stat">
-            <div className="perf-label">GPU</div>
-            <div className="perf-value">{snapshot.gpuAvailable ? 'on' : 'off'}</div>
-          </div>
-          <div className="perf-stat">
-            <div className="perf-label">Batch</div>
-            <div className="perf-value">
-              {snapshot.batch
-                ? `${snapshot.batch.entityCount}@${Math.round(snapshot.batch.timestamp)}ms`
-                : 'N/A'}
+        {isCollapsed ? null : (
+          <>
+            <div className="perf-panel-row">
+              {panels.map(({ config, value }) => (
+                <CanvasPanel
+                  key={config.id}
+                  id={config.id}
+                  label={config.label}
+                  unit={config.unit}
+                  fg={config.fg}
+                  bg={config.bg}
+                  maxValue={config.maxValue}
+                  value={value}
+                />
+              ))}
             </div>
-          </div>
-          <div className="perf-stat">
-            <div className="perf-label">GPU avg</div>
-            <div className="perf-value">
-              {snapshot.gpuComputeMs != null && snapshot.gpuComputeMs > 0
-                ? `${snapshot.gpuComputeMs.toFixed(2)}ms`
-                : 'N/A'}
-            </div>
-          </div>
-          {snapshot.gpuTrackedProps && snapshot.gpuTrackedProps.length > 0 && (
-            <div className="perf-stat">
-              <div className="perf-label">GPU props</div>
-              <div
-                className="perf-value"
-                style={{
-                  maxWidth: '220px',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {snapshot.gpuTrackedProps.join(', ')}
+            <div className="perf-debug">
+              <div className="perf-stat">
+                <div className="perf-label">GPU</div>
+                <div className="perf-value">{snapshot.gpuAvailable ? 'on' : 'off'}</div>
               </div>
-            </div>
-          )}
-          <div className="perf-stat">
-            <div className="perf-label">GPU last</div>
-            <div className="perf-value">
-              {snapshot.gpuComputeLastMs != null && snapshot.gpuComputeLastMs > 0
-                ? formatMs(snapshot.gpuComputeLastMs)
-                : 'N/A'}
-            </div>
-          </div>
-          <div className="perf-stat">
-            <div className="perf-label">Batches</div>
-            <div className="perf-value">
-              {snapshot.gpuBatchCount != null && snapshot.gpuBatchCount > 0
-                ? snapshot.gpuBatchCount
-                : 'N/A'}
-            </div>
-          </div>
-          <details className="perf-details" open>
-            <summary style={{ cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>
-              Archetype Details (
-              {snapshot.gpuArchetypes && snapshot.gpuArchetypes.size > 0
-                ? snapshot.gpuArchetypes.size
-                : 0}
-              )
-            </summary>
-            <div
-              style={{
-                fontSize: '9px',
-                marginTop: '2px',
-                paddingLeft: '8px',
-                height: '100px',
-                overflowY: 'auto',
-                flexShrink: 0,
-              }}
-            >
-              {snapshot.gpuArchetypes && snapshot.gpuArchetypes.size > 0 ? (
-                Array.from(snapshot.gpuArchetypes.entries()).map(([archetypeId, timing]) => (
-                  <div key={archetypeId} style={{ marginBottom: '2px' }}>
-                    <div style={{ fontWeight: 'bold' }}>{archetypeId}:</div>
-                    <div style={{ paddingLeft: '8px' }}>
-                      Avg: {timing.avgComputeMs.toFixed(3)}ms | Min:{' '}
-                      {timing.minComputeMs.toFixed(3)}ms | Max: {timing.maxComputeMs.toFixed(3)}ms
-                      <br />
-                      Entities: {timing.entityCount} | Dispatches: {timing.dispatchCount}
-                    </div>
+              <div className="perf-stat">
+                <div className="perf-label">Batch</div>
+                <div className="perf-value">
+                  {snapshot.batch
+                    ? `${snapshot.batch.entityCount}@${Math.round(snapshot.batch.timestamp)}ms`
+                    : 'N/A'}
+                </div>
+              </div>
+              <div className="perf-stat">
+                <div className="perf-label">GPU avg</div>
+                <div className="perf-value">
+                  {snapshot.gpuComputeMs != null && snapshot.gpuComputeMs > 0
+                    ? `${snapshot.gpuComputeMs.toFixed(2)}ms`
+                    : 'N/A'}
+                </div>
+              </div>
+              {snapshot.gpuTrackedProps && snapshot.gpuTrackedProps.length > 0 && (
+                <div className="perf-stat">
+                  <div className="perf-label">GPU props</div>
+                  <div
+                    className="perf-value"
+                    style={{
+                      maxWidth: '220px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {snapshot.gpuTrackedProps.join(', ')}
                   </div>
-                ))
-              ) : (
-                <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontStyle: 'italic' }}>
-                  No archetype data available
                 </div>
               )}
-            </div>
-          </details>
-          <div className="perf-stat">
-            <div className="perf-label">Sync</div>
-            <div className="perf-value">
-              {snapshot.gpuAvailable ? (snapshot.gpuSyncPerformed ? '✓' : '—') : 'N/A'}
-            </div>
-          </div>
-          <div className="perf-stat">
-            <div className="perf-label">Sync avg</div>
-            <div className="perf-value">
-              {snapshot.gpuAvailable && snapshot.gpuSyncAvgMs != null && snapshot.gpuSyncAvgMs > 0
-                ? formatMs(snapshot.gpuSyncAvgMs)
-                : 'N/A'}
-            </div>
-          </div>
-          <div className="perf-stat">
-            <div className="perf-label">Sync data</div>
-            <div className="perf-value">
-              {snapshot.gpuAvailable &&
-              snapshot.gpuSyncDataSizeBytes != null &&
-              snapshot.gpuSyncDataSizeBytes > 0
-                ? formatBytes(snapshot.gpuSyncDataSizeBytes)
-                : 'N/A'}
-            </div>
-          </div>
-          {snapshot.systems && snapshot.systems.length > 0 ? (
-            <details className="perf-details" open>
-              <summary style={{ cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>
-                Systems ({snapshot.systems.length})
-              </summary>
-              <div
-                style={{
-                  fontSize: '9px',
-                  marginTop: '2px',
-                  paddingLeft: '8px',
-                  height: '110px',
-                  overflowY: 'auto',
-                  flexShrink: 0,
-                }}
-              >
-                {snapshot.systems.map((s) => (
-                  <div key={s.name} style={{ marginBottom: '2px' }}>
-                    {s.name}: avg {s.avgMs.toFixed(2)}ms | last {s.lastMs.toFixed(2)}ms
-                  </div>
-                ))}
+              <div className="perf-stat">
+                <div className="perf-label">GPU last</div>
+                <div className="perf-value">
+                  {snapshot.gpuComputeLastMs != null && snapshot.gpuComputeLastMs > 0
+                    ? formatMs(snapshot.gpuComputeLastMs)
+                    : 'N/A'}
+                </div>
               </div>
-            </details>
-          ) : null}
-        </div>
+              <div className="perf-stat">
+                <div className="perf-label">Batches</div>
+                <div className="perf-value">
+                  {snapshot.gpuBatchCount != null && snapshot.gpuBatchCount > 0
+                    ? snapshot.gpuBatchCount
+                    : 'N/A'}
+                </div>
+              </div>
+              <details className="perf-details" open>
+                <summary style={{ cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>
+                  Archetype Details (
+                  {snapshot.gpuArchetypes && snapshot.gpuArchetypes.size > 0
+                    ? snapshot.gpuArchetypes.size
+                    : 0}
+                  )
+                </summary>
+                <div
+                  style={{
+                    fontSize: '9px',
+                    marginTop: '2px',
+                    paddingLeft: '8px',
+                    height: '100px',
+                    overflowY: 'auto',
+                    flexShrink: 0,
+                  }}
+                >
+                  {snapshot.gpuArchetypes && snapshot.gpuArchetypes.size > 0 ? (
+                    Array.from(snapshot.gpuArchetypes.entries()).map(([archetypeId, timing]) => (
+                      <div key={archetypeId} style={{ marginBottom: '2px' }}>
+                        <div style={{ fontWeight: 'bold' }}>{archetypeId}:</div>
+                        <div style={{ paddingLeft: '8px' }}>
+                          Avg: {timing.avgComputeMs.toFixed(3)}ms | Min:{' '}
+                          {timing.minComputeMs.toFixed(3)}ms | Max: {timing.maxComputeMs.toFixed(3)}
+                          ms
+                          <br />
+                          Entities: {timing.entityCount} | Dispatches: {timing.dispatchCount}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontStyle: 'italic' }}>
+                      No archetype data available
+                    </div>
+                  )}
+                </div>
+              </details>
+              <div className="perf-stat">
+                <div className="perf-label">Sync</div>
+                <div className="perf-value">
+                  {snapshot.gpuAvailable ? (snapshot.gpuSyncPerformed ? '✓' : '—') : 'N/A'}
+                </div>
+              </div>
+              <div className="perf-stat">
+                <div className="perf-label">Sync avg</div>
+                <div className="perf-value">
+                  {snapshot.gpuAvailable &&
+                  snapshot.gpuSyncAvgMs != null &&
+                  snapshot.gpuSyncAvgMs > 0
+                    ? formatMs(snapshot.gpuSyncAvgMs)
+                    : 'N/A'}
+                </div>
+              </div>
+              <div className="perf-stat">
+                <div className="perf-label">Sync data</div>
+                <div className="perf-value">
+                  {snapshot.gpuAvailable &&
+                  snapshot.gpuSyncDataSizeBytes != null &&
+                  snapshot.gpuSyncDataSizeBytes > 0
+                    ? formatBytes(snapshot.gpuSyncDataSizeBytes)
+                    : 'N/A'}
+                </div>
+              </div>
+              {snapshot.systems && snapshot.systems.length > 0 ? (
+                <details className="perf-details" open>
+                  <summary style={{ cursor: 'pointer', fontSize: '10px', marginTop: '4px' }}>
+                    Systems ({snapshot.systems.length})
+                  </summary>
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      marginTop: '2px',
+                      paddingLeft: '8px',
+                      height: '110px',
+                      overflowY: 'auto',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {snapshot.systems.map((s) => (
+                      <div key={s.name} style={{ marginBottom: '2px' }}>
+                        {s.name}: avg {s.avgMs.toFixed(2)}ms | last {s.lastMs.toFixed(2)}ms
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
