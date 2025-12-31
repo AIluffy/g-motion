@@ -16,6 +16,7 @@ const EASING_MODE_HOLD = 2;
 
 const bufferCache = new BatchBufferCache();
 const MAX_KEYFRAMES_PER_CHANNEL = 4;
+const MIN_GPU_KEYFRAME_DURATION = 0.0001;
 
 // Use extended keyframe stride (10 floats) for Bezier support
 const KEYFRAME_FLOATS = KEYFRAME_STRIDE; // 10 floats per keyframe
@@ -100,8 +101,13 @@ export const BatchSamplingSystem: SystemDef = {
       return;
     }
     const now = performance.now();
-    const frame = frameId++;
     const config = world.config;
+    const engineFrame =
+      typeof ctx?.sampling?.engineFrame === 'number' ? ctx!.sampling!.engineFrame : frameId++;
+    const tickFrame =
+      (config as any).samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number'
+        ? ctx!.sampling!.frame
+        : engineFrame;
     const channelRegistry = getGPUChannelMappingRegistry();
     const callbackCode = getRendererCode('callback');
 
@@ -255,7 +261,7 @@ export const BatchSamplingSystem: SystemDef = {
             const phase = typedTickPhase
               ? typedTickPhase[i]
               : Number((stateBuffer[i] as any).tickPhase ?? 0);
-            if ((frame + phase) % interval !== 0) {
+            if ((tickFrame + phase) % interval !== 0) {
               continue;
             }
           }
@@ -379,7 +385,8 @@ export const BatchSamplingSystem: SystemDef = {
                     }
 
                     keyframesData[globalIndex] = kf.startTime;
-                    keyframesData[globalIndex + 1] = kf.time - kf.startTime;
+                    const dur = kf.time - kf.startTime;
+                    keyframesData[globalIndex + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
                     keyframesData[globalIndex + 2] = kf.startValue;
                     keyframesData[globalIndex + 3] = kf.endValue;
                     keyframesData[globalIndex + 4] = easingId;
@@ -453,7 +460,8 @@ export const BatchSamplingSystem: SystemDef = {
                   }
 
                   keyframesData[w] = kf.startTime;
-                  keyframesData[w + 1] = kf.time - kf.startTime;
+                  const dur = kf.time - kf.startTime;
+                  keyframesData[w + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
                   keyframesData[w + 2] = kf.startValue;
                   keyframesData[w + 3] = kf.endValue;
                   keyframesData[w + 4] = easingId;

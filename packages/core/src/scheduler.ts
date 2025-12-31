@@ -19,6 +19,10 @@ export class SystemScheduler {
   private activeEntityCount = 0;
   private metricsCounter = 0;
   private keepAliveUntil = 0;
+  private engineFrame = 0;
+  private elapsedMs = 0;
+  private lastSamplingFrame = 0;
+  private lastSamplingFps = 0;
 
   private services?: EngineServices;
 
@@ -84,6 +88,10 @@ export class SystemScheduler {
     if (!this.services) return;
     this.isRunning = true;
     this.lastTime = performance.now();
+    this.engineFrame = 0;
+    this.elapsedMs = 0;
+    this.lastSamplingFrame = 0;
+    this.lastSamplingFps = 0;
     this.loop();
   }
 
@@ -138,11 +146,37 @@ export class SystemScheduler {
 
     // Safety cap for dt to prevent spiraling on lag spikes (e.g., tab background)
     const safeDt = Math.min(dt, SCHEDULER_LIMITS.MAX_FRAME_TIME_MS);
+    this.engineFrame++;
+    this.elapsedMs += safeDt;
+
+    const config = (this.services?.config ?? (this.getWorld()?.config as any) ?? {}) as any;
+    const samplingFps = Number(config.samplingFps ?? config.targetFps ?? 60);
+    const fps = Number.isFinite(samplingFps) && samplingFps > 0 ? samplingFps : 60;
+    const framePosition = (this.elapsedMs * fps) / 1000;
+    const frame = Math.floor(framePosition + 1e-9);
+    let deltaFrame = 0;
+    if (!Object.is(this.lastSamplingFps, fps)) {
+      this.lastSamplingFps = fps;
+      this.lastSamplingFrame = frame;
+    } else {
+      deltaFrame = Math.max(0, frame - this.lastSamplingFrame);
+      this.lastSamplingFrame = frame;
+    }
+    const deltaTimeMs = (deltaFrame * 1000) / fps;
 
     const ctx: SystemContext | undefined = this.services
       ? {
           services: this.services,
           dt: safeDt,
+          sampling: {
+            engineFrame: this.engineFrame,
+            timeMs: this.elapsedMs,
+            fps,
+            framePosition,
+            frame,
+            deltaFrame,
+            deltaTimeMs,
+          },
         }
       : undefined;
 

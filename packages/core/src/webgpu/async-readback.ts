@@ -128,7 +128,9 @@ export class AsyncReadbackManager {
 
         const expired = !!p.expired;
         const view = p.stagingBuffer.getMappedRange();
-        const values = new Float32Array(view.slice(0));
+        const bytes = Math.max(0, Math.min(p.byteSize, view.byteLength));
+        const alignedBytes = bytes - (bytes % 4);
+        const values = new Float32Array(view.slice(0, alignedBytes));
         p.stagingBuffer.unmap();
 
         results.push({

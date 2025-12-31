@@ -200,6 +200,7 @@ export * from './api/track';
 export * from './api/adjust';
 export * from './api/mark';
 export * from './api/animate';
+export * from './api/frameSampler';
 export * from './values';
 export { engine } from './engine';
 export * from './api/visualTarget';

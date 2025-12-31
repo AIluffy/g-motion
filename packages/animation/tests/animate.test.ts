@@ -46,4 +46,26 @@ describe('animate syntax sugar', () => {
     await new Promise((resolve) => setTimeout(resolve, 120));
     expect(onUpdate).toHaveBeenCalled();
   });
+
+  it('supports repeatType reverse (pingpong) with data integrity', async () => {
+    const target = { x: 0 };
+
+    const control = animate(target, { x: [0, 100] }, { duration: 80, repeatType: 'reverse' });
+
+    expect(control).toBeDefined();
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(target.x).toBeGreaterThan(0);
+    expect(target.x).toBeLessThanOrEqual(100);
+
+    await new Promise((resolve) => setTimeout(resolve, 90));
+    expect(target.x).toBeGreaterThanOrEqual(0);
+    expect(target.x).toBeLessThanOrEqual(100);
+    expect(target.x).toBeGreaterThan(30);
+    expect(target.x).toBeLessThan(80);
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(target.x).toBeGreaterThanOrEqual(0);
+    expect(target.x).toBeLessThanOrEqual(10);
+  });
 });

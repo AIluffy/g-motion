@@ -62,6 +62,8 @@ export interface MotionAppConfig {
   globalSpeed?: number;
   targetFps?: number;
   frameDuration?: number;
+  samplingMode?: 'time' | 'frame';
+  samplingFps?: number;
 
   workSlicing?: {
     enabled?: boolean;
@@ -92,6 +94,15 @@ export interface EngineServices {
 export interface SystemContext {
   services: EngineServices;
   dt: number;
+  sampling?: {
+    engineFrame: number;
+    timeMs: number;
+    fps: number;
+    framePosition: number;
+    frame: number;
+    deltaFrame: number;
+    deltaTimeMs: number;
+  };
 }
 
 // Minimal interface to avoid circular dependency with App

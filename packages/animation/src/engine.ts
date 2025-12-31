@@ -45,6 +45,34 @@ class EngineConfig {
     return this.getWorld().config.targetFps ?? 60;
   }
 
+  setSamplingMode(mode: 'time' | 'frame'): void {
+    if (!['time', 'frame'].includes(mode)) {
+      throw new Error(`[Motion Engine] Invalid sampling mode: ${mode}`);
+    }
+    const world = this.getWorld();
+    (world.config as any).samplingMode = mode;
+  }
+
+  getSamplingMode(): 'time' | 'frame' {
+    const world = this.getWorld();
+    return ((world.config as any).samplingMode ?? 'time') as any;
+  }
+
+  setSamplingFps(fps: number): void {
+    if (!Number.isFinite(fps) || fps <= 0) {
+      throw new Error(`[Motion Engine] samplingFps must be a positive number, got: ${fps}`);
+    }
+    const world = this.getWorld();
+    (world.config as any).samplingFps = fps;
+    (world.config as any).samplingMode = (world.config as any).samplingMode ?? 'frame';
+  }
+
+  getSamplingFps(): number {
+    const world = this.getWorld();
+    const config = world.config as any;
+    return Number(config.samplingFps ?? config.targetFps ?? 60);
+  }
+
   /**
    * Force GPU acceleration mode
    * @param mode - GPU compute mode: 'auto' | 'always' | 'never'
@@ -171,6 +199,7 @@ class EngineConfig {
     gpuThreshold?: number;
     gpuEasing?: boolean;
     metricsSamplingRate?: number;
+    sampling?: { mode?: 'time' | 'frame'; fps?: number };
     workSlicing?: {
       enabled?: boolean;
       interpolationArchetypesPerFrame?: number;
@@ -195,6 +224,12 @@ class EngineConfig {
     if (config.metricsSamplingRate !== undefined) {
       this.setMetricsSamplingRate(config.metricsSamplingRate);
     }
+    if (config.sampling?.mode !== undefined) {
+      this.setSamplingMode(config.sampling.mode);
+    }
+    if (config.sampling?.fps !== undefined) {
+      this.setSamplingFps(config.sampling.fps);
+    }
     if (config.workSlicing !== undefined) {
       this.setWorkSlicing(config.workSlicing);
     }
@@ -210,6 +245,7 @@ class EngineConfig {
     gpuMode: 'auto' | 'always' | 'never';
     gpuEasing: boolean;
     metricsSamplingRate: number;
+    sampling: { mode: 'time' | 'frame'; fps: number };
     workSlicing: {
       enabled?: boolean;
       interpolationArchetypesPerFrame?: number;
@@ -222,6 +258,7 @@ class EngineConfig {
       gpuMode: this.getGpuMode(),
       gpuEasing: this.getGpuEasing(),
       metricsSamplingRate: this.getMetricsSamplingRate(),
+      sampling: { mode: this.getSamplingMode(), fps: this.getSamplingFps() },
       workSlicing: this.getWorkSlicing(),
     };
   }
@@ -236,6 +273,7 @@ class EngineConfig {
       gpuMode: 'always', // GPU-first by default
       gpuEasing: true,
       metricsSamplingRate: 1,
+      sampling: { mode: 'time', fps: 60 },
       workSlicing: {
         enabled: false,
         interpolationArchetypesPerFrame: 0,

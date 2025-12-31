@@ -31,6 +31,37 @@ motion('#box').mark({ to: { x: 100 }, at: 1000 }).play();
 - Systems pipeline: Time -> Timeline -> Interpolation -> Render; optional Batch/WebGPU for large workloads.
 - Plugins: add property handling, systems, or renderers (e.g., DOM plugin registers Transform + DOM renderer).
 
+## Frame-based Sampling (新)
+
+除默认的“按时间采样”（每次 rAF 用 dt 推进）外，引擎新增“按帧采样”模式，用于：
+- 以任意 FPS（含小数，例如 23.976）对动画推进做帧对齐
+- 在不同采样率之间保持一致的帧同步（例如渲染 60Hz，采样 24fps）
+- 允许 sub-frame 精度的帧定位/seek
+
+### 开启方式
+
+```ts
+import { engine } from '@g-motion/animation';
+
+engine.setSamplingMode('frame');
+engine.setSamplingFps(23.976);
+```
+
+### Seek 到指定帧
+
+```ts
+const control = motion('#box').mark({ to: { x: 100 }, at: 1000 }).play();
+
+control.seekFrame(10);        // 第 10 帧
+control.seekFrame(10.5);      // 第 10.5 帧（sub-frame）
+control.getFramePosition();   // 当前帧位置（可带小数）
+control.getFrameIndex();      // 当前帧索引（向下取整）
+```
+
+### 性能特征
+
+按帧采样的热点开销与按时间采样一致：帧计算在调度器中一次完成并通过上下文复用；当采样 fps 低于渲染 fps 时，部分帧会得到 0 的 deltaFrame，从而避免无意义的时间推进与后续系统写入。
+
 ## VisualTarget & GPU 属性配置
 
 `@g-motion/animation` 会把 DOM / 对象 / 原始值统一抽象成 `VisualTarget`，并在这一层决定哪些属性可以走 GPU 通道（WebGPU 批处理）、哪些属性走 CPU。

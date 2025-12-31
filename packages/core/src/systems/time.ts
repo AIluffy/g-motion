@@ -14,7 +14,10 @@ export const TimeSystem: SystemDef = {
     // Apply global speed multiplier if set
     const globalSpeed =
       (ctx?.services.config as any)?.globalSpeed ?? (world.config as any).globalSpeed ?? 1;
-    const adjustedDt = dt * globalSpeed;
+    const config = (ctx?.services.config ?? world.config) as any;
+    const samplingMode = (config.samplingMode ?? 'time') as 'time' | 'frame';
+    const baseDt = samplingMode === 'frame' ? (ctx?.sampling?.deltaTimeMs ?? 0) : dt;
+    const adjustedDt = baseDt * globalSpeed;
 
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');

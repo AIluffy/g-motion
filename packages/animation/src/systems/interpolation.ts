@@ -49,7 +49,12 @@ export const InterpolationSystem: SystemDef = {
 
     const channelRegistry = gpuActive ? getGPUChannelMappingRegistry() : null;
 
-    const frame = frameId++;
+    const engineFrame =
+      typeof ctx?.sampling?.engineFrame === 'number' ? ctx!.sampling!.engineFrame : frameId++;
+    const tickFrame =
+      (config as any).samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number'
+        ? ctx!.sampling!.frame
+        : engineFrame;
     const slice = config?.workSlicing as
       | { enabled?: boolean; interpolationArchetypesPerFrame?: number }
       | undefined;
@@ -126,7 +131,7 @@ export const InterpolationSystem: SystemDef = {
             : Number(state.tickInterval ?? 0);
           if (interval > 1) {
             const phase = typedTickPhase ? typedTickPhase[i] : Number(state.tickPhase ?? 0);
-            if ((frame + phase) % interval !== 0) {
+            if ((tickFrame + phase) % interval !== 0) {
               continue;
             }
           }

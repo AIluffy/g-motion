@@ -1,5 +1,6 @@
 import { World, MotionStatus, WorldProvider } from '@g-motion/core';
 import type { MotionStateComponentData, TimelineComponentData } from '../component-types';
+import { FrameSampler } from './frameSampler';
 
 export class AnimationControl {
   private static entityToControl = new Map<number, AnimationControl>();
@@ -191,6 +192,39 @@ export class AnimationControl {
     }
   }
 
+  seekFrame(framePosition: number, fps?: number) {
+    if (this.isBatch && this.controls.length > 0) {
+      for (const control of this.controls) {
+        control.seekFrame(framePosition, fps);
+      }
+      return;
+    }
+
+    const world = this.getWorld();
+    const config = world.config as any;
+    const resolvedFps = fps ?? config.samplingFps ?? config.targetFps ?? 60;
+    const sampler = new FrameSampler(resolvedFps);
+
+    for (const entityId of this.entityIds) {
+      const archetype = world.getEntityArchetype(entityId);
+      if (!archetype) continue;
+
+      const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
+      const timeline = archetype.getEntityData(entityId, 'Timeline') as TimelineComponentData;
+      if (!state || !timeline) continue;
+
+      const duration = timeline.duration ?? 0;
+      const timeMs = sampler.seekTimeByFrame(framePosition, { clampMs: { min: 0, max: duration } });
+      state.currentTime = timeMs;
+
+      const index = (archetype as any).getInternalEntityIndices?.().get(entityId);
+      if (index !== undefined) {
+        const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+        if (typedCurrentTime) typedCurrentTime[index] = timeMs;
+      }
+    }
+  }
+
   /** Get current absolute time (ms) on the timeline. */
   getCurrentTime(): number {
     const world = this.getWorld();
@@ -200,6 +234,22 @@ export class AnimationControl {
       | MotionStateComponentData
       | undefined;
     return state?.currentTime ?? 0;
+  }
+
+  getFramePosition(fps?: number): number {
+    const world = this.getWorld();
+    const config = world.config as any;
+    const resolvedFps = fps ?? config.samplingFps ?? config.targetFps ?? 60;
+    const sampler = new FrameSampler(resolvedFps);
+    return sampler.timeToFramePosition(this.getCurrentTime());
+  }
+
+  getFrameIndex(fps?: number): number {
+    const world = this.getWorld();
+    const config = world.config as any;
+    const resolvedFps = fps ?? config.samplingFps ?? config.targetFps ?? 60;
+    const sampler = new FrameSampler(resolvedFps);
+    return sampler.timeToFrameIndex(this.getCurrentTime(), 'floor');
   }
 
   /** Get total duration (ms) of the timeline. */
@@ -227,7 +277,7 @@ export class AnimationControl {
       const archetype = world.getEntityArchetype(entityId);
       if (!archetype) continue;
       const state = archetype.getEntityData(entityId, 'MotionState') as MotionStateComponentData;
-      if (state && Number.isFinite(rate) && rate > 0) {
+      if (state && Number.isFinite(rate)) {
         state.playbackRate = rate;
         const index = (archetype as any).getInternalEntityIndices?.().get(entityId);
         if (index !== undefined) {

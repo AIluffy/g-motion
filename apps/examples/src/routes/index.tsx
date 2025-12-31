@@ -71,6 +71,9 @@ function Hub() {
             <Link to="/engine-config" className={linkButtonClass('ghost')}>
               Engine Configuration
             </Link>
+            <Link to={'/animation-controller-demo' as any} className={linkButtonClass('ghost')}>
+              Animation controller
+            </Link>
             <Link to={'/dev-debug' as any} className={linkButtonClass('ghost')}>
               Dev debug panel
             </Link>
@@ -297,6 +300,23 @@ function Hub() {
                 Interactive controls for speed multiplier, frame rate, and GPU acceleration.
               </div>
               <Link to="/engine-config" className={linkButtonClass('ghost')}>
+                View demo
+              </Link>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Animation controller demo</CardTitle>
+              <CardDescription>
+                Player-style controls for timelines: play/pause/stop, loop modes, speed, and seek.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="justify-between">
+              <div className="text-sm text-slate-300">
+                Demonstrates frame/time mapping (Comp FPS) and negative playback rate (reverse).
+              </div>
+              <Link to={'/animation-controller-demo' as any} className={linkButtonClass('ghost')}>
                 View demo
               </Link>
             </CardFooter>

@@ -24,6 +24,8 @@ pnpm test       # repo tests; filter if needed
 
 ## What to look at
 - src/routes/index.tsx — hub page with inline timeline/repeat demo and links to routes.
+- src/routes/animation-controller-demo.tsx — animation controller usage demo (player controls, seek, loop, speed).
+- src/components/player-controller.tsx — reusable player controller UI for AnimationControl.
 - src/routes/dom.tsx — DOM transform demo with controls.
 - src/routes/object.tsx — object/callback demo reflecting values in React state.
 - src/main.tsx — app bootstrap (Vite + TanStack Router).
@@ -44,4 +46,3 @@ motion([el, obj, 42, '.item']).mark({ to: { value: 10 }, time: 300 }).animate();
 ```
 
 If you change public APIs in packages/*, update these demos accordingly and re-run `pnpm dev` to verify behavior.
-

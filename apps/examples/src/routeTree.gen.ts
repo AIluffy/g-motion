@@ -23,6 +23,7 @@ import { Route as DomRouteImport } from './routes/dom';
 import { Route as DevDebugRouteImport } from './routes/dev-debug';
 import { Route as CustomEasingRouteImport } from './routes/custom-easing';
 import { Route as BenchmarkRouteImport } from './routes/benchmark';
+import { Route as AnimationControllerDemoRouteImport } from './routes/animation-controller-demo';
 import { Route as AnimateRouteImport } from './routes/animate';
 import { Route as IndexRouteImport } from './routes/index';
 
@@ -96,6 +97,11 @@ const BenchmarkRoute = BenchmarkRouteImport.update({
   path: '/benchmark',
   getParentRoute: () => rootRouteImport,
 } as any);
+const AnimationControllerDemoRoute = AnimationControllerDemoRouteImport.update({
+  id: '/animation-controller-demo',
+  path: '/animation-controller-demo',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const AnimateRoute = AnimateRouteImport.update({
   id: '/animate',
   path: '/animate',
@@ -110,6 +116,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
   '/benchmark': typeof BenchmarkRoute;
   '/custom-easing': typeof CustomEasingRoute;
   '/dev-debug': typeof DevDebugRoute;
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
   '/benchmark': typeof BenchmarkRoute;
   '/custom-easing': typeof CustomEasingRoute;
   '/dev-debug': typeof DevDebugRoute;
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
   '/benchmark': typeof BenchmarkRoute;
   '/custom-easing': typeof CustomEasingRoute;
   '/dev-debug': typeof DevDebugRoute;
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/animate'
+    | '/animation-controller-demo'
     | '/benchmark'
     | '/custom-easing'
     | '/dev-debug'
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/animate'
+    | '/animation-controller-demo'
     | '/benchmark'
     | '/custom-easing'
     | '/dev-debug'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/animate'
+    | '/animation-controller-demo'
     | '/benchmark'
     | '/custom-easing'
     | '/dev-debug'
@@ -222,6 +234,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   AnimateRoute: typeof AnimateRoute;
+  AnimationControllerDemoRoute: typeof AnimationControllerDemoRoute;
   BenchmarkRoute: typeof BenchmarkRoute;
   CustomEasingRoute: typeof CustomEasingRoute;
   DevDebugRoute: typeof DevDebugRoute;
@@ -338,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BenchmarkRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/animation-controller-demo': {
+      id: '/animation-controller-demo';
+      path: '/animation-controller-demo';
+      fullPath: '/animation-controller-demo';
+      preLoaderRoute: typeof AnimationControllerDemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/animate': {
       id: '/animate';
       path: '/animate';
@@ -358,6 +378,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnimateRoute: AnimateRoute,
+  AnimationControllerDemoRoute: AnimationControllerDemoRoute,
   BenchmarkRoute: BenchmarkRoute,
   CustomEasingRoute: CustomEasingRoute,
   DevDebugRoute: DevDebugRoute,
