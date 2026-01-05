@@ -16,6 +16,14 @@ const FORMAT_ANGLE_RAD: u32 = 4u;   // Angle in radians
 const FORMAT_PERCENT: u32 = 5u;     // Percentage (0-100)
 const FORMAT_MATRIX_2D: u32 = 6u;   // 2D transform matrix (6 floats)
 const FORMAT_MATRIX_3D: u32 = 7u;   // 3D transform matrix (16 floats)
+const FORMAT_PACKED_HALF2: u32 = 8u; // Two f16 packed into u32, bitcast to f32
+
+struct OutputFormatParams {
+    usedRawValueCount: u32,
+    rawStride: u32,
+    outputStride: u32,
+    _pad: u32,
+}
 
 // Output channel descriptor
 struct OutputChannel {
@@ -25,15 +33,10 @@ struct OutputChannel {
     maxValue: f32,      // For clamping/normalization
 }
 
-// Packed RGBA color output
-struct PackedColor {
-    rgba: u32,          // R(8) | G(8) | B(8) | A(8)
-}
-
 @group(0) @binding(0) var<storage, read> rawOutputs: array<f32>;
 @group(0) @binding(1) var<storage, read> channels: array<OutputChannel>;
 @group(0) @binding(2) var<storage, read_write> formattedOutputs: array<f32>;
-@group(0) @binding(3) var<storage, read_write> packedColors: array<PackedColor>;
+@group(0) @binding(3) var<uniform> params: OutputFormatParams;
 
 // Convert float to packed RGBA
 fn floatToPackedRGBA(r: f32, g: f32, b: f32, a: f32) -> u32 {
@@ -42,6 +45,37 @@ fn floatToPackedRGBA(r: f32, g: f32, b: f32, a: f32) -> u32 {
     let bi = u32(clamp(b * 255.0, 0.0, 255.0));
     let ai = u32(clamp(a * 255.0, 0.0, 255.0));
     return (ri << 24u) | (gi << 16u) | (bi << 8u) | ai;
+}
+
+fn floatToHalfBits(value: f32) -> u32 {
+    let fbits = bitcast<u32>(value);
+    let sign = (fbits >> 16u) & 0x8000u;
+    let exp = (fbits >> 23u) & 0xffu;
+    var mantissa = fbits & 0x7fffffu;
+    if (exp == 0xffu) {
+        if (mantissa != 0u) {
+            return sign | 0x7e00u;
+        }
+        return sign | 0x7c00u;
+    }
+    var exponent = i32(exp) - 127 + 15;
+    if (exponent <= 0) {
+        if (exponent < -10) {
+            return sign;
+        }
+        mantissa = (mantissa | 0x800000u) >> u32(1 - exponent);
+        return sign | (mantissa >> 13u);
+    }
+    if (exponent >= 31) {
+        return sign | 0x7c00u;
+    }
+    return sign | (u32(exponent) << 10u) | (mantissa >> 13u);
+}
+
+fn packHalfs(a: f32, b: f32) -> u32 {
+    let ha = floatToHalfBits(a) & 0xffffu;
+    let hb = floatToHalfBits(b) & 0xffffu;
+    return ha | (hb << 16u);
 }
 
 // Normalize value to 0-1 range
@@ -63,18 +97,48 @@ fn radToDeg(rad: f32) -> f32 {
     return rad * 180.0 / 3.14159265;
 }
 
+fn linearToSRGB(c: f32) -> f32 {
+    if (c <= 0.0031308) {
+        return 12.92 * c;
+    }
+    return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+}
+
+fn sRGBToLinear(c: f32) -> f32 {
+    if (c <= 0.04045) {
+        return c / 12.92;
+    }
+    return pow((c + 0.055) / 1.055, 2.4);
+}
+
 // Format single output value
 @compute @workgroup_size(64)
 fn formatOutputs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
-    let channelCount = arrayLength(&channels);
+    let rawStride = params.rawStride;
+    let outputStride = params.outputStride;
+    let usedRawValueCount = params.usedRawValueCount;
 
-    if (index >= channelCount) {
+    if (rawStride == 0u || outputStride == 0u) {
         return;
     }
 
-    let channel = channels[index];
-    let rawValue = rawOutputs[channel.sourceIndex];
+    let usedEntityCount = usedRawValueCount / rawStride;
+    let usedOutputCount = usedEntityCount * outputStride;
+
+    if (index >= usedOutputCount) {
+        return;
+    }
+
+    let channelIndex = index % outputStride;
+    let entityIndex = index / outputStride;
+    let rawEntityBase = entityIndex * rawStride;
+    let channel = channels[channelIndex];
+    let rawIndex = rawEntityBase + channel.sourceIndex;
+    if (rawIndex >= usedRawValueCount) {
+        return;
+    }
+    let rawValue = rawOutputs[rawIndex];
 
     var formattedValue = rawValue;
 
@@ -86,8 +150,22 @@ fn formatOutputs(@builtin(global_invocation_id) global_id: vec3<u32>) {
             }
         }
         case FORMAT_COLOR_RGBA: {
-            // Assume rawValue is a single channel, normalize to 0-255
-            formattedValue = clamp(rawValue * 255.0, 0.0, 255.0);
+            if (rawEntityBase + channel.sourceIndex + 3u >= usedRawValueCount) {
+                formattedOutputs[index] = 0.0;
+                return;
+            }
+            let r0 = normalize(rawOutputs[rawEntityBase + channel.sourceIndex + 0u], channel.minValue, channel.maxValue);
+            let g0 = normalize(rawOutputs[rawEntityBase + channel.sourceIndex + 1u], channel.minValue, channel.maxValue);
+            let b0 = normalize(rawOutputs[rawEntityBase + channel.sourceIndex + 2u], channel.minValue, channel.maxValue);
+            let a0 = normalize(rawOutputs[rawEntityBase + channel.sourceIndex + 3u], channel.minValue, channel.maxValue);
+
+            let r = linearToSRGB(clamp(r0, 0.0, 1.0));
+            let g = linearToSRGB(clamp(g0, 0.0, 1.0));
+            let b = linearToSRGB(clamp(b0, 0.0, 1.0));
+            let a = clamp(a0, 0.0, 1.0);
+
+            let packed = floatToPackedRGBA(r, g, b, a);
+            formattedValue = bitcast<f32>(packed);
         }
         case FORMAT_COLOR_NORM: {
             // Normalize to 0-1
@@ -109,8 +187,33 @@ fn formatOutputs(@builtin(global_invocation_id) global_id: vec3<u32>) {
             }
         }
         case FORMAT_PERCENT: {
-            // Convert to percentage
-            formattedValue = normalize(rawValue, channel.minValue, channel.maxValue) * 100.0;
+            formattedValue = normalize(rawValue, channel.minValue, channel.maxValue);
+        }
+        case FORMAT_MATRIX_2D: {
+            formattedValue = rawValue;
+        }
+        case FORMAT_MATRIX_3D: {
+            formattedValue = rawValue;
+        }
+        case FORMAT_PACKED_HALF2: {
+            if (rawEntityBase + channel.sourceIndex + 1u >= usedRawValueCount) {
+                formattedOutputs[index] = 0.0;
+                return;
+            }
+            var a = rawOutputs[rawEntityBase + channel.sourceIndex + 0u];
+            var b = rawOutputs[rawEntityBase + channel.sourceIndex + 1u];
+            if (channel.sourceIndex == 2u) {
+                a = a % 360.0;
+                if (a < 0.0) {
+                    a = a + 360.0;
+                }
+                b = clamp(b, 0.0, 10.0);
+            } else if (channel.sourceIndex == 4u) {
+                a = clamp(a, 0.0, 10.0);
+                b = clamp(b, 0.0, 1.0);
+            }
+            let packed = packHalfs(a, b);
+            formattedValue = bitcast<f32>(packed);
         }
         default: {
             formattedValue = rawValue;
@@ -221,7 +324,134 @@ export const OUTPUT_FORMAT = {
   PERCENT: 5,
   MATRIX_2D: 6,
   MATRIX_3D: 7,
+  PACKED_HALF2: 8,
 } as const;
+
+function clamp01(v: number): number {
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
+}
+
+export function linearToSRGB(v: number): number {
+  if (v <= 0.0031308) {
+    return 12.92 * v;
+  }
+  return 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+}
+
+export function sRGBToLinear(v: number): number {
+  if (v <= 0.04045) {
+    return v / 12.92;
+  }
+  return Math.pow((v + 0.055) / 1.055, 2.4);
+}
+
+export function formatOutputValue(
+  formatType: number,
+  rawValue: number,
+  minValue = 0,
+  maxValue = 1,
+): number {
+  let value = rawValue;
+  if (formatType === OUTPUT_FORMAT.FLOAT) {
+    if (minValue < maxValue) {
+      if (value < minValue) value = minValue;
+      else if (value > maxValue) value = maxValue;
+    }
+    return value;
+  }
+  if (formatType === OUTPUT_FORMAT.COLOR_RGBA) {
+    const range = maxValue - minValue;
+    let norm = 0;
+    if (range > 0) {
+      norm = (value - minValue) / range;
+      if (norm < 0) norm = 0;
+      else if (norm > 1) norm = 1;
+    }
+    const srgb = linearToSRGB(clamp01(norm));
+    return packNormalizedRGBA(srgb, srgb, srgb, 1) >>> 0;
+  }
+  if (formatType === OUTPUT_FORMAT.COLOR_NORM) {
+    const range = maxValue - minValue;
+    if (range <= 0) return 0;
+    let norm = (value - minValue) / range;
+    if (norm < 0) norm = 0;
+    else if (norm > 1) norm = 1;
+    return norm;
+  }
+  if (formatType === OUTPUT_FORMAT.ANGLE_DEG) {
+    let deg = value % 360;
+    if (deg < 0) deg += 360;
+    return deg;
+  }
+  if (formatType === OUTPUT_FORMAT.ANGLE_RAD) {
+    const twoPi = Math.PI * 2;
+    let rad = value % twoPi;
+    if (rad < 0) rad += twoPi;
+    return rad;
+  }
+  if (formatType === OUTPUT_FORMAT.PERCENT) {
+    const range = maxValue - minValue;
+    if (range <= 0) return 0;
+    let norm = (value - minValue) / range;
+    if (norm < 0) norm = 0;
+    else if (norm > 1) norm = 1;
+    return norm;
+  }
+  return value;
+}
+
+export function packNormalizedRGBA(r: number, g: number, b: number, a: number): number {
+  const rc = Math.round(clamp01(r) * 255);
+  const gc = Math.round(clamp01(g) * 255);
+  const bc = Math.round(clamp01(b) * 255);
+  const ac = Math.round(clamp01(a) * 255);
+  return ((rc & 0xff) << 24) | ((gc & 0xff) << 16) | ((bc & 0xff) << 8) | (ac & 0xff);
+}
+
+export function unpackNormalizedRGBA(packed: number): {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+} {
+  const r = (packed >> 24) & 0xff;
+  const g = (packed >> 16) & 0xff;
+  const b = (packed >> 8) & 0xff;
+  const a = packed & 0xff;
+  return {
+    r: r / 255,
+    g: g / 255,
+    b: b / 255,
+    a: a / 255,
+  };
+}
+
+function halfToFloat(half: number): number {
+  const sign = (half & 0x8000) >> 15;
+  const exponent = (half & 0x7c00) >> 10;
+  const mantissa = half & 0x03ff;
+  if (exponent === 0) {
+    if (mantissa === 0) {
+      return sign === 1 ? -0.0 : 0.0;
+    }
+    return (sign ? -1 : 1) * Math.pow(2, -14) * (mantissa / 1024);
+  }
+  if (exponent === 31) {
+    if (mantissa === 0) {
+      return sign === 1 ? -Infinity : Infinity;
+    }
+    return NaN;
+  }
+  return (sign ? -1 : 1) * Math.pow(2, exponent - 15) * (1 + mantissa / 1024);
+}
+
+export function unpackHalf2(packed: number): [number, number] {
+  const lo = packed & 0xffff;
+  const hi = (packed >>> 16) & 0xffff;
+  return [halfToFloat(lo), halfToFloat(hi)];
+}
 
 /**
  * Output channel descriptor
@@ -253,18 +483,19 @@ export const INTERLEAVED_OUTPUT_STRIDE = 8; // 8 values per interleaved output
 /**
  * Pack output channel descriptors for GPU
  */
-export function packOutputChannels(channels: OutputChannelDesc[]): Float32Array {
-  const data = new Float32Array(channels.length * OUTPUT_CHANNEL_STRIDE);
+export function packOutputChannels(channels: OutputChannelDesc[]): ArrayBuffer {
+  const buffer = new ArrayBuffer(channels.length * OUTPUT_CHANNEL_STRIDE * 4);
+  const u32 = new Uint32Array(buffer);
+  const f32 = new Float32Array(buffer);
   for (let i = 0; i < channels.length; i++) {
     const c = channels[i];
-    const offset = i * OUTPUT_CHANNEL_STRIDE;
-    // Store as float but will be read as u32 in shader
-    data[offset + 0] = c.sourceIndex;
-    data[offset + 1] = c.formatType;
-    data[offset + 2] = c.minValue ?? 0;
-    data[offset + 3] = c.maxValue ?? 1;
+    const base = i * OUTPUT_CHANNEL_STRIDE;
+    u32[base + 0] = (c.sourceIndex >>> 0) as unknown as number;
+    u32[base + 1] = (c.formatType >>> 0) as unknown as number;
+    f32[base + 2] = c.minValue ?? 0;
+    f32[base + 3] = c.maxValue ?? 1;
   }
-  return data;
+  return buffer;
 }
 
 /**
@@ -296,11 +527,11 @@ export function unpackInterleavedOutputs(data: Float32Array): InterleavedOutputD
  * Convert packed RGBA to CSS color string
  */
 export function packedRGBAToCSS(packed: number): string {
-  const r = (packed >> 24) & 0xff;
-  const g = (packed >> 16) & 0xff;
-  const b = (packed >> 8) & 0xff;
-  const a = packed & 0xff;
-  return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+  const { r, g, b, a } = unpackNormalizedRGBA(packed);
+  const ri = Math.round(r * 255);
+  const gi = Math.round(g * 255);
+  const bi = Math.round(b * 255);
+  return `rgba(${ri}, ${gi}, ${bi}, ${a.toFixed(3)})`;
 }
 
 /**

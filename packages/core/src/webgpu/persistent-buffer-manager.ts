@@ -41,6 +41,37 @@ export interface IncrementalUpdateStats {
   totalBytesProcessed: number;
 }
 
+export interface BufferAlignmentConfig {
+  smallThresholdBytes: number;
+  mediumThresholdBytes: number;
+  smallAlignmentBytes: number;
+  mediumAlignmentBytes: number;
+  largeAlignmentBytes: number;
+}
+
+const defaultBufferAlignmentConfig: BufferAlignmentConfig = {
+  smallThresholdBytes: 1024,
+  mediumThresholdBytes: 64 * 1024,
+  smallAlignmentBytes: 64,
+  mediumAlignmentBytes: 256,
+  largeAlignmentBytes: 4096,
+};
+
+let bufferAlignmentConfig: BufferAlignmentConfig = {
+  ...defaultBufferAlignmentConfig,
+};
+
+export function getBufferAlignmentConfig(): BufferAlignmentConfig {
+  return bufferAlignmentConfig;
+}
+
+export function setBufferAlignmentConfig(overrides: Partial<BufferAlignmentConfig>): void {
+  bufferAlignmentConfig = {
+    ...bufferAlignmentConfig,
+    ...overrides,
+  };
+}
+
 /**
  * Persistent GPU Buffer Manager
  *
@@ -63,6 +94,7 @@ export class PersistentGPUBufferManager {
     bytesSkipped: 0,
     totalBytesProcessed: 0,
   };
+  private peakMemoryBytes = 0;
 
   constructor(device: GPUDevice) {
     this.device = device;
@@ -305,19 +337,14 @@ export class PersistentGPUBufferManager {
    * - Large buffers (>=64KB): 4KB alignment (page-aligned)
    */
   private calculateOptimalSize(requiredSize: number): number {
-    // Add 25% headroom for growth
     const withHeadroom = Math.ceil(requiredSize * 1.25);
-
-    // P2-1: Tiered alignment based on buffer size
-    if (withHeadroom < 1024) {
-      // Small buffers: 64-byte alignment (reduces waste from 131% to 56% for 100-byte buffers)
-      return Math.ceil(withHeadroom / 64) * 64;
-    } else if (withHeadroom < 64 * 1024) {
-      // Medium buffers: 256-byte alignment (balanced)
-      return Math.ceil(withHeadroom / 256) * 256;
+    const config = bufferAlignmentConfig;
+    if (withHeadroom < config.smallThresholdBytes) {
+      return Math.ceil(withHeadroom / config.smallAlignmentBytes) * config.smallAlignmentBytes;
+    } else if (withHeadroom < config.mediumThresholdBytes) {
+      return Math.ceil(withHeadroom / config.mediumAlignmentBytes) * config.mediumAlignmentBytes;
     } else {
-      // Large buffers: 4KB alignment (page-aligned for optimal GPU performance)
-      return Math.ceil(withHeadroom / 4096) * 4096;
+      return Math.ceil(withHeadroom / config.largeAlignmentBytes) * config.largeAlignmentBytes;
     }
   }
 
@@ -374,14 +401,22 @@ export class PersistentGPUBufferManager {
     totalMemoryBytes: number;
     averageBufferSize: number;
     cacheHitRate: number;
+    currentMemoryUsage: number;
+    peakMemoryUsage: number;
   } {
     let totalMemory = 0;
     for (const buffer of this.buffers.values()) {
       totalMemory += buffer.size;
     }
 
+    if (totalMemory > this.peakMemoryBytes) {
+      this.peakMemoryBytes = totalMemory;
+    }
+
     const cacheHitRate =
       this.stats.totalUpdates > 0 ? 1 - this.stats.incrementalUpdates / this.stats.totalUpdates : 0;
+    const currentMemoryUsage = totalMemory;
+    const peakMemoryUsage = this.peakMemoryBytes;
 
     return {
       ...this.stats,
@@ -389,6 +424,8 @@ export class PersistentGPUBufferManager {
       totalMemoryBytes: totalMemory,
       averageBufferSize: this.buffers.size > 0 ? totalMemory / this.buffers.size : 0,
       cacheHitRate,
+      currentMemoryUsage,
+      peakMemoryUsage,
     };
   }
 

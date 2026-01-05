@@ -121,6 +121,40 @@ metrics.forEach(m => {
 });
 ```
 
+## Advanced: GPU Memory Monitoring
+
+```typescript
+import { getGPUBatchStatus } from '@g-motion/animation';
+import { getGPUMetricsProvider } from '@g-motion/core';
+
+// Read latest memory snapshot from batch status (for UI)
+const status = getGPUBatchStatus();
+console.log('Current GPU memory (bytes):', status.memoryUsageBytes);
+console.log('Peak GPU memory (bytes):', status.peakMemoryUsageBytes);
+console.log('Threshold (bytes):', status.memoryUsageThresholdBytes);
+console.log('Memory alert active:', status.memoryAlertActive);
+
+// Configure threshold and query history via metrics provider
+const provider = getGPUMetricsProvider();
+
+// Set threshold, for example 100MB
+provider.updateStatus({
+  memoryUsageThresholdBytes: 100 * 1024 * 1024,
+});
+
+// Historical snapshots (sampled automatically by the scheduler)
+const history = provider.getMemoryHistory?.() ?? [];
+history.forEach((snapshot) => {
+  console.log(
+    new Date(snapshot.timestamp).toISOString(),
+    'bytesSkipped=', snapshot.bytesSkipped,
+    'processed=', snapshot.totalBytesProcessed,
+    'current=', snapshot.currentMemoryUsage,
+    'peak=', snapshot.peakMemoryUsage,
+  );
+});
+```
+
 ## Backward Compatibility
 
 ✅ **No breaking changes**

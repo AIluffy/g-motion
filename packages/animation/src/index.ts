@@ -10,7 +10,7 @@ import {
   getEngineForWorld,
   MotionStatus,
 } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger, hasDomWithQuerySelectorAll } from '@g-motion/utils';
 import { TimelineSystem } from './systems/timeline';
 import { InterpolationSystem } from './systems/interpolation';
 import { RovingResolverSystem } from './systems/rovingResolver';
@@ -135,7 +135,7 @@ export function inspectTargets(
   const root = options?.root ?? (typeof document !== 'undefined' ? document : null);
   const hasDocument = typeof document !== 'undefined';
   const hasWindow = typeof window !== 'undefined';
-  const hasDOM = hasDocument && typeof (document as any).querySelectorAll === 'function';
+  const hasDOM = hasDomWithQuerySelectorAll();
   const selectorCache: SelectorCache = {};
   const resolved = resolveTargets(input, {
     root: root ?? undefined,

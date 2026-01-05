@@ -1,6 +1,6 @@
 import type { MotionApp } from '@g-motion/core';
 import { MotionPlugin } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger, createDomTargetResolver } from '@g-motion/utils';
 import { registerTargetResolver, TargetResolver, TargetType } from '@g-motion/animation';
 import { TransformComponent } from './components/transform';
 import { createDOMRenderer, DOMRendererConfig } from './renderer';
@@ -14,66 +14,7 @@ export interface DOMPluginOptions {
   rendererConfig?: DOMRendererConfig;
 }
 
-const domTargetResolver: TargetResolver = (input, ctx) => {
-  const results: { target: unknown; type: TargetType }[] = [];
-
-  const hasDOM =
-    typeof document !== 'undefined' && typeof (document as any).querySelectorAll === 'function';
-
-  if (!hasDOM) {
-    return null;
-  }
-
-  const root = ctx.root ?? document;
-
-  const pushElement = (el: Element) => {
-    results.push({ target: el, type: TargetType.DOM });
-  };
-
-  const fromElements = (els: Iterable<Element>) => {
-    for (const el of els) {
-      pushElement(el);
-    }
-  };
-
-  if (typeof input === 'string') {
-    try {
-      const nodeList = (root as Document | Element).querySelectorAll(input);
-      if (nodeList.length === 0) {
-        return null;
-      }
-      fromElements(Array.from(nodeList));
-      return results;
-    } catch {
-      return null;
-    }
-  }
-
-  if (typeof Element !== 'undefined' && input instanceof Element) {
-    pushElement(input);
-    return results;
-  }
-
-  if (
-    (typeof NodeList !== 'undefined' && input instanceof NodeList) ||
-    (typeof HTMLCollection !== 'undefined' && input instanceof HTMLCollection)
-  ) {
-    fromElements(Array.from(input as any));
-    return results;
-  }
-
-  if (
-    Array.isArray(input) &&
-    input.length > 0 &&
-    typeof Element !== 'undefined' &&
-    input.every((x) => x instanceof Element)
-  ) {
-    fromElements(input as Element[]);
-    return results;
-  }
-
-  return null;
-};
+const domTargetResolver: TargetResolver = createDomTargetResolver(TargetType.DOM);
 
 export const createDOMPlugin = (options: DOMPluginOptions = {}): MotionPlugin => ({
   name: 'DOMPlugin',

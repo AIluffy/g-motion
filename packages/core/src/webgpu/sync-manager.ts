@@ -55,6 +55,8 @@ export class SyncManager {
     dataTransferred: 0,
     uploadBandwidth: 0,
     downloadBandwidth: 0,
+    readbackTimeMs: 0,
+    readbackPercentage: 0,
   };
 
   /**
@@ -84,6 +86,12 @@ export class SyncManager {
 
     this.metrics.totalTime =
       this.metrics.uploadTime + this.metrics.computeTime + this.metrics.downloadTime;
+
+    this.metrics.readbackTimeMs = this.metrics.downloadTime;
+    this.metrics.readbackPercentage =
+      this.metrics.totalTime > 0 && this.metrics.downloadTime > 0
+        ? (this.metrics.downloadTime / this.metrics.totalTime) * 100
+        : 0;
   }
 
   /**
@@ -113,6 +121,8 @@ export class SyncManager {
       dataTransferred: 0,
       uploadBandwidth: 0,
       downloadBandwidth: 0,
+      readbackTimeMs: 0,
+      readbackPercentage: 0,
     };
   }
 

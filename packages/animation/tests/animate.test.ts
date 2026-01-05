@@ -47,6 +47,20 @@ describe('animate syntax sugar', () => {
     expect(onUpdate).toHaveBeenCalled();
   });
 
+  it('supports primitive number from/to signature', async () => {
+    const onUpdate = vi.fn();
+
+    animate(0, 10, { duration: 50, onUpdate });
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    expect(onUpdate).toHaveBeenCalled();
+    const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0];
+    expect(typeof lastCall).toBe('number');
+    expect(lastCall).toBeGreaterThan(9);
+    expect(lastCall).toBeLessThanOrEqual(10);
+  });
+
   it('supports repeatType reverse (pingpong) with data integrity', async () => {
     const target = { x: 0 };
 

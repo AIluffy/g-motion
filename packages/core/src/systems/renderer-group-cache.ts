@@ -15,6 +15,36 @@
 
 import type { RendererDef } from '../plugin';
 
+export interface RendererGroupCacheConfig {
+  maxCacheAge: number;
+  cleanupInterval: number;
+  growthFactor: number;
+}
+
+const defaultRendererGroupCacheConfig: RendererGroupCacheConfig = {
+  maxCacheAge: 300,
+  cleanupInterval: 60,
+  growthFactor: 1.5,
+};
+
+let rendererGroupCacheConfig: RendererGroupCacheConfig = {
+  ...defaultRendererGroupCacheConfig,
+};
+
+export function getRendererGroupCacheConfig(): RendererGroupCacheConfig {
+  return rendererGroupCacheConfig;
+}
+
+export function setRendererGroupCacheConfig(overrides: Partial<RendererGroupCacheConfig>): void {
+  rendererGroupCacheConfig = {
+    ...rendererGroupCacheConfig,
+    ...overrides,
+  };
+  if (globalRendererGroupCache) {
+    globalRendererGroupCache.applyConfig(rendererGroupCacheConfig);
+  }
+}
+
 export interface RendererGroup {
   renderer: RendererDef | null;
   entityIds: Int32Array;
@@ -34,7 +64,15 @@ export interface RendererGroup {
 export class RendererGroupCache {
   private groups = new Map<string, RendererGroup>();
   private currentFrame = 0;
-  private readonly maxCacheAge = 300; // Frames (~5 seconds at 60fps)
+  private maxCacheAge = rendererGroupCacheConfig.maxCacheAge;
+  private cleanupInterval = rendererGroupCacheConfig.cleanupInterval;
+  private growthFactor = rendererGroupCacheConfig.growthFactor;
+
+  applyConfig(config: RendererGroupCacheConfig): void {
+    this.maxCacheAge = config.maxCacheAge;
+    this.cleanupInterval = config.cleanupInterval;
+    this.growthFactor = config.growthFactor;
+  }
 
   /**
    * Get or create a renderer group
@@ -54,7 +92,7 @@ export class RendererGroupCache {
     // Create new group or resize if capacity insufficient
     if (!group || group.capacity < safeCapacity) {
       const newCapacity = group
-        ? Math.max(safeCapacity, Math.floor(group.capacity * 1.5))
+        ? Math.max(safeCapacity, Math.floor(group.capacity * this.growthFactor))
         : safeCapacity;
 
       // Additional safety check for array length limits
@@ -134,7 +172,7 @@ export class RendererGroupCache {
     this.currentFrame++;
 
     // Periodic cleanup: remove stale entries
-    if (this.currentFrame % 60 === 0) {
+    if (this.currentFrame % this.cleanupInterval === 0) {
       const toRemove: string[] = [];
 
       for (const [key, group] of this.groups.entries()) {
@@ -191,6 +229,7 @@ let globalRendererGroupCache: RendererGroupCache | null = null;
 export function getRendererGroupCache(): RendererGroupCache {
   if (!globalRendererGroupCache) {
     globalRendererGroupCache = new RendererGroupCache();
+    globalRendererGroupCache.applyConfig(rendererGroupCacheConfig);
   }
   return globalRendererGroupCache;
 }

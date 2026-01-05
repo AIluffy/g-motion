@@ -46,3 +46,8 @@ export function createDebugger(namespace: string) {
 
 // Convenience default debugger for quick use
 export const debug = createDebugger('Core');
+
+export * from './targetResolver';
+export * from './time/frameSampler';
+export * from './math/rollingAverage';
+export * from './packedStream';

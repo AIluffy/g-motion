@@ -11,7 +11,10 @@ import {
   getErrorHandler,
   getGPUChannelMappingRegistry,
   createBatchChannelTable,
+  isStandardTransformChannels,
   KEYFRAME_STRIDE,
+  MotionError,
+  BatchChannelTable,
 } from '../src';
 import { ComputeBatchProcessor } from '../src/systems/batch';
 
@@ -123,5 +126,62 @@ describe('BatchSamplingSystem multi-channel keyframes packing', () => {
     expect(kfY[1]).toBe(200); // duration
     expect(kfY[2]).toBe(5); // startValue
     expect(kfY[3]).toBe(15); // endValue
+  });
+});
+
+describe('GPUChannelMappingRegistry standard transform validation', () => {
+  it('detects standard transform channel layouts', () => {
+    const channels = [
+      { index: 0, property: 'x' },
+      { index: 1, property: 'y' },
+      { index: 2, property: 'rotate' },
+      { index: 3, property: 'scaleX' },
+      { index: 4, property: 'scaleY' },
+      { index: 5, property: 'opacity' },
+    ];
+
+    expect(isStandardTransformChannels(channels)).toBe(true);
+
+    const shuffled = [...channels].reverse();
+    expect(isStandardTransformChannels(shuffled)).toBe(false);
+
+    const missing = channels.slice(0, 5);
+    expect(isStandardTransformChannels(missing)).toBe(false);
+  });
+
+  it('classifies batch kinds and enforces primitive stride rules', () => {
+    const registry = getGPUChannelMappingRegistry();
+    registry.clear();
+
+    const standardTable = createBatchChannelTable('standard', 6, [
+      'x',
+      'y',
+      'rotate',
+      'scaleX',
+      'scaleY',
+      'opacity',
+    ]);
+    registry.registerBatchChannels(standardTable);
+    const standardFromRegistry = registry.getChannels('standard');
+    expect(standardTable.kind).toBe('standardTransform');
+    expect(standardFromRegistry?.kind).toBe('standardTransform');
+
+    const primitiveTable: BatchChannelTable = {
+      batchId: 'primitive-ok',
+      stride: 1,
+      channels: [{ index: 0, property: '__primitive' }],
+    };
+    registry.registerBatchChannels(primitiveTable);
+    const primitiveFromRegistry = registry.getChannels('primitive-ok');
+    expect(primitiveTable.kind).toBe('primitive');
+    expect(primitiveFromRegistry?.kind).toBe('primitive');
+
+    expect(() =>
+      registry.registerBatchChannels({
+        batchId: 'primitive-bad',
+        stride: 2,
+        channels: [{ index: 0, property: '__primitive' }],
+      }),
+    ).toThrow(MotionError);
   });
 });

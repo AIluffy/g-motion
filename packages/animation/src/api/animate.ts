@@ -1,4 +1,5 @@
 import type { Easing } from '@g-motion/core';
+import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
 import { motion } from '..';
@@ -18,17 +19,47 @@ const DEFAULT_DURATION = 300;
 
 function applyAnimateMark(
   builder: { mark(mark: MarkOptions | MarkOptions[]): unknown },
-  to: Record<string, unknown>,
-  options?: AnimateOptions,
+  to: number | Record<string, unknown>,
+  options: AnimateOptions | undefined,
+  targetType: TargetType,
 ) {
   const totalDuration = options?.duration ?? DEFAULT_DURATION;
+
+  if (targetType === TargetType.Primitive && typeof to === 'number') {
+    const mark: MarkOptions = {
+      to,
+      duration: totalDuration,
+      ease: options?.ease,
+    };
+    builder.mark(mark);
+    return;
+  }
+
+  if (!to || typeof to !== 'object') {
+    const mark: MarkOptions = {
+      to,
+      duration: totalDuration,
+      ease: options?.ease,
+    };
+    builder.mark(mark);
+    return;
+  }
 
   const values = Object.values(to);
   const hasKeyframes = values.some((v) => Array.isArray(v));
 
   if (!hasKeyframes) {
+    let markTo: any = to;
+
+    if (targetType === TargetType.Primitive) {
+      const keys = Object.keys(to);
+      if (keys.length === 1 && (keys[0] === 'value' || keys[0] === '__primitive')) {
+        markTo = to[keys[0]];
+      }
+    }
+
     const mark: MarkOptions = {
-      to,
+      to: markTo,
       duration: totalDuration,
       ease: options?.ease,
     };
@@ -120,12 +151,13 @@ function applyAnimateMark(
 
 export function animate(
   target: any,
-  to: Record<string, unknown>,
+  to: number | Record<string, unknown>,
   options?: AnimateOptions,
 ): AnimationControl {
   const builder = motion(target);
+  const targetType = getTargetType(target);
 
-  applyAnimateMark(builder, to, options);
+  applyAnimateMark(builder, to, options, targetType);
 
   if (options) {
     builder.option({

@@ -109,12 +109,16 @@ engine.reset();
 - **Note**: Actual FPS may be lower due to browser performance
 
 ### GPU Implementation
-- **Storage**: Uses existing `world.config.gpuCompute`, `world.config.webgpuThreshold`, `world.config.gpuEasing`
+- **Storage**: Uses existing `world.config.gpuCompute`, `world.config.webgpuThreshold`, `world.config.gpuEasing`, `world.config.keyframeSearchOptimized`
 - **Modes**:
   - `'auto'`: ThresholdMonitorSystem decides based on entity count vs threshold
   - `'always'`: Force GPU regardless of entity count
   - `'never'`: Force CPU, disable GPU
-- **System**: ThresholdMonitorSystem reads config and sets GPU eligibility flags
+- **Keyframe search shader switch**:
+  - `keyframeSearchOptimized: true` (default): use optimized GPU keyframe search shader with cache-friendly access and prefetch
+  - `keyframeSearchOptimized: false`: use baseline GPU keyframe search shader
+  - Environment override: `MOTION_USE_OPTIMIZED_KEYFRAME_SHADER=0|false|off` forces baseline shader, any other non-empty value forces optimized shader
+- **System**: ThresholdMonitorSystem reads config and sets GPU eligibility flags; WebGPUComputeSystem reads `keyframeSearchOptimized` and environment override to choose keyframe search shader
 
 ## Example Integration
 

@@ -317,7 +317,7 @@ fn easeInOutBounce(t: f32) -> f32 {
 }
 
 // CUSTOM_EASING_FUNCTIONS
-
+//
 // Apply easing based on easing ID (0-30)
 fn applyEasing(t: f32, easingId: f32) -> f32 {
     let id = u32(easingId);
@@ -358,6 +358,61 @@ fn applyEasing(t: f32, easingId: f32) -> f32 {
     }
 }
 
+struct ActiveKeyframeSearchResult {
+    index: u32,
+    isActive: u32,
+    progress: f32,
+}
+
+fn binarySearchKeyframeInChannel(
+    time: f32,
+    baseIndex: u32,
+    count: u32,
+) -> ActiveKeyframeSearchResult {
+    var result: ActiveKeyframeSearchResult;
+    result.index = baseIndex;
+    result.isActive = 0u;
+    result.progress = 0.0;
+
+    if (count == 0u) {
+        return result;
+    }
+
+    var left = 0u;
+    var right = count;
+
+    while (left < right) {
+        let mid = (left + right) / 2u;
+        let kf = keyframes[baseIndex + mid];
+        let start = kf.startTime;
+        let endTime = kf.startTime + kf.duration;
+
+        if (time < start) {
+            right = mid;
+        } else if (time > endTime) {
+            left = mid + 1u;
+        } else {
+            result.index = baseIndex + mid;
+            result.isActive = 1u;
+            let duration = endTime - start;
+            if (duration > 0.0) {
+                result.progress = (time - start) / duration;
+            }
+            return result;
+        }
+    }
+
+    if (left > 0u && left < count) {
+        result.index = baseIndex + left - 1u;
+        result.progress = 1.0;
+    } else if (left == 0u && count > 0u) {
+        result.index = baseIndex;
+        result.progress = 0.0;
+    }
+
+    return result;
+}
+
 // Main compute kernel
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -386,33 +441,24 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     for (var c: u32 = 0u; c < channelCount; c = c + 1u) {
         let baseIndex = index * channelCount * MAX_KEYFRAMES_PER_CHANNEL + c * MAX_KEYFRAMES_PER_CHANNEL;
 
-        var activeKf = keyframes[baseIndex];
-        var found = false;
-
+        var validCount: u32 = 0u;
         for (var i: u32 = 0u; i < MAX_KEYFRAMES_PER_CHANNEL; i = i + 1u) {
-            let idx = baseIndex + i;
-            let kf = keyframes[idx];
-
+            let kf = keyframes[baseIndex + i];
             if (kf.duration <= 0.0) {
                 break;
             }
-
-            let start = kf.startTime;
-            let endTime = kf.startTime + kf.duration;
-
-            if (!found && adjustedElapsedTime < start) {
-                activeKf = kf;
-                found = true;
-                break;
-            }
-
-            activeKf = kf;
-            found = true;
-
-            if (adjustedElapsedTime <= endTime) {
-                break;
-            }
+            validCount = validCount + 1u;
         }
+
+        if (validCount == 0u) {
+            let outIndex = index * channelCount + c;
+            outputs[outIndex] = 0.0;
+            continue;
+        }
+
+        let searchResult = binarySearchKeyframeInChannel(adjustedElapsedTime, baseIndex, validCount);
+        let activeIndex = searchResult.index;
+        let activeKf = keyframes[activeIndex];
 
         if (activeKf.duration <= 0.0) {
             let outIndex = index * channelCount + c;
@@ -420,7 +466,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
             continue;
         }
 
-        var progress = (adjustedElapsedTime - activeKf.startTime) / activeKf.duration;
+        var progress = searchResult.progress;
         progress = clamp(progress, 0.0, 1.0);
 
         // Apply easing based on easing mode (Phase 1.1: Bezier support)

@@ -283,9 +283,10 @@ export class World {
     this.scheduler.stop();
   }
 
-  getArchetype(componentNames: string[]): Archetype {
-    const sorted = componentNames.slice().sort().join('|');
-    let arch = this.archetypes.get(sorted);
+  getArchetype(componentNames: string[], id?: string): Archetype {
+    const sortedNames = componentNames.slice().sort();
+    const archetypeId = id ?? sortedNames.join('|');
+    let arch = this.archetypes.get(archetypeId);
     if (!arch) {
       const defs = new Map();
       for (const name of componentNames) {
@@ -300,8 +301,8 @@ export class World {
         }
         defs.set(name, def);
       }
-      arch = new Archetype(sorted, defs);
-      this.archetypes.set(sorted, arch);
+      arch = new Archetype(archetypeId, defs);
+      this.archetypes.set(archetypeId, arch);
     }
     return arch;
   }
@@ -317,7 +318,13 @@ export class World {
   createEntity(components: ComponentData): number {
     const id = this.entityManager.create();
     const names = Object.keys(components);
-    const archetype = this.getArchetype(names);
+    const render = components.Render as { rendererId?: string } | undefined;
+    let archetypeIdOverride: string | undefined;
+    if (render && typeof render.rendererId === 'string') {
+      const sortedNames = names.slice().sort();
+      archetypeIdOverride = `${sortedNames.join('|')}::${render.rendererId}`;
+    }
+    const archetype = this.getArchetype(names, archetypeIdOverride);
     archetype.addEntity(id, components);
     this.entityArchetypes.set(id, archetype);
 
@@ -341,7 +348,7 @@ export class World {
     let delta = 0;
     for (const data of dataArray) {
       const motionState = data.MotionState as { status?: number } | undefined;
-      if (motionState && (motionState.status === 1 || motionState.status === 2)) {
+      if (motionState && this.isActiveMotionStatus(motionState.status)) {
         delta++;
       }
     }

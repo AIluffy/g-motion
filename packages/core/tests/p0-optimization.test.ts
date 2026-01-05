@@ -198,6 +198,23 @@ describe('P0 Optimization: Persistent Buffer Manager', () => {
       );
     });
 
+    it('tracks current and peak memory usage in stats', () => {
+      const data1 = new Float32Array(4);
+      const data2 = new Float32Array(8);
+
+      manager.getOrCreateBuffer('mem:a', data1, 0x0008 | 0x0004);
+      const firstStats = manager.getStats() as any;
+      expect(firstStats.currentMemoryUsage).toBeGreaterThanOrEqual(data1.byteLength);
+      const firstPeak = firstStats.peakMemoryUsage;
+
+      manager.getOrCreateBuffer('mem:b', data2, 0x0008 | 0x0004);
+      const secondStats = manager.getStats() as any;
+      expect(secondStats.currentMemoryUsage).toBeGreaterThanOrEqual(
+        data1.byteLength + data2.byteLength,
+      );
+      expect(secondStats.peakMemoryUsage).toBeGreaterThanOrEqual(firstPeak);
+    });
+
     it('should demonstrate P0-2 optimization benefit', () => {
       const iterations = 100;
       const data = new Float32Array(5000 * 4 * 4 * 5); // 5000 entities × 4 channels × 4 keyframes × 5 fields

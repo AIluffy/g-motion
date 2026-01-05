@@ -9,6 +9,10 @@ export interface GPUBatchStatus {
   frameTimeMs?: number;
   queueDepth?: number;
   cpuFallbackActive?: boolean;
+  memoryUsageBytes?: number;
+  peakMemoryUsageBytes?: number;
+  memoryUsageThresholdBytes?: number;
+  memoryAlertActive?: boolean;
 }
 
 export interface GPUBatchMetric {
@@ -42,6 +46,14 @@ export interface SystemTimingStat {
   lastMs: number;
 }
 
+export interface GPUMemoryStats {
+  bytesSkipped: number;
+  totalBytesProcessed: number;
+  currentMemoryUsage: number;
+  peakMemoryUsage: number;
+  timestamp: number;
+}
+
 export interface GPUMetricsProvider {
   getStatus(): GPUBatchStatus;
   updateStatus(update: Partial<GPUBatchStatus>): GPUBatchStatus;
@@ -49,6 +61,9 @@ export interface GPUMetricsProvider {
   getMetrics(): GPUBatchMetric[];
   recordSystemTiming?(name: string, durationMs: number): void;
   getSystemTimings?(): Record<string, SystemTimingStat>;
+  recordMemorySnapshot?(snapshot: GPUMemoryStats): void;
+  getMemoryHistory?(): GPUMemoryStats[];
+  getLatestMemorySnapshot?(): GPUMemoryStats | null;
   clear(): void;
   seedFromLegacy(input: {
     status?: any;
@@ -76,6 +91,9 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   private readonly MAX_METRICS = 100;
   private readonly MAX_SYSTEM_TIMINGS = 64;
   private syncToGlobalEnabled = false;
+  private memoryHistory: GPUMemoryStats[] = [];
+  private readonly MAX_MEMORY_HISTORY = 300;
+  private lastMemoryLogTime = 0;
 
   enableGlobalSync(enabled: boolean): void {
     this.syncToGlobalEnabled = enabled;
@@ -144,6 +162,72 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
     return out;
   }
 
+  recordMemorySnapshot(snapshot: GPUMemoryStats): void {
+    this.memoryHistory.push(snapshot);
+    if (this.memoryHistory.length > this.MAX_MEMORY_HISTORY) {
+      this.memoryHistory.shift();
+    }
+
+    this.status = {
+      ...this.status,
+      memoryUsageBytes: snapshot.currentMemoryUsage,
+      peakMemoryUsageBytes: snapshot.peakMemoryUsage,
+    };
+
+    const threshold = this.status.memoryUsageThresholdBytes;
+    const overThreshold =
+      typeof threshold === 'number' && threshold > 0 && snapshot.currentMemoryUsage > threshold;
+
+    if (overThreshold) {
+      this.status = {
+        ...this.status,
+        memoryAlertActive: true,
+      };
+      if (isDev()) {
+        console.warn('Motion GPU memory usage exceeded threshold', {
+          usage: snapshot.currentMemoryUsage,
+          peak: snapshot.peakMemoryUsage,
+          threshold,
+        });
+      }
+      const g = globalThis as any;
+      if (!Array.isArray(g.__motionGPUMemoryAlerts)) {
+        g.__motionGPUMemoryAlerts = [];
+      }
+      g.__motionGPUMemoryAlerts.push({
+        ...snapshot,
+        threshold,
+      });
+    } else if (this.status.memoryAlertActive) {
+      this.status = {
+        ...this.status,
+        memoryAlertActive: false,
+      };
+    }
+
+    const now = snapshot.timestamp;
+    if (!Number.isFinite(now)) {
+      return;
+    }
+    if (now - this.lastMemoryLogTime >= 5000) {
+      this.lastMemoryLogTime = now;
+      if (typeof console !== 'undefined' && console.log) {
+        console.log('Motion GPU memory stats', snapshot);
+      }
+    }
+  }
+
+  getMemoryHistory(): GPUMemoryStats[] {
+    return [...this.memoryHistory];
+  }
+
+  getLatestMemorySnapshot(): GPUMemoryStats | null {
+    if (this.memoryHistory.length === 0) {
+      return null;
+    }
+    return this.memoryHistory[this.memoryHistory.length - 1];
+  }
+
   private updateArchetypeTiming(metric: GPUBatchMetric): void {
     const existing = this.archetypeTimings.get(metric.batchId);
     if (!existing) {
@@ -191,6 +275,7 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
     this.metrics = [];
     this.archetypeTimings.clear();
     this.systemTimings.clear();
+    this.memoryHistory = [];
     this.status = { ...DEFAULT_STATUS };
   }
 

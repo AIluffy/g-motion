@@ -384,3 +384,48 @@ describe('Phase 4: Multi-Archetype Stress Test', () => {
     { iterations: 20, time: 500, warmupTime: 100, warmupIterations: 5 },
   );
 });
+
+describe('Phase 4: OutputFormat and standard transform mapping benchmarks', () => {
+  bench(
+    'Standard transform mapping: 10K entities × 6 channels',
+    () => {
+      const registry = new GPUChannelMappingRegistry();
+      registry.registerBatchChannels(
+        createBatchChannelTable('standard-transform', 6, [
+          'x',
+          'y',
+          'rotate',
+          'scaleX',
+          'scaleY',
+          'opacity',
+        ]),
+      );
+      const table = registry.getChannels('standard-transform');
+      expect(table).toBeDefined();
+
+      const entityCount = 10000;
+      const stride = table!.stride;
+      const values = new Float32Array(entityCount * stride);
+      for (let i = 0; i < entityCount; i++) {
+        const base = i * stride;
+        values[base + 0] = i;
+        values[base + 1] = i * 2;
+        values[base + 2] = i * 0.5;
+        values[base + 3] = 1;
+        values[base + 4] = 1;
+        values[base + 5] = 1;
+      }
+
+      const render = { props: {} as Record<string, number> };
+      for (let i = 0; i < entityCount; i++) {
+        const base = i * stride;
+        for (const channel of table!.channels) {
+          render.props[channel.property] = values[base + channel.index];
+        }
+      }
+
+      expect(render.props.opacity).toBe(1);
+    },
+    { iterations: 10, time: 300, warmupTime: 100, warmupIterations: 3 },
+  );
+});

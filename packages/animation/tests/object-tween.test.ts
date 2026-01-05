@@ -102,6 +102,37 @@ describe('Object Tween Tests', () => {
     expect(lastCall).toBeCloseTo(200, 0);
   });
 
+  it('should update frequently for counter-style object tween', async () => {
+    const onUpdate = vi.fn();
+    const target = { value: 0 };
+
+    motion(target)
+      .mark([{ to: { value: 100 }, at: 90 }])
+      .mark([{ to: { value: 20 }, at: 140 }])
+      .mark([{ to: { value: 60 }, at: 180 }])
+      .option({ onUpdate })
+      .play();
+
+    await new Promise((resolve) => setTimeout(resolve, 260));
+
+    expect(onUpdate.mock.calls.length).toBeGreaterThan(3);
+  });
+
+  it('should update frequently for counter-style primitive tween', async () => {
+    const onUpdate = vi.fn();
+
+    motion(0)
+      .mark([{ to: 100, at: 90 }])
+      .mark([{ to: 20, at: 140 }])
+      .mark([{ to: 60, at: 180 }])
+      .option({ onUpdate })
+      .play();
+
+    await new Promise((resolve) => setTimeout(resolve, 260));
+
+    expect(onUpdate.mock.calls.length).toBeGreaterThan(3);
+  });
+
   it('should support string animation (numbers passed as "to" values)', async () => {
     const onUpdate = vi.fn();
 

@@ -5,7 +5,7 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-describe('GPU transform final value', () => {
+describe('GPU final values', () => {
   beforeAll(() => {
     const g = global as any;
     g.requestAnimationFrame = (cb: FrameRequestCallback) => {
@@ -52,5 +52,40 @@ describe('GPU transform final value', () => {
     expect(a.y).toBeCloseTo(b.y, 5);
     expect(a.rotate).toBeCloseTo(b.rotate, 5);
     expect(a.scale).toBeCloseTo(b.scale, 5);
+  });
+
+  it('reaches exact primitive target at timeline end with and without GPU', async () => {
+    const snapshots: number[] = [];
+
+    for (const mode of modes) {
+      engine.forceGpu(mode);
+
+      let value = 0;
+
+      const control = motion(0)
+        .mark([{ to: 100, at: 200 }])
+        .option({
+          onUpdate: (v) => {
+            value = v;
+          },
+        })
+        .play();
+
+      expect(control).toBeDefined();
+
+      await wait(260);
+
+      snapshots.push(value);
+    }
+
+    expect(snapshots.length).toBe(2);
+
+    for (const snap of snapshots) {
+      expect(snap).toBeCloseTo(100, 4);
+    }
+
+    const a = snapshots[0];
+    const b = snapshots[1];
+    expect(a).toBeCloseTo(b, 5);
   });
 });

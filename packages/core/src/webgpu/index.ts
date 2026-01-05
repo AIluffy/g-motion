@@ -55,9 +55,11 @@ export type { Transform2DData, Transform3DData } from './transform-shader';
 export {
   CULLING_SHADER,
   ADVANCED_CULLING_SHADER,
+  ADVANCED_CULLING_OUTPUT_COMPACT_SHADER,
   COMPACTION_SHADER,
   RENDER_STATE_STRIDE,
   CULL_RESULT_STRIDE,
+  FRUSTUM_PLANES_FLOATS,
   packRenderStates,
   unpackCullResults,
   getVisibleEntityIds,

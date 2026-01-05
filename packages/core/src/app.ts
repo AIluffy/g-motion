@@ -162,24 +162,9 @@ export function registerBuiltInRenderers(app: App): void {
 
   app.registerRenderer('object', {
     update(_entity: number, target: any, components: any) {
-      const props = components.Render?.props;
-      if (!props) return;
-
-      if (
-        target &&
-        typeof target === 'object' &&
-        typeof (target as any).set === 'function' &&
-        typeof (target as any).get === 'function'
-      ) {
-        for (const [key, value] of Object.entries(props)) {
-          (target as any).set(key, value as any);
-        }
-      } else {
-        Object.assign(target, props);
-      }
-    },
-    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
-      const renderComp = getComponent('Render') as { props?: Record<string, any> } | undefined;
+      const renderComp = components.Render as
+        | { props?: Record<string, any>; onUpdate?: (val: any) => void }
+        | undefined;
       const props = renderComp?.props;
       if (!props) return;
 
@@ -194,6 +179,44 @@ export function registerBuiltInRenderers(app: App): void {
         }
       } else {
         Object.assign(target, props);
+      }
+
+      if (renderComp?.onUpdate) {
+        if (Object.keys(props).length === 1) {
+          const value = Object.values(props)[0];
+          renderComp.onUpdate(value);
+        } else {
+          renderComp.onUpdate(props);
+        }
+      }
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as
+        | { props?: Record<string, any>; onUpdate?: (val: any) => void }
+        | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      if (
+        target &&
+        typeof target === 'object' &&
+        typeof (target as any).set === 'function' &&
+        typeof (target as any).get === 'function'
+      ) {
+        for (const [key, value] of Object.entries(props)) {
+          (target as any).set(key, value as any);
+        }
+      } else {
+        Object.assign(target, props);
+      }
+
+      if (renderComp?.onUpdate) {
+        if (Object.keys(props).length === 1) {
+          const value = Object.values(props)[0];
+          renderComp.onUpdate(value);
+        } else {
+          renderComp.onUpdate(props);
+        }
       }
     },
   });

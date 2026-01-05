@@ -97,6 +97,40 @@ describe('GPUMetricsProvider', () => {
     ]);
   });
 
+  it('records GPU memory snapshots, history, and threshold alerts', () => {
+    const provider = getGPUMetricsProvider() as any;
+    const now = Date.now();
+    (globalThis as any).__motionGPUMemoryAlerts = [];
+    provider.updateStatus({
+      memoryUsageThresholdBytes: 512,
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    provider.recordMemorySnapshot?.({
+      bytesSkipped: 10,
+      totalBytesProcessed: 100,
+      currentMemoryUsage: 1024,
+      peakMemoryUsage: 2048,
+      timestamp: now,
+    });
+
+    const history = provider.getMemoryHistory?.() as any[];
+    expect(history && history.length).toBeGreaterThan(0);
+    const latest = provider.getLatestMemorySnapshot?.() as any;
+    expect(latest.currentMemoryUsage).toBe(1024);
+    expect(latest.peakMemoryUsage).toBe(2048);
+
+    const status = provider.getStatus() as any;
+    expect(status.memoryUsageBytes).toBe(1024);
+    expect(status.peakMemoryUsageBytes).toBe(2048);
+    expect(status.memoryAlertActive).toBe(true);
+
+    const alerts = (globalThis as any).__motionGPUMemoryAlerts as any[];
+    expect(Array.isArray(alerts)).toBe(true);
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(warn).toHaveBeenCalled();
+  });
+
   it('seeds from legacy globals and warns once in dev', () => {
     (globalThis as any).__motionThresholdContext = legacyStatus;
     (globalThis as any).__motionGPUMetrics = legacyMetrics;

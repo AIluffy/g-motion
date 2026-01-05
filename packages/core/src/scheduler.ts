@@ -1,6 +1,7 @@
 import type { EngineServices, SystemContext, SystemDef } from './plugin';
 import { WorldProvider } from './worldProvider';
 import { SCHEDULER_LIMITS } from './constants';
+import { FrameSampler } from './utils';
 import { getErrorHandler } from './context';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors';
 import {
@@ -8,6 +9,7 @@ import {
   getPendingReadbackCount,
   setGPUResultWakeup,
 } from './webgpu/sync-manager';
+import { getPersistentGPUBufferManager } from './webgpu/persistent-buffer-manager';
 
 const GPU_TAIL_KEEP_ALIVE_MS = 250;
 
@@ -21,10 +23,10 @@ export class SystemScheduler {
   private keepAliveUntil = 0;
   private engineFrame = 0;
   private elapsedMs = 0;
-  private lastSamplingFrame = 0;
-  private lastSamplingFps = 0;
 
   private services?: EngineServices;
+
+  private frameSampler = new FrameSampler();
 
   setServices(services: EngineServices): void {
     this.services = services;
@@ -90,8 +92,6 @@ export class SystemScheduler {
     this.lastTime = performance.now();
     this.engineFrame = 0;
     this.elapsedMs = 0;
-    this.lastSamplingFrame = 0;
-    this.lastSamplingFps = 0;
     this.loop();
   }
 
@@ -148,21 +148,8 @@ export class SystemScheduler {
     const safeDt = Math.min(dt, SCHEDULER_LIMITS.MAX_FRAME_TIME_MS);
     this.engineFrame++;
     this.elapsedMs += safeDt;
-
     const config = (this.services?.config ?? (this.getWorld()?.config as any) ?? {}) as any;
-    const samplingFps = Number(config.samplingFps ?? config.targetFps ?? 60);
-    const fps = Number.isFinite(samplingFps) && samplingFps > 0 ? samplingFps : 60;
-    const framePosition = (this.elapsedMs * fps) / 1000;
-    const frame = Math.floor(framePosition + 1e-9);
-    let deltaFrame = 0;
-    if (!Object.is(this.lastSamplingFps, fps)) {
-      this.lastSamplingFps = fps;
-      this.lastSamplingFrame = frame;
-    } else {
-      deltaFrame = Math.max(0, frame - this.lastSamplingFrame);
-      this.lastSamplingFrame = frame;
-    }
-    const deltaTimeMs = (deltaFrame * 1000) / fps;
+    const sampling = this.frameSampler.compute(this.elapsedMs, config);
 
     const ctx: SystemContext | undefined = this.services
       ? {
@@ -171,11 +158,11 @@ export class SystemScheduler {
           sampling: {
             engineFrame: this.engineFrame,
             timeMs: this.elapsedMs,
-            fps,
-            framePosition,
-            frame,
-            deltaFrame,
-            deltaTimeMs,
+            fps: sampling.fps,
+            framePosition: sampling.framePosition,
+            frame: sampling.frame,
+            deltaFrame: sampling.deltaFrame,
+            deltaTimeMs: sampling.deltaTimeMs,
           },
         }
       : undefined;
@@ -213,6 +200,56 @@ export class SystemScheduler {
       this.services.metrics.updateStatus({ frameTimeMs: frameDurationMs });
     } catch {}
 
+    try {
+      const samplingRate = ((this.services?.config as any)?.metricsSamplingRate ?? 1) as number;
+      const shouldSampleMemory =
+        samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
+      if (shouldSampleMemory) {
+        const metricsAny = this.services?.metrics as any;
+        const recordMemorySnapshot = metricsAny?.recordMemorySnapshot as
+          | ((snapshot: {
+              bytesSkipped: number;
+              totalBytesProcessed: number;
+              currentMemoryUsage: number;
+              peakMemoryUsage: number;
+              timestamp: number;
+            }) => void)
+          | undefined;
+        if (recordMemorySnapshot) {
+          let managerStats: {
+            bytesSkipped: number;
+            totalBytesProcessed: number;
+            currentMemoryUsage: number;
+            peakMemoryUsage: number;
+            totalMemoryBytes?: number;
+          } | null = null;
+          try {
+            const manager = getPersistentGPUBufferManager();
+            const stats = manager.getStats() as any;
+            managerStats = {
+              bytesSkipped: stats.bytesSkipped ?? 0,
+              totalBytesProcessed: stats.totalBytesProcessed ?? 0,
+              currentMemoryUsage: stats.currentMemoryUsage ?? stats.totalMemoryBytes ?? 0,
+              peakMemoryUsage: stats.peakMemoryUsage ?? stats.totalMemoryBytes ?? 0,
+              totalMemoryBytes: stats.totalMemoryBytes,
+            };
+          } catch {
+            managerStats = null;
+          }
+          if (managerStats) {
+            const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            recordMemorySnapshot({
+              bytesSkipped: managerStats.bytesSkipped,
+              totalBytesProcessed: managerStats.totalBytesProcessed,
+              currentMemoryUsage: managerStats.currentMemoryUsage,
+              peakMemoryUsage: managerStats.peakMemoryUsage,
+              timestamp,
+            });
+          }
+        }
+      }
+    } catch {}
+
     const now = performance.now();
     const hasPendingGPUWork = getPendingReadbackCount() > 0 || getGPUResultQueueLength() > 0;
     const shouldContinue =
@@ -223,6 +260,12 @@ export class SystemScheduler {
       return;
     }
 
-    this.frameId = requestAnimationFrame(this.loop);
+    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : undefined;
+    if (!raf) {
+      this.isRunning = false;
+      return;
+    }
+
+    this.frameId = raf(this.loop);
   };
 }

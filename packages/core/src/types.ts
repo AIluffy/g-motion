@@ -199,6 +199,10 @@ export interface ArchetypeBatchDescriptor {
   keyframesData: Float32Array; // Flat: [t₀, dur₀, sv₀, ev₀, eid₀, ...]
   keyframesVersion?: number; // P0-2: Version signature for fast change detection
   workgroupHint: number; // 16, 32, 64, or 128 (adaptive based on entity count)
+  preprocessedKeyframes?: {
+    rawKeyframesPerEntity: Float32Array[];
+    channelMapPerEntity: Uint32Array[];
+  };
   // Optional GPU resources (managed by WebGPUComputeSystem)
   gpuBuffers?: {
     statesBuffer: any; // GPUBuffer

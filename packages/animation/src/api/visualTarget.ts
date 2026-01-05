@@ -1,3 +1,4 @@
+import { resolveDomElements } from '@g-motion/utils';
 import { TargetType } from './mark';
 
 export type VisualTargetKind = 'dom' | 'object' | 'primitive';
@@ -68,6 +69,27 @@ export function setVisualTargetGPUConfig(config: VisualTargetGPUConfig): void {
 
 function isObjectLike(value: unknown): value is object {
   return (typeof value === 'object' && value !== null) || typeof value === 'function';
+}
+
+function resolveDomElement(source: any, root?: Document | Element | null): HTMLElement | null {
+  if (typeof HTMLElement !== 'undefined' && source instanceof HTMLElement) {
+    return source;
+  }
+  if (typeof source === 'string') {
+    if (typeof document === 'undefined') return null;
+    const scope = root ?? document;
+    if (typeof (scope as any).querySelectorAll === 'function') {
+      try {
+        const elements = resolveDomElements(source, scope as Document | Element);
+        const first = elements && elements.length > 0 ? elements[0] : null;
+        return first as HTMLElement | null;
+      } catch {}
+    }
+    if (typeof (scope as any).querySelector === 'function') {
+      return (scope as Document | Element).querySelector(source) as HTMLElement | null;
+    }
+  }
+  return null;
 }
 
 class BaseVisualTarget implements VisualTarget {
@@ -173,8 +195,10 @@ class PrimitiveVisualTarget extends BaseVisualTarget {
     return this.value;
   }
 
-  canUseGPU(_prop: string): boolean {
-    return false;
+  canUseGPU(prop: string): boolean {
+    if (prop !== '__primitive') return false;
+    const initial = this.getInitial('__primitive');
+    return typeof initial === 'number' && Number.isFinite(initial);
   }
 }
 
@@ -189,14 +213,7 @@ class DomVisualTarget extends BaseVisualTarget {
 
   private resolveElement(): HTMLElement | null {
     if (this.element !== undefined) return this.element;
-    let el: HTMLElement | null = null;
-    if (typeof HTMLElement !== 'undefined' && this.source instanceof HTMLElement) {
-      el = this.source;
-    } else if (typeof this.source === 'string') {
-      if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
-        el = document.querySelector(this.source) as HTMLElement | null;
-      }
-    }
+    const el = resolveDomElement(this.source);
     this.element = el;
     return el;
   }

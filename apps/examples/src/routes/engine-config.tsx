@@ -123,6 +123,14 @@ function EngineConfigDemo() {
           archeArr.sort((a, b) => b.avgMs - a.avgMs);
         }
       } catch {}
+      const latestMemory = (provider as any).getLatestMemorySnapshot?.() as
+        | {
+            currentMemoryUsage?: number;
+            peakMemoryUsage?: number;
+          }
+        | undefined;
+      const currentMemoryUsageBytes = latestMemory?.currentMemoryUsage ?? 0;
+      const peakMemoryUsageBytes = latestMemory?.peakMemoryUsage ?? 0;
       setActiveCount(status.activeEntityCount ?? 0);
       const frameMs = status.frameTimeMs ?? 0;
       const fpsApprox = frameMs > 0 ? Math.round(1000 / frameMs) : (world.config.targetFps ?? 0);
@@ -137,6 +145,8 @@ function EngineConfigDemo() {
         gpuBatchCount: status.queueDepth ?? undefined,
         systemTimings: timingsArr,
         archetypeTimings: archeArr,
+        currentMemoryUsageBytes,
+        peakMemoryUsageBytes,
       });
     }, intervalMs);
     return () => clearInterval(id);

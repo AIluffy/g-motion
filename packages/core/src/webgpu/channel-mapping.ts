@@ -1,3 +1,7 @@
+import { MotionError, ErrorCode, ErrorSeverity } from '../errors';
+
+const STANDARD_TRANSFORM_PROPERTIES = ['x', 'y', 'rotate', 'scaleX', 'scaleY', 'opacity'] as const;
+
 /**
  * GPU Channel Mapping Table
  * Maps GPU output indices to render component property paths.
@@ -5,21 +9,31 @@
  */
 
 export interface ChannelMapping {
-  /** Index in GPU output (0-based, within stride) */
   index: number;
-  /** Property path in render.props (e.g., "x", "y", "rotateX") */
   property: string;
-  /** Optional: callback to transform value before assignment */
+  sourceIndex?: number;
+  packedProps?: [string, string];
   transform?: (value: number) => number;
+  unpackAndAssign?: (value: number, context: any) => void;
+  formatType?: number;
+  minValue?: number;
+  maxValue?: number;
 }
+
+export type BatchChannelKind = 'primitive' | 'standardTransform' | 'custom';
 
 export interface BatchChannelTable {
   /** Batch/archetype ID */
   batchId: string;
+  /** Raw stride: how many channels per entity produced by interpolation pass */
+  rawStride?: number;
+  /** Raw channel order used for sampling and interpolation */
+  rawChannels?: ChannelMapping[];
   /** Stride: how many channels per entity */
   stride: number;
   /** Channel mappings */
   channels: ChannelMapping[];
+  kind?: BatchChannelKind;
 }
 
 /**
@@ -34,6 +48,73 @@ export class GPUChannelMappingRegistry {
    * Register a channel mapping table for a batch
    */
   registerBatchChannels(table: BatchChannelTable): void {
+    if (!Number.isFinite(table.stride) || table.stride <= 0) {
+      throw new MotionError(
+        'GPU channel table stride must be a positive integer.',
+        ErrorCode.BATCH_VALIDATION_FAILED,
+        ErrorSeverity.FATAL,
+        { batchId: table.batchId, stride: table.stride },
+      );
+    }
+
+    if (!Array.isArray(table.channels) || table.channels.length === 0) {
+      throw new MotionError(
+        'GPU channel table must define at least one channel.',
+        ErrorCode.BATCH_VALIDATION_FAILED,
+        ErrorSeverity.FATAL,
+        { batchId: table.batchId },
+      );
+    }
+
+    const firstChannel = table.channels[0];
+    const isPrimitiveTable =
+      table.channels.length === 1 && firstChannel && firstChannel.property === '__primitive';
+
+    if (isPrimitiveTable && table.stride !== 1) {
+      throw new MotionError(
+        'Primitive GPU channel table must use stride=1 for __primitive output.',
+        ErrorCode.BATCH_VALIDATION_FAILED,
+        ErrorSeverity.FATAL,
+        { batchId: table.batchId, stride: table.stride },
+      );
+    }
+
+    const rawChannels = table.rawChannels ?? table.channels;
+    if (!Array.isArray(rawChannels) || rawChannels.length === 0) {
+      throw new MotionError(
+        'GPU channel table must define at least one raw channel.',
+        ErrorCode.BATCH_VALIDATION_FAILED,
+        ErrorSeverity.FATAL,
+        { batchId: table.batchId },
+      );
+    }
+    if (table.rawStride !== undefined) {
+      if (!Number.isFinite(table.rawStride) || table.rawStride <= 0) {
+        throw new MotionError(
+          'GPU channel table rawStride must be a positive integer.',
+          ErrorCode.BATCH_VALIDATION_FAILED,
+          ErrorSeverity.FATAL,
+          { batchId: table.batchId, rawStride: table.rawStride },
+        );
+      }
+      if (table.rawStride !== rawChannels.length) {
+        throw new MotionError(
+          'GPU channel table rawStride must match rawChannels.length.',
+          ErrorCode.BATCH_VALIDATION_FAILED,
+          ErrorSeverity.FATAL,
+          { batchId: table.batchId, rawStride: table.rawStride, rawChannels: rawChannels.length },
+        );
+      }
+    }
+
+    if (isStandardTransformChannels(table.channels)) {
+      table.kind = 'standardTransform';
+    } else if (isPrimitiveTable) {
+      table.kind = 'primitive';
+    } else if (!table.kind) {
+      table.kind = 'custom';
+    }
+
     this.tables.set(table.batchId, table);
   }
 
@@ -54,6 +135,7 @@ export class GPUChannelMappingRegistry {
       batchId: '__default__',
       stride,
       channels: defaultChannels,
+      kind: 'custom',
     };
   }
 
@@ -141,4 +223,18 @@ export function createBatchChannelTable(
       property: prop,
     })),
   };
+}
+
+export function isStandardTransformChannels(channels: ChannelMapping[]): boolean {
+  if (channels.length !== STANDARD_TRANSFORM_PROPERTIES.length) {
+    return false;
+  }
+  for (let i = 0; i < STANDARD_TRANSFORM_PROPERTIES.length; i++) {
+    const expected = STANDARD_TRANSFORM_PROPERTIES[i];
+    const ch = channels[i];
+    if (!ch || ch.property !== expected || ch.index !== i) {
+      return false;
+    }
+  }
+  return true;
 }

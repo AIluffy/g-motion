@@ -9,7 +9,7 @@ import {
   MotionError,
   getErrorHandler,
 } from '@g-motion/core';
-import { createDebugger, isDev } from '@g-motion/utils';
+import { createDebugger, isDev, resolveDomElements } from '@g-motion/utils';
 
 export type MarkOptions = {
   to?: any | ((index: number, entityId: number, target?: any) => any);
@@ -127,8 +127,44 @@ export type TargetResolver = (
 
 const targetResolvers: TargetResolver[] = [];
 
+type ResolverNamespace = {
+  name: string;
+  resolvers: TargetResolver[];
+};
+
+const resolverNamespaces: ResolverNamespace[] = [
+  {
+    name: 'default',
+    resolvers: targetResolvers,
+  },
+];
+
 export function registerTargetResolver(resolver: TargetResolver): void {
   targetResolvers.push(resolver);
+}
+
+export function registerTargetResolverWithScope(
+  _scopeName: string,
+  resolver: TargetResolver,
+): void {
+  targetResolvers.push(resolver);
+}
+
+function resolveWithRegisteredResolvers(
+  input: unknown,
+  ctx: TargetResolveContext,
+): TargetResolveResult | null {
+  if (targetResolvers.length === 0) {
+    return null;
+  }
+  const activeResolvers = resolverNamespaces[0]?.resolvers ?? targetResolvers;
+  for (const resolver of activeResolvers) {
+    const resolved = resolver(input, ctx);
+    if (resolved && resolved.length > 0) {
+      return resolved;
+    }
+  }
+  return null;
 }
 
 function isDomElement(value: unknown): value is Element {
@@ -150,6 +186,22 @@ function isArrayLike(value: unknown): value is { length: number } & { [index: nu
   return true;
 }
 
+function getRootDiagnostics(root: TargetScopeRoot): {
+  rootKind: string;
+  hasQuerySelectorAll: boolean;
+} {
+  const rootKind =
+    root == null
+      ? 'null'
+      : typeof Document !== 'undefined' && root instanceof Document
+        ? 'document'
+        : typeof Element !== 'undefined' && root instanceof Element
+          ? 'element'
+          : 'custom';
+  const hasQuerySelectorAll = !!root && typeof (root as any).querySelectorAll === 'function';
+  return { rootKind, hasQuerySelectorAll };
+}
+
 export function resolveTargets(
   input: unknown,
   options?: TargetResolutionOptions,
@@ -160,18 +212,15 @@ export function resolveTargets(
   const result: ResolvedTarget[] = [];
   const strict = options?.strictTargets ?? isDev();
 
-  if (targetResolvers.length > 0) {
-    const ctx: TargetResolveContext = {
-      root: root ?? null,
-      selectorCache,
-      strictTargets: strict,
-    };
-    for (const resolver of targetResolvers) {
-      const resolved = resolver(input, ctx);
-      if (resolved && resolved.length > 0) {
-        return resolved;
-      }
-    }
+  const resolverCtx: TargetResolveContext = {
+    root: root ?? null,
+    selectorCache,
+    strictTargets: strict,
+  };
+
+  const resolvedByNamespace = resolveWithRegisteredResolvers(input, resolverCtx);
+  if (resolvedByNamespace && resolvedByNamespace.length > 0) {
+    return resolvedByNamespace;
   }
 
   const handler = getErrorHandler();
@@ -209,8 +258,112 @@ export function resolveTargets(
     handler.handle(error);
   };
 
+  const handleSelectorDomEnvMissing = (selector: string, reason: string) => {
+    const severity = strict ? ErrorSeverity.FATAL : ErrorSeverity.WARNING;
+    const { rootKind, hasQuerySelectorAll } = getRootDiagnostics(root ?? null);
+    handleTargetError(
+      'DOM environment missing for selector resolution',
+      ErrorCode.DOM_ENV_MISSING,
+      severity,
+      {
+        selector,
+        root: root ?? null,
+        reason,
+        rootKind,
+        hasQuerySelectorAll,
+      },
+    );
+    if (options?.onSelectorError) {
+      options.onSelectorError(selector, reason);
+    } else {
+      debugResolveTargets('Selector resolution skipped in non-DOM environment', selector);
+    }
+  };
+
+  const handleSelectorResolutionError = (selector: string, reason: string) => {
+    const { rootKind, hasQuerySelectorAll } = getRootDiagnostics(root ?? null);
+    handleTargetError(
+      'Invalid selector or error during selector resolution',
+      ErrorCode.INVALID_SELECTOR,
+      ErrorSeverity.WARNING,
+      {
+        selector,
+        root,
+        reason,
+        rootKind,
+        hasQuerySelectorAll,
+      },
+    );
+    if (options?.onSelectorError) {
+      options.onSelectorError(selector, reason);
+    } else {
+      debugResolveTargets('Selector resolution error', selector, reason);
+    }
+  };
+
+  type SelectorResolutionPolicy = {
+    useCache: boolean;
+    reportDomEnvMissing: boolean;
+    reportResolutionError: boolean;
+  };
+
+  const defaultSelectorPolicy: SelectorResolutionPolicy = {
+    useCache: true,
+    reportDomEnvMissing: true,
+    reportResolutionError: true,
+  };
+
+  const resolveSelectorWithPolicy = (
+    selector: string,
+    rootNode: TargetScopeRoot,
+    cache: SelectorCache,
+    policy: SelectorResolutionPolicy = defaultSelectorPolicy,
+  ): { elements: Element[] | null; handled: boolean } => {
+    if (!rootNode || typeof (rootNode as any).querySelectorAll !== 'function') {
+      if (policy.reportDomEnvMissing) {
+        const reason = 'No DOM root with querySelectorAll available for selector resolution';
+        handleSelectorDomEnvMissing(selector, reason);
+      }
+      return { elements: null, handled: true };
+    }
+
+    if (!policy.useCache) {
+      const resolved = resolveDomElements(selector, rootNode as Element | Document);
+      return { elements: resolved, handled: false };
+    }
+
+    const elements = resolveSelectorElementsWithCache(
+      selector,
+      rootNode as Element | Document,
+      cache,
+    );
+    return { elements, handled: false };
+  };
+
+  const resolveSelectorElementsWithCache = (
+    selector: string,
+    rootNode: Element | Document,
+    cache: SelectorCache,
+  ): Element[] | null => {
+    try {
+      let elements = cache[selector];
+      if (!elements) {
+        const resolved = resolveDomElements(selector, rootNode as Element | Document);
+        elements = resolved ?? [];
+        cache[selector] = elements;
+      }
+      return elements;
+    } catch (e) {
+      const reason =
+        e instanceof Error && e.message ? e.message : 'Unknown error during selector resolution';
+      handleSelectorResolutionError(selector, reason);
+      return null;
+    }
+  };
+
   const pushTarget = (value: unknown) => {
     if (value == null) {
+      const { rootKind } = getRootDiagnostics(root ?? null);
       handleTargetError(
         'Resolved target is null or undefined',
         ErrorCode.TARGET_NULL,
@@ -218,14 +371,7 @@ export function resolveTargets(
         {
           input,
           root: root ?? null,
-          rootKind:
-            root == null
-              ? 'null'
-              : typeof Document !== 'undefined' && root instanceof Document
-                ? 'document'
-                : typeof Element !== 'undefined' && root instanceof Element
-                  ? 'element'
-                  : 'custom',
+          rootKind,
           strictTargets: strict,
         },
       );
@@ -279,86 +425,22 @@ export function resolveTargets(
     }
 
     if (typeof value === 'string') {
-      if (!root || typeof (root as any).querySelectorAll !== 'function') {
-        const reason = 'No DOM root with querySelectorAll available for selector resolution';
-        const severity = strict ? ErrorSeverity.FATAL : ErrorSeverity.WARNING;
-        const rootKind =
-          root == null
-            ? 'null'
-            : typeof Document !== 'undefined' && root instanceof Document
-              ? 'document'
-              : typeof Element !== 'undefined' && root instanceof Element
-                ? 'element'
-                : 'custom';
-        const hasQuerySelectorAll = !!root && typeof (root as any).querySelectorAll === 'function';
-        handleTargetError(
-          'DOM environment missing for selector resolution',
-          ErrorCode.DOM_ENV_MISSING,
-          severity,
-          {
-            selector: value,
-            root: root ?? null,
-            reason,
-            rootKind,
-            hasQuerySelectorAll,
-          },
-        );
-        if (options?.onSelectorError) {
-          options.onSelectorError(value, reason);
-        } else {
-          debugResolveTargets('Selector resolution skipped in non-DOM environment', value);
-        }
+      const { elements, handled } = resolveSelectorWithPolicy(
+        value,
+        root ?? null,
+        selectorCache,
+        defaultSelectorPolicy,
+      );
+
+      if (handled) {
         return;
       }
 
-      try {
-        let elements = selectorCache[value];
-        if (!elements) {
-          const nodeList = (root as Document | Element).querySelectorAll(value);
-          const list: Element[] = [];
-          for (let i = 0; i < nodeList.length; i++) {
-            const el = nodeList.item(i);
-            if (el) list.push(el);
-          }
-          elements = list;
-          selectorCache[value] = elements;
+      if (elements && elements.length > 1) {
+        for (const el of elements) {
+          pushTarget(el);
         }
-
-        if (elements.length > 1) {
-          for (const el of elements) {
-            pushTarget(el);
-          }
-          return;
-        }
-      } catch (e) {
-        const reason =
-          e instanceof Error && e.message ? e.message : 'Unknown error during selector resolution';
-        const rootKind =
-          root == null
-            ? 'null'
-            : typeof Document !== 'undefined' && root instanceof Document
-              ? 'document'
-              : typeof Element !== 'undefined' && root instanceof Element
-                ? 'element'
-                : 'custom';
-        const hasQuerySelectorAll = !!root && typeof (root as any).querySelectorAll === 'function';
-        handleTargetError(
-          'Invalid selector or error during selector resolution',
-          ErrorCode.INVALID_SELECTOR,
-          ErrorSeverity.WARNING,
-          {
-            selector: value,
-            root,
-            reason,
-            rootKind,
-            hasQuerySelectorAll,
-          },
-        );
-        if (options?.onSelectorError) {
-          options.onSelectorError(value, reason);
-        } else {
-          debugResolveTargets('Selector resolution error', value, reason);
-        }
+        return;
       }
 
       pushTarget(value);

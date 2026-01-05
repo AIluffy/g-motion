@@ -53,6 +53,12 @@ import {
   unpackInterleavedOutputs,
   packedRGBAToCSS,
   createStandardChannelMapping,
+  formatOutputValue,
+  linearToSRGB,
+  sRGBToLinear,
+  packNormalizedRGBA,
+  unpackNormalizedRGBA,
+  unpackHalf2,
 } from '../src/webgpu/output-format-shader';
 
 import {
@@ -60,11 +66,23 @@ import {
   RAW_KEYFRAME_STRIDE,
   PACKED_KEYFRAME_STRIDE,
   packRawKeyframes,
+  KEYFRAME_SEARCH_SHADER,
+  KEYFRAME_SEARCH_SHADER_OPT,
+  STRING_SEARCH_SHADER,
   packChannelMaps,
   hashPropertyName,
   PROPERTY_HASHES,
   easingStringToType,
+  generateRawKeyframesForTrack,
+  type RawKeyframeGenerationOptions,
+  buildChannelMapData,
+  preprocessChannelsToRawAndMap,
 } from '../src/webgpu/keyframe-preprocess-shader';
+
+import {
+  __resolveKeyframeSearchOptimizedFlagForTests,
+  __getKeyframeSearchShaderModeForTests,
+} from '../src/systems/webgpu/system';
 
 describe('GPU Shader Optimization', () => {
   describe('Phase 1.1: Bezier Curve Support', () => {
@@ -333,6 +351,7 @@ describe('GPU Shader Optimization', () => {
       expect(OUTPUT_FORMAT.FLOAT).toBe(0);
       expect(OUTPUT_FORMAT.COLOR_RGBA).toBe(1);
       expect(OUTPUT_FORMAT.ANGLE_DEG).toBe(3);
+      expect(OUTPUT_FORMAT.PACKED_HALF2).toBe(8);
     });
 
     it('should have correct stride constants', () => {
@@ -347,10 +366,20 @@ describe('GPU Shader Optimization', () => {
       ];
 
       const data = packOutputChannels(channels);
+      const u32 = new Uint32Array(data);
+      const f32 = new Float32Array(data);
 
-      expect(data.length).toBe(channels.length * OUTPUT_CHANNEL_STRIDE);
-      expect(data[0]).toBe(0); // sourceIndex
-      expect(data[1]).toBe(OUTPUT_FORMAT.FLOAT); // formatType
+      expect(u32.length).toBe(channels.length * OUTPUT_CHANNEL_STRIDE);
+      expect(u32[0]).toBe(0);
+      expect(u32[1]).toBe(OUTPUT_FORMAT.FLOAT);
+      expect(f32[2]).toBe(0);
+      expect(f32[3]).toBe(1);
+
+      const secondOffset = OUTPUT_CHANNEL_STRIDE;
+      expect(u32[secondOffset + 0]).toBe(1);
+      expect(u32[secondOffset + 1]).toBe(OUTPUT_FORMAT.ANGLE_DEG);
+      expect(f32[secondOffset + 2]).toBe(0);
+      expect(f32[secondOffset + 3]).toBe(360);
     });
 
     it('should convert packed RGBA to CSS', () => {
@@ -361,13 +390,92 @@ describe('GPU Shader Optimization', () => {
       expect(css).toBe('rgba(255, 128, 64, 1.000)');
     });
 
+    it('should unpack half2 correctly for common values', () => {
+      const one = 0x3c00; // f16(1.0)
+      const two = 0x4000; // f16(2.0)
+      const packed = (two << 16) | one;
+      const [a, b] = unpackHalf2(packed);
+      expect(a).toBeCloseTo(1, 3);
+      expect(b).toBeCloseTo(2, 3);
+    });
+
     it('should create standard channel mapping', () => {
       const mapping = createStandardChannelMapping();
 
       expect(mapping.length).toBe(6);
+
       expect(mapping[0].sourceIndex).toBe(0);
+      expect(mapping[0].formatType).toBe(OUTPUT_FORMAT.FLOAT);
+
       expect(mapping[1].sourceIndex).toBe(1);
+      expect(mapping[1].formatType).toBe(OUTPUT_FORMAT.FLOAT);
+
+      expect(mapping[2].sourceIndex).toBe(2);
       expect(mapping[2].formatType).toBe(OUTPUT_FORMAT.ANGLE_DEG);
+
+      expect(mapping[3].sourceIndex).toBe(3);
+      expect(mapping[3].formatType).toBe(OUTPUT_FORMAT.FLOAT);
+      expect(mapping[3].minValue).toBe(0);
+      expect(mapping[3].maxValue).toBe(10);
+
+      expect(mapping[4].sourceIndex).toBe(4);
+      expect(mapping[4].formatType).toBe(OUTPUT_FORMAT.FLOAT);
+      expect(mapping[4].minValue).toBe(0);
+      expect(mapping[4].maxValue).toBe(10);
+
+      expect(mapping[5].sourceIndex).toBe(5);
+      expect(mapping[5].formatType).toBe(OUTPUT_FORMAT.COLOR_NORM);
+      expect(mapping[5].minValue).toBe(0);
+      expect(mapping[5].maxValue).toBe(1);
+    });
+
+    it('should convert linear and sRGB approximately inversely', () => {
+      const linear = 0.5;
+      const srgb = linearToSRGB(linear);
+      const back = sRGBToLinear(srgb);
+      expect(back).toBeCloseTo(linear, 3);
+    });
+
+    it('should normalize percent output to 0-1 range', () => {
+      const v0 = formatOutputValue(OUTPUT_FORMAT.PERCENT, 0, 0, 100);
+      const v50 = formatOutputValue(OUTPUT_FORMAT.PERCENT, 50, 0, 100);
+      const v100 = formatOutputValue(OUTPUT_FORMAT.PERCENT, 100, 0, 100);
+      expect(v0).toBeCloseTo(0);
+      expect(v50).toBeCloseTo(0.5);
+      expect(v100).toBeCloseTo(1);
+    });
+
+    it('should normalize angle degrees into [0, 360)', () => {
+      const a1 = formatOutputValue(OUTPUT_FORMAT.ANGLE_DEG, 450);
+      const a2 = formatOutputValue(OUTPUT_FORMAT.ANGLE_DEG, -30);
+      expect(a1).toBeCloseTo(90);
+      expect(a2).toBeCloseTo(330);
+    });
+
+    it('should normalize angle radians into [0, 2π)', () => {
+      const twoPi = Math.PI * 2;
+      const a1 = formatOutputValue(OUTPUT_FORMAT.ANGLE_RAD, twoPi + Math.PI / 2);
+      const a2 = formatOutputValue(OUTPUT_FORMAT.ANGLE_RAD, -Math.PI / 2);
+      expect(a1).toBeCloseTo(Math.PI / 2);
+      expect(a2).toBeCloseTo(twoPi - Math.PI / 2);
+    });
+
+    it('should clamp float output when min and max are provided', () => {
+      const v1 = formatOutputValue(OUTPUT_FORMAT.FLOAT, -10, 0, 5);
+      const v2 = formatOutputValue(OUTPUT_FORMAT.FLOAT, 2, 0, 5);
+      const v3 = formatOutputValue(OUTPUT_FORMAT.FLOAT, 10, 0, 5);
+      expect(v1).toBe(0);
+      expect(v2).toBe(2);
+      expect(v3).toBe(5);
+    });
+
+    it('should pack and unpack normalized RGBA correctly', () => {
+      const packed = packNormalizedRGBA(1, 0.5, 0, 1);
+      const { r, g, b, a } = unpackNormalizedRGBA(packed);
+      expect(r).toBeCloseTo(1, 3);
+      expect(g).toBeCloseTo(0.5, 2);
+      expect(b).toBeCloseTo(0, 3);
+      expect(a).toBeCloseTo(1, 3);
     });
   });
 
@@ -378,9 +486,9 @@ describe('GPU Shader Optimization', () => {
       expect(EASING_TYPE.HOLD).toBe(101);
     });
 
-    it('should have correct stride constants', () => {
+    it('should have correct stride constants (raw=8 floats, packed=5 u32 words)', () => {
       expect(RAW_KEYFRAME_STRIDE).toBe(8);
-      expect(PACKED_KEYFRAME_STRIDE).toBe(10);
+      expect(PACKED_KEYFRAME_STRIDE).toBe(5);
     });
 
     it('should pack raw keyframes correctly', () => {
@@ -438,6 +546,190 @@ describe('GPU Shader Optimization', () => {
       expect(data[1]).toBe(0); // channelIndex
       expect(data[2]).toBe(0); // entityOffset
       expect(data[3]).toBe(2); // keyframeCount
+    });
+
+    it('should generate raw keyframes for track with subdivision', () => {
+      const track = [
+        {
+          startTime: 0,
+          time: 1000,
+          startValue: 0,
+          endValue: 100,
+          easing: 'linear',
+        },
+      ];
+      const options: RawKeyframeGenerationOptions = {
+        timeInterval: 200,
+        maxSubdivisionsPerSegment: 4,
+      };
+      const evaluate = (kf: any, t: number) => {
+        const p = (t - kf.startTime) / (kf.time - kf.startTime);
+        return kf.startValue + (kf.endValue - kf.startValue) * p;
+      };
+      const raws = generateRawKeyframesForTrack(track, options, evaluate);
+      expect(raws.length).toBe(4);
+      expect(raws[0].startTime).toBeCloseTo(0);
+      expect(raws[0].endTime).toBeCloseTo(250);
+      expect(raws[0].startValue).toBeCloseTo(0);
+      expect(raws[0].endValue).toBeCloseTo(25);
+      expect(raws[3].startTime).toBeCloseTo(750);
+      expect(raws[3].endTime).toBeCloseTo(1000);
+      expect(raws[3].startValue).toBeCloseTo(75);
+      expect(raws[3].endValue).toBeCloseTo(100);
+      for (const r of raws) {
+        expect(r.easingType).toBe(EASING_TYPE.LINEAR);
+      }
+    });
+
+    it('should build channel map data with sequential offsets', () => {
+      const channels = [
+        { property: 'x', keyframeCount: 3 },
+        { property: 'opacity', keyframeCount: 2 },
+      ];
+      const maps = buildChannelMapData(channels, 0);
+      expect(maps.length).toBe(2);
+      expect(maps[0].propertyHash).toBe(PROPERTY_HASHES.x);
+      expect(maps[0].channelIndex).toBe(0);
+      expect(maps[0].entityOffset).toBe(0);
+      expect(maps[0].keyframeCount).toBe(3);
+      expect(maps[1].propertyHash).toBe(PROPERTY_HASHES.opacity);
+      expect(maps[1].channelIndex).toBe(1);
+      expect(maps[1].entityOffset).toBe(3);
+      expect(maps[1].keyframeCount).toBe(2);
+    });
+
+    it('should preprocess channels to raw keyframes and channel maps', () => {
+      const channels = [
+        {
+          property: 'x',
+          track: [
+            {
+              startTime: 0,
+              time: 1000,
+              startValue: 0,
+              endValue: 100,
+              easing: 'linear',
+            },
+          ],
+        },
+        {
+          property: 'opacity',
+          track: [
+            {
+              startTime: 0,
+              time: 500,
+              startValue: 0,
+              endValue: 1,
+              easing: 'linear',
+            },
+          ],
+        },
+      ];
+      const options: RawKeyframeGenerationOptions = {
+        timeInterval: 500,
+        maxSubdivisionsPerSegment: 4,
+      };
+      const evaluate = (kf: any, t: number) => {
+        const p = (t - kf.startTime) / (kf.time - kf.startTime);
+        return kf.startValue + (kf.endValue - kf.startValue) * p;
+      };
+      const { rawKeyframes, channelMaps } = preprocessChannelsToRawAndMap(
+        channels,
+        options,
+        evaluate,
+      );
+      expect(rawKeyframes.length).toBe(4);
+      expect(channelMaps.length).toBe(2);
+      expect(channelMaps[0].propertyHash).toBe(PROPERTY_HASHES.x);
+      expect(channelMaps[0].entityOffset).toBe(0);
+      expect(channelMaps[0].keyframeCount).toBe(2);
+      expect(channelMaps[1].propertyHash).toBe(PROPERTY_HASHES.opacity);
+      expect(channelMaps[1].entityOffset).toBe(2);
+      expect(channelMaps[1].keyframeCount).toBe(2);
+    });
+  });
+
+  describe('Phase 3.2: Keyframe Search Shader', () => {
+    it('should export binary search shader with correct entry point', () => {
+      expect(typeof KEYFRAME_SEARCH_SHADER).toBe('string');
+      expect(KEYFRAME_SEARCH_SHADER.length).toBeGreaterThan(0);
+      expect(KEYFRAME_SEARCH_SHADER).toContain('fn binarySearchKeyframe');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('fn linearSearchKeyframe');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('fn adaptiveSearchKeyframe');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('fn findActiveKeyframes');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('@compute @workgroup_size(64)');
+    });
+
+    it('should handle empty keyframe sequences in shader code', () => {
+      expect(KEYFRAME_SEARCH_SHADER).toContain('if (count == 0u)');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('return result;');
+    });
+
+    it('should compute progress based on start and duration from packed data', () => {
+      expect(KEYFRAME_SEARCH_SHADER).toContain('let times = getStartAndEndTime(kf);');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('let start = times.x;');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('let endTime = times.y;');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('if (duration > 0.0)');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('result.progress = (time - start) / duration;');
+    });
+
+    it('should clamp outside time range to nearest keyframe', () => {
+      expect(KEYFRAME_SEARCH_SHADER).toContain('if (left > 0u && left < count)');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('result.progress = 1.0;');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('else if (left == 0u && count > 0u)');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('result.progress = 0.0;');
+    });
+
+    it('should include adaptive threshold and workgroup cache', () => {
+      expect(KEYFRAME_SEARCH_SHADER).toContain('const ADAPTIVE_SEARCH_THRESHOLD');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('var<workgroup> cachedOffsets');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('var<workgroup> cachedCounts');
+    });
+  });
+
+  describe('Phase 3.3: Keyframe Search Shader Mode Switch', () => {
+    it('should resolve optimized flag from config when present', () => {
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({ keyframeSearchOptimized: true })).toBe(
+        true,
+      );
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({ keyframeSearchOptimized: false })).toBe(
+        false,
+      );
+    });
+
+    it('should resolve optimized flag from environment override when config missing', () => {
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, '0')).toBe(false);
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, 'false')).toBe(false);
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, 'off')).toBe(false);
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, '1')).toBe(true);
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, 'true')).toBe(true);
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, 'on')).toBe(true);
+      expect(__resolveKeyframeSearchOptimizedFlagForTests({}, null)).toBe(true);
+    });
+
+    it('should export optimized shader variant with shared layout and entry point', () => {
+      expect(typeof KEYFRAME_SEARCH_SHADER_OPT).toBe('string');
+      expect(KEYFRAME_SEARCH_SHADER_OPT.length).toBeGreaterThan(0);
+      expect(KEYFRAME_SEARCH_SHADER_OPT).toContain('struct PackedKeyframe');
+      expect(KEYFRAME_SEARCH_SHADER_OPT).toContain('fn linearSearchKeyframeOptimized');
+      expect(KEYFRAME_SEARCH_SHADER_OPT).toContain('fn binarySearchKeyframeOptimized');
+      expect(KEYFRAME_SEARCH_SHADER_OPT).toContain('fn adaptiveSearchKeyframeOptimized');
+      expect(KEYFRAME_SEARCH_SHADER_OPT).toContain('@compute @workgroup_size(64)');
+    });
+
+    it('should expose shader mode for runtime inspection', () => {
+      const mode = __getKeyframeSearchShaderModeForTests();
+      expect(mode === null || typeof mode === 'boolean').toBe(true);
+    });
+  });
+
+  describe('String Search Shader', () => {
+    it('should export string search shader with correct entry point', () => {
+      expect(typeof STRING_SEARCH_SHADER).toBe('string');
+      expect(STRING_SEARCH_SHADER.length).toBeGreaterThan(0);
+      expect(STRING_SEARCH_SHADER).toContain('struct StringSearchResult');
+      expect(STRING_SEARCH_SHADER).toContain('fn findSubstring');
+      expect(STRING_SEARCH_SHADER).toContain('@compute @workgroup_size(64)');
     });
   });
 });

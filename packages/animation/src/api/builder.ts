@@ -7,6 +7,7 @@ import {
   MotionStatus,
   getGPUChannelMappingRegistry,
   createBatchChannelTable,
+  OUTPUT_FORMAT,
 } from '@g-motion/core';
 import { WorldProvider } from '@g-motion/core';
 import { registerAnimationSystems } from '../index';
@@ -226,23 +227,100 @@ export class MotionBuilder {
       components.Render = renderData.Render;
     }
 
-    if (
-      this.tracks.size > 0 &&
-      (targetType === TargetType.DOM || targetType === TargetType.Object)
-    ) {
-      const properties: string[] = [];
-      for (const key of this.tracks.keys()) {
-        if (key === '__primitive') continue;
-        properties.push(key);
+    if (this.tracks.size > 0) {
+      const componentNames = Object.keys(components).sort();
+      const render = components.Render as { rendererId?: string } | undefined;
+      const archetypeId =
+        render && typeof render.rendererId === 'string'
+          ? `${componentNames.join('|')}::${render.rendererId}`
+          : componentNames.join('|');
+      const registry = getGPUChannelMappingRegistry();
+
+      if (targetType === TargetType.Primitive) {
+        if (this.tracks.has('__primitive') && visualTarget.canUseGPU('__primitive')) {
+          registry.registerBatchChannels({
+            batchId: archetypeId,
+            rawStride: 1,
+            rawChannels: [{ index: 0, property: '__primitive' }],
+            stride: 1,
+            channels: [{ index: 0, property: '__primitive', formatType: OUTPUT_FORMAT.FLOAT }],
+          });
+        }
       }
-      if (properties.length) {
-        const gpuProps = properties.filter((prop) => visualTarget.canUseGPU(prop));
-        const selected = gpuProps.length ? gpuProps : properties;
-        const componentNames = Object.keys(components).sort();
-        const archetypeId = componentNames.join('|');
-        const registry = getGPUChannelMappingRegistry();
-        const table = createBatchChannelTable(archetypeId, selected.length, selected);
-        registry.registerBatchChannels(table);
+
+      if (targetType === TargetType.DOM || targetType === TargetType.Object) {
+        const properties: string[] = [];
+        for (const key of this.tracks.keys()) {
+          if (key === '__primitive') continue;
+          properties.push(key);
+        }
+        if (properties.length) {
+          const gpuProps = properties.filter((prop) => visualTarget.canUseGPU(prop));
+          if (gpuProps.length) {
+            const standardTransformProps = ['x', 'y', 'rotate', 'scaleX', 'scaleY', 'opacity'];
+            const canUsePackedTransform =
+              gpuProps.length === standardTransformProps.length &&
+              standardTransformProps.every((p) => gpuProps.includes(p));
+
+            if (canUsePackedTransform) {
+              const rawChannels = standardTransformProps.map((prop, idx) => ({
+                index: idx,
+                property: prop,
+              }));
+              const channels = [
+                {
+                  index: 0,
+                  property: '__packed0',
+                  sourceIndex: 0,
+                  formatType: OUTPUT_FORMAT.PACKED_HALF2,
+                  packedProps: ['x', 'y'] as [string, string],
+                },
+                {
+                  index: 1,
+                  property: '__packed1',
+                  sourceIndex: 2,
+                  formatType: OUTPUT_FORMAT.PACKED_HALF2,
+                  packedProps: ['rotate', 'scaleX'] as [string, string],
+                },
+                {
+                  index: 2,
+                  property: '__packed2',
+                  sourceIndex: 4,
+                  formatType: OUTPUT_FORMAT.PACKED_HALF2,
+                  packedProps: ['scaleY', 'opacity'] as [string, string],
+                },
+              ];
+              registry.registerBatchChannels({
+                batchId: archetypeId,
+                rawStride: rawChannels.length,
+                rawChannels,
+                stride: channels.length,
+                channels,
+              });
+            } else {
+              const table = createBatchChannelTable(archetypeId, gpuProps.length, gpuProps);
+              for (const ch of table.channels) {
+                switch (ch.property) {
+                  case 'rotate':
+                  case 'rotateX':
+                  case 'rotateY':
+                  case 'rotateZ':
+                    ch.formatType = OUTPUT_FORMAT.ANGLE_DEG;
+                    break;
+                  case 'opacity':
+                    ch.formatType = OUTPUT_FORMAT.COLOR_NORM;
+                    ch.minValue = 0;
+                    ch.maxValue = 1;
+                    break;
+                  default:
+                    ch.formatType = OUTPUT_FORMAT.FLOAT;
+                    break;
+                }
+              }
+              registry.registerBatchChannels(table);
+            }
+          }
+        }
       }
     }
 

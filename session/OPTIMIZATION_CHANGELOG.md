@@ -90,6 +90,94 @@
 
 **无** - 所有改动均为内部实现优化，不影响公共 API。
 
+---
+
+## [2025-12-20] - Motion API 与 DOM 渲染内部重构（目标解析与渲染管线）
+
+围绕 DOM 目标解析路径、目标解析器扩展能力以及 DOM 渲染管线，实施了一轮以“行为不变”为前提的内部重构。
+
+### 🧩 DOM 目标解析路径分层
+
+- **策略分层**：
+  - 工具层：`@g-motion/utils` 中的 DOM 查询工具（如 `resolveDomElements`）专注于“如何从 selector 拿到 DOM 元素”，负责：
+    - DOM API 调用与错误防御
+    - selector 解析与返回 `HTMLElement[]`
+    - 尽量不感知动画语义
+  - animation 层：`packages/animation/src/api/mark.ts` 内的 `resolveTargets` 专注于“动画目标解析策略”，负责：
+    - 将 selector / DOM 节点 / 自定义对象解析成统一的 Target 列表
+    - 处理缓存策略与错误策略（例如忽略错误 vs 抛出）
+    - 组合多种 TargetResolver 的结果
+- **行为影响**：
+  - 本阶段仅是职责重排和内部 helper 抽取（例如缓存处理与错误策略封装），**对外行为保持不变**：
+    - 既有 selector、DOM 节点、对象 target 的解析结果一致
+    - 既有异常提示 / 容错策略不变
+
+### 🧭 targetResolvers 命名空间结构
+
+- **内部结构**：
+  - 在 animation 层为 targetResolvers 引入 namespace 抽象：
+    - 默认命名空间：挂接现有的 resolver 列表（如 DOM、object、primitive 等）
+    - 预留 `registerTargetResolverWithScope(scopeName, resolver)` 能力，用于未来按 scope 注册 resolver
+  - 当前实现中，所有 resolver 仍然在默认 namespace 下执行，命名空间结构仅作为内部组织形式存在。
+- **行为影响**：
+  - 现阶段所有目标解析仍然与之前一致，**属于纯内部重构**：
+    - resolver 调用顺序不变
+    - 解析优先级不变
+    - 未启用任何基于 scope 的分流逻辑
+  - 未来调整点（潜在行为变化）：
+    - 当按 scope 启用不同 resolver 集合时：
+      - 不同插件 / 子系统可以拥有各自的目标解析策略
+      - 相同输入在不同 scope 下可能解析出不同的 target 集合
+    - 启用前需要：
+      - 明确 scope 分配策略（按插件、按 world、按 app 实例等）
+      - 补充相应测试与文档说明
+
+### 🧱 DOMRenderSystem 适配器角色
+
+- **适配设计**：
+  - 保留 `@g-motion/plugin-dom` 中的 legacy 导出 `DOMRenderSystem`，但其内部逻辑收敛为对 `createDOMRenderer` 的调用：
+    - 在 `packages/plugins/dom/src/renderer.ts` 中，增加:
+      - `buildTransformTypedBuffersForArchetype(archetype)`：一次性提取当前 archetype 的 Transform typed buffers
+      - `applyDomRenderFromArchetype(renderer, archetype, index, buffers, hasAnyTransformTyped)`：从 archetype 读取当前 entity 的组件，组装为 renderer 所需的 `components`，并调用 `renderer.update(...)`
+    - `DOMRenderSystem.update()` 中仅负责：
+      - 遍历 world / archetype / entity
+      - 为每个 entity 调用 `applyDomRenderFromArchetype` 进行适配
+  - 统一 DOM 渲染逻辑：
+    - 所有实际 DOM 写入逻辑（transform 计算、style 批量更新、GPU 初始化）仍然只在 `createDOMRenderer` 的实现中存在。
+    - legacy ECS world 不再直接触碰 DOM，而是通过 renderer 接口间接完成。
+- **行为影响**：
+  - 当前阶段属于 **纯内部重构**：
+    - `DOMRenderSystem` 依旧存在并可被旧代码使用
+    - DOM 渲染效果、GPU 初始化行为、Transform 字段解析均保持一致
+  - 收益：
+    - 消除“系统直接写 DOM”与“renderer 写 DOM”两套逻辑的漂移风险
+    - 未来可以更安心地在 `createDOMRenderer` 内演进 GPU 策略与 DOM 写入优化
+
+### 🧪 验证
+
+- **测试**：
+  - `pnpm --filter @g-motion/plugin-dom test`
+    - DOM 渲染、GPU 初始化、selector 缓存、动画集成等测试全部通过。
+- **静态检查**：
+  - `pnpm lint`
+  - `pnpm type-check`
+  - 整个 monorepo 级别的 lint 与类型检查均无错误。
+
+### ⚠️ 破坏性变更
+
+- **无**（当前阶段）
+  - 所有改动均为内部重构：
+    - DOM 目标解析结果保持不变
+    - targetResolvers 的执行顺序与优先级保持不变
+    - DOMRenderSystem 仍然导出并可被旧代码使用
+- **潜在未来行为变更点**：
+  - 当启用 resolver scope 时：
+    - 不同 scope 下可能使用不同 resolver 列表，从而影响目标解析结果
+    - 需要在启用前明确并记录：
+      - 哪些 API 会携带 scope 信息（如 motion builder 或 world/app 配置）
+      - 不同 scope 之间的默认回退策略（如找不到 scope 时是否回退到 default）
+
+
 ### 📝 文件变更统计
 
 ```

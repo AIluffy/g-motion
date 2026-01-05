@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { motion } from '../src/index';
+import { motion as builderMotion } from '../src/api/builder';
+import { World } from '@g-motion/core';
 
 describe('Sparse Keyframe Interpolation', () => {
   it('should interpolate missing properties across sparse keyframes (like CSS animation)', async () => {
@@ -85,5 +87,27 @@ describe('Sparse Keyframe Interpolation', () => {
 
     // Check final value
     expect(value).toBeCloseTo(100, 0);
+  });
+
+  it('assigns separate archetypes for object and primitive targets', () => {
+    const world = new World();
+    const objTarget = { count: 0 };
+    let primitiveValue = 0;
+
+    builderMotion(objTarget, { world })
+      .mark({ to: { count: 1 }, at: 100 })
+      .play();
+
+    builderMotion(primitiveValue, { world })
+      .mark([
+        { to: 0, at: 0 },
+        { to: 1, at: 100 },
+      ])
+      .option({ onUpdate: (v) => (primitiveValue = v) })
+      .play();
+
+    const archetypeIds = Array.from(world.getArchetypes()).map((a: any) => a.id as string);
+    expect(archetypeIds.some((id) => id.includes('::object'))).toBe(true);
+    expect(archetypeIds.some((id) => id.includes('::primitive'))).toBe(true);
   });
 });

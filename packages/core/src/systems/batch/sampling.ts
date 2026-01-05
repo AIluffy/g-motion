@@ -8,6 +8,13 @@ import type { TimelineData, Track, Keyframe } from '../../types';
 import { getRendererCode } from '../../renderer-code';
 import { getArchetypeBufferCache, resetArchetypeBufferCache } from './archetype-buffer-cache'; // P1-2: Buffer cache
 import { KEYFRAME_STRIDE } from '../../webgpu/shader'; // Phase 1.1: Extended keyframe support
+import {
+  preprocessChannelsToRawAndMap,
+  type RawKeyframeGenerationOptions,
+  type RawKeyframeValueEvaluator,
+  packRawKeyframes,
+  packChannelMaps,
+} from '../../webgpu/keyframe-preprocess-shader';
 
 // Easing mode constants (matching shader EASING_MODE)
 const EASING_MODE_STANDARD = 0;
@@ -109,6 +116,20 @@ export const BatchSamplingSystem: SystemDef = {
         ? ctx!.sampling!.frame
         : engineFrame;
     const channelRegistry = getGPUChannelMappingRegistry();
+    const preprocessConfig = (config as any).keyframePreprocess as
+      | { enabled?: boolean; timeInterval?: number; maxSubdivisionsPerSegment?: number }
+      | undefined;
+    const preprocessEnabled = !!preprocessConfig?.enabled;
+    const preprocessOptions: RawKeyframeGenerationOptions = {
+      timeInterval: preprocessConfig?.timeInterval ?? 16,
+      maxSubdivisionsPerSegment: preprocessConfig?.maxSubdivisionsPerSegment ?? 4,
+    };
+    const evaluateRawValue: RawKeyframeValueEvaluator = (kf, t) => {
+      const duration = kf.time - kf.startTime;
+      if (!(duration > 0)) return kf.endValue;
+      const p = (t - kf.startTime) / duration;
+      return kf.startValue + (kf.endValue - kf.startValue) * p;
+    };
     const callbackCode = getRendererCode('callback');
 
     // GPU-First: Only skip if explicitly disabled
@@ -223,8 +244,13 @@ export const BatchSamplingSystem: SystemDef = {
       }
 
       const table = channelRegistry.getChannels(archetype.id);
-      const channels = table?.channels ?? [];
-      const channelCount = channels.length;
+      let outputChannels = table?.channels ?? [];
+      let rawChannels = table?.rawChannels ?? outputChannels;
+      if ((!table || rawChannels.length === 0) && archetype.id.includes('::primitive')) {
+        rawChannels = [{ index: 0, property: '__primitive' }];
+        outputChannels = rawChannels;
+      }
+      const channelCount = rawChannels.length;
 
       let entityIndicesBuf: Int32Array =
         entityIndicesScratchByArchetype.get(archetype.id) ?? new Int32Array(64);
@@ -327,6 +353,59 @@ export const BatchSamplingSystem: SystemDef = {
         }
 
         let keyframesData: Float32Array;
+        let preprocessedRawKeyframesPerEntity: Float32Array[] | undefined;
+        let preprocessedChannelMapPerEntity: Uint32Array[] | undefined;
+
+        if (preprocessEnabled && channelCount > 0) {
+          preprocessedRawKeyframesPerEntity = new Array(entityCount);
+          preprocessedChannelMapPerEntity = new Array(entityCount);
+          for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+            const i = entityIndicesBuf[eIndex];
+            const timeline = timelineBuffer[i] as { tracks?: TimelineData };
+            const tracks = timeline.tracks as TimelineData | undefined;
+            if (!tracks || tracks.size === 0) {
+              preprocessedRawKeyframesPerEntity[eIndex] = new Float32Array(0);
+              preprocessedChannelMapPerEntity[eIndex] = new Uint32Array(0);
+              continue;
+            }
+            const channelTracks: {
+              property: string;
+              track: {
+                startTime: number;
+                time: number;
+                startValue: number;
+                endValue: number;
+                easing: unknown;
+              }[];
+            }[] = [];
+            for (let cIndex = 0; cIndex < channelCount; cIndex++) {
+              const prop = rawChannels[cIndex].property;
+              const track = tracks.get(prop) as Track | undefined;
+              if (!track || track.length === 0) continue;
+              const truncated = track.slice(0, MAX_KEYFRAMES_PER_CHANNEL);
+              const converted = truncated.map((kf) => ({
+                startTime: kf.startTime,
+                time: kf.time,
+                startValue: kf.startValue,
+                endValue: kf.endValue,
+                easing: kf.easing,
+              }));
+              channelTracks.push({ property: prop, track: converted });
+            }
+            if (channelTracks.length === 0) {
+              preprocessedRawKeyframesPerEntity[eIndex] = new Float32Array(0);
+              preprocessedChannelMapPerEntity[eIndex] = new Uint32Array(0);
+              continue;
+            }
+            const { rawKeyframes, channelMaps } = preprocessChannelsToRawAndMap(
+              channelTracks,
+              preprocessOptions,
+              evaluateRawValue,
+            );
+            preprocessedRawKeyframesPerEntity[eIndex] = packRawKeyframes(rawKeyframes);
+            preprocessedChannelMapPerEntity[eIndex] = packChannelMaps(channelMaps);
+          }
+        }
 
         // Build signatures for static-cache decision
         let versionSig = 0 >>> 0;
@@ -359,7 +438,7 @@ export const BatchSamplingSystem: SystemDef = {
               const tracks = timeline.tracks as TimelineData | undefined;
 
               for (let cIndex = 0; cIndex < channelCount; cIndex++) {
-                const prop = channels[cIndex].property;
+                const prop = rawChannels[cIndex].property;
                 const track = tracks?.get(prop) as Track | undefined;
                 const count = track ? Math.min(track.length, MAX_KEYFRAMES_PER_CHANNEL) : 0;
 
@@ -486,6 +565,17 @@ export const BatchSamplingSystem: SystemDef = {
           }
         }
 
+        const preprocessed =
+          preprocessEnabled &&
+          channelCount > 0 &&
+          preprocessedRawKeyframesPerEntity &&
+          preprocessedChannelMapPerEntity
+            ? {
+                rawKeyframesPerEntity: preprocessedRawKeyframesPerEntity,
+                channelMapPerEntity: preprocessedChannelMapPerEntity,
+              }
+            : undefined;
+
         // Add per-archetype batch with adaptive workgroup hint
         // P0-2: Pass keyframes version signature for fast change detection
         const batch = processor.addArchetypeBatch(
@@ -496,6 +586,7 @@ export const BatchSamplingSystem: SystemDef = {
           statesData,
           keyframesData,
           versionSig, // P0-2: Version signature for O(1) change detection
+          preprocessed,
         );
 
         totalEntities += batch.entityCount;

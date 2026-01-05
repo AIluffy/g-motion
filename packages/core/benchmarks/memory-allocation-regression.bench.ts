@@ -17,9 +17,15 @@ import type { EngineServices } from '../src/plugin';
 
 let webgpuMockInstalled = false;
 
-function ensureMockWebGPU() {
+export function ensureMockWebGPU() {
   const g = globalThis as any;
   if (webgpuMockInstalled) return;
+  const metrics =
+    g.__webgpuTestMetrics ??
+    (g.__webgpuTestMetrics = {
+      dispatchCount: 0,
+      totalBufferBytes: 0,
+    });
   if (!g.GPUBufferUsage) {
     g.GPUBufferUsage = { STORAGE: 1, COPY_DST: 2, COPY_SRC: 4, QUERY_RESOLVE: 8, MAP_READ: 16 };
   }
@@ -28,13 +34,16 @@ function ensureMockWebGPU() {
   }
   class FakeBuffer {
     size: number;
+    data: ArrayBuffer;
     constructor(size: number) {
       this.size = size;
+      this.data = new ArrayBuffer(size);
     }
     destroy() {}
-    getMappedRange(_offset?: number, size?: number) {
+    getMappedRange(offset?: number, size?: number) {
+      const start = offset ?? 0;
       const len = size ?? this.size;
-      return new ArrayBuffer(len);
+      return this.data.slice(start, start + len);
     }
     unmap() {}
     mapAsync(_mode: number) {
@@ -42,14 +51,26 @@ function ensureMockWebGPU() {
     }
   }
   class FakeComputePass {
+    private metrics: { dispatchCount: number };
+    constructor(metricsRef: { dispatchCount: number }) {
+      this.metrics = metricsRef;
+    }
     setPipeline(_pipeline: any) {}
     setBindGroup(_index: number, _group: any) {}
-    dispatchWorkgroups(_x: number, _y?: number, _z?: number) {}
+    dispatchWorkgroups(x: number, y?: number, z?: number) {
+      const yy = y ?? 1;
+      const zz = z ?? 1;
+      this.metrics.dispatchCount += x * yy * zz;
+    }
     end() {}
   }
   class FakeCommandEncoder {
+    private metrics: { dispatchCount: number };
+    constructor(metricsRef: { dispatchCount: number }) {
+      this.metrics = metricsRef;
+    }
     beginComputePass(): FakeComputePass {
-      return new FakeComputePass();
+      return new FakeComputePass(this.metrics);
     }
     finish(): any {
       return {};
@@ -69,13 +90,38 @@ function ensureMockWebGPU() {
   }
   class FakeDevice {
     features: { has: (name: string) => boolean };
-    queue: { submit: (commandBuffers: any[]) => void };
+    queue: {
+      submit: (commandBuffers: any[]) => void;
+      writeBuffer: (
+        buffer: FakeBuffer,
+        bufferOffset: number,
+        data: ArrayBufferView,
+        dataOffset?: number,
+        size?: number,
+      ) => void;
+    };
     private lastBindGroupLayout: any;
     constructor() {
       this.features = { has: () => false };
-      this.queue = { submit: (_cbs: any[]) => {} };
+      this.queue = {
+        submit: (_cbs: any[]) => {},
+        writeBuffer: (
+          buffer: FakeBuffer,
+          bufferOffset: number,
+          data: ArrayBufferView,
+          dataOffset?: number,
+          size?: number,
+        ) => {
+          const offset = dataOffset ?? 0;
+          const length = size ?? data.byteLength - offset;
+          const src = new Uint8Array(data.buffer, data.byteOffset + offset, length);
+          const dst = new Uint8Array(buffer.data);
+          dst.set(src, bufferOffset);
+        },
+      };
     }
     createBuffer(options: { size: number }) {
+      metrics.totalBufferBytes += options.size;
       return new FakeBuffer(options.size);
     }
     createShaderModule(config: { code: string }) {
@@ -96,7 +142,7 @@ function ensureMockWebGPU() {
       return { layout: config.layout, entries: config.entries };
     }
     createCommandEncoder(_config?: { label?: string }) {
-      return new FakeCommandEncoder();
+      return new FakeCommandEncoder(metrics);
     }
   }
   class FakeAdapter {
@@ -117,6 +163,7 @@ function ensureMockWebGPU() {
   }
   g.navigator.gpu = {
     requestAdapter: async () => adapter,
+    __isFake: true,
   };
   webgpuMockInstalled = true;
 }
@@ -422,5 +469,164 @@ describe('Batch Sampling Allocation', () => {
     const allocatedKB = (finalHeap - initialHeap) / 1024;
     console.log(`Batch sampling allocated: ${allocatedKB.toFixed(2)}KB`);
     expect(allocatedKB).toBeLessThan(100);
+  });
+});
+
+describe('Readback Metrics Baseline', () => {
+  let world: World;
+  let services: EngineServices;
+
+  beforeEach(() => {
+    world = new World();
+    registerCoreComponents(world);
+    ensureMockWebGPU();
+    __resetWebGPUComputeSystemForTests();
+    const batchProcessor = new ComputeBatchProcessor();
+    const metrics = getGPUMetricsProvider();
+    metrics.clear();
+    const appContext = getAppContext();
+    services = {
+      world,
+      scheduler: world.scheduler,
+      app: {} as any,
+      config: {
+        ...world.config,
+        gpuCompute: 'always',
+      },
+      batchProcessor,
+      metrics,
+      errorHandler: appContext.getErrorHandler(),
+      appContext,
+    };
+    world.scheduler.setServices(services);
+    world.scheduler.add(TimeSystem);
+    world.scheduler.add(BatchSamplingSystem);
+  });
+
+  bench('Readback metrics per archetype', async () => {
+    const archetypeACount = 200;
+    const archetypeBCount = 200;
+
+    for (let i = 0; i < archetypeACount; i++) {
+      const tracks = new Map();
+      tracks.set('__primitive', [{ startTime: 0, time: 100, startValue: 0, endValue: 100 }]);
+      world.createEntity({
+        MotionState: {
+          status: MotionStatus.Running,
+          startTime: 0,
+          currentTime: 0,
+          playbackRate: 1,
+          delay: 0,
+          iteration: 0,
+          pausedAt: 0,
+        },
+        Timeline: {
+          tracks,
+          duration: 100,
+          loop: 0,
+          repeat: 0,
+        },
+        Render: {
+          rendererId: 'primitive',
+          target: { value: 0 },
+          props: { __primitive: 0 },
+        },
+      });
+    }
+
+    for (let i = 0; i < archetypeBCount; i++) {
+      const tracks = new Map();
+      tracks.set('x', [{ startTime: 0, time: 200, startValue: 0, endValue: 200 }]);
+      world.createEntity({
+        MotionState: {
+          status: MotionStatus.Running,
+          startTime: 0,
+          currentTime: 0,
+          playbackRate: 1,
+          delay: 0,
+          iteration: 0,
+          pausedAt: 0,
+        },
+        Timeline: {
+          tracks,
+          duration: 200,
+          loop: 0,
+          repeat: 0,
+        },
+      });
+    }
+
+    const frames = 20;
+    for (let frame = 0; frame < frames; frame++) {
+      TimeSystem.update(16, { services, dt: 16 });
+      BatchSamplingSystem.update(16, { services, dt: 16 });
+      await WebGPUComputeSystem.update(16, { services, dt: 16 });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const metricsProvider = getGPUMetricsProvider();
+    const allMetrics = metricsProvider.getMetrics();
+    const syncMetrics = allMetrics.filter(
+      (m) => m.syncPerformed && typeof m.syncDataSize === 'number' && m.syncDataSize > 0,
+    );
+
+    expect(syncMetrics.length).toBeGreaterThan(0);
+
+    const archetypeSummary = new Map<string, { bytes: number; ms: number; samples: number }>();
+
+    for (const m of syncMetrics) {
+      const id = m.batchId;
+      const existing = archetypeSummary.get(id) || { bytes: 0, ms: 0, samples: 0 };
+      const bytes = typeof m.syncDataSize === 'number' ? m.syncDataSize : 0;
+      const ms = typeof m.syncDurationMs === 'number' ? m.syncDurationMs : 0;
+      existing.bytes += bytes;
+      existing.ms += ms;
+      existing.samples += 1;
+      archetypeSummary.set(id, existing);
+    }
+
+    expect(archetypeSummary.size).toBeGreaterThan(0);
+
+    const rows: {
+      archetype: string;
+      samples: number;
+      totalBytes: number;
+      totalMs: number;
+      avgBytes: number;
+      avgMs: number;
+    }[] = [];
+
+    for (const [id, value] of archetypeSummary) {
+      expect(value.bytes).toBeGreaterThan(0);
+      const avgBytes = value.samples > 0 ? value.bytes / value.samples : 0;
+      const avgMs = value.samples > 0 ? value.ms / value.samples : 0;
+      rows.push({
+        archetype: id,
+        samples: value.samples,
+        totalBytes: value.bytes,
+        totalMs: value.ms,
+        avgBytes,
+        avgMs,
+      });
+    }
+
+    rows.sort((a, b) => a.archetype.localeCompare(b.archetype));
+
+    const header = ['archetype', 'samples', 'totalBytes', 'totalMs', 'avgBytes', 'avgMs'];
+    console.log('Readback metrics baseline');
+    console.log(header.join(', '));
+    for (const row of rows) {
+      const line = [
+        row.archetype,
+        String(row.samples),
+        String(row.totalBytes),
+        row.totalMs.toFixed(3),
+        row.avgBytes.toFixed(1),
+        row.avgMs.toFixed(3),
+      ].join(', ');
+      console.log(line);
+      expect(row.avgMs).toBeLessThan(50);
+    }
   });
 });

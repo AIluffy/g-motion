@@ -1,15 +1,21 @@
 import type { SystemContext, SystemDef } from '../../plugin';
 import { drainGPUResults } from '../../webgpu/sync-manager';
-import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
+import {
+  getGPUChannelMappingRegistry,
+  isStandardTransformChannels,
+} from '../../webgpu/channel-mapping';
 import type { ChannelMapping } from '../../webgpu/channel-mapping';
+import { OUTPUT_FORMAT, packedRGBAToCSS, unpackHalf2 } from '../../webgpu/output-format-shader';
 import { isDev } from '@g-motion/utils';
 import { getRendererCode } from '../../renderer-code';
+import { MotionError, ErrorCode, ErrorSeverity } from '../../errors';
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
   order: 28, // before RenderSystem
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
+    const errorHandler = ctx?.services.errorHandler;
     if (!world) return;
     const packets = drainGPUResults();
     if (!packets.length) return;
@@ -31,8 +37,76 @@ export const GPUResultApplySystem: SystemDef = {
       if (!channelsResolved) {
         const table = channelRegistry.getChannels(p.archetypeId);
         if (table) {
-          stride = table.stride;
-          channelsResolved = table.channels;
+          const tableRawStride = table.rawStride ?? table.rawChannels?.length;
+          if (
+            packetStride !== undefined &&
+            tableRawStride !== undefined &&
+            packetStride === tableRawStride &&
+            table.rawChannels &&
+            table.rawChannels.length
+          ) {
+            stride = packetStride;
+            channelsResolved = table.rawChannels;
+          } else {
+            stride = table.stride;
+            channelsResolved = table.channels;
+          }
+        }
+      }
+
+      if (channelsResolved && channelsResolved.length) {
+        const isPrimitiveChannels =
+          channelsResolved.length === 1 && channelsResolved[0].property === '__primitive';
+        const hasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
+        const isStandardTransform = isStandardTransformChannels(channelsResolved);
+
+        if (isPrimitiveChannels && stride !== 1 && errorHandler) {
+          const error = new MotionError(
+            'GPU result packet has primitive channel mapping but stride is not 1.',
+            ErrorCode.BATCH_VALIDATION_FAILED,
+            ErrorSeverity.WARNING,
+            {
+              archetypeId: p.archetypeId,
+              stride,
+              channelCount: channelsResolved.length,
+            },
+          );
+          errorHandler.handle(error);
+        }
+
+        if (hasNonPrimitiveProp && stride === 1 && errorHandler) {
+          const error = new MotionError(
+            'GPU result packet uses stride=1 but channel mapping includes non-primitive properties.',
+            ErrorCode.BATCH_VALIDATION_FAILED,
+            ErrorSeverity.WARNING,
+            {
+              archetypeId: p.archetypeId,
+              stride,
+              channelCount: channelsResolved.length,
+              properties: channelsResolved.map((c) => c.property),
+            },
+          );
+          errorHandler.handle(error);
+        }
+
+        if (isStandardTransform && stride !== channelsResolved.length && errorHandler) {
+          const error = new MotionError(
+            'GPU result packet has standard transform channel mapping but stride does not match channel count.',
+            ErrorCode.BATCH_VALIDATION_FAILED,
+            ErrorSeverity.WARNING,
+            {
+              archetypeId: p.archetypeId,
+              stride,
+              channelCount: channelsResolved.length,
+            },
+          );
+          errorHandler.handle(error);
+        }
+      }
+
+      if (!channelsResolved) {
+        if (p.archetypeId.includes('::primitive')) {
+          channelsResolved = [{ index: 0, property: '__primitive' }];
         }
       }
 
@@ -41,12 +115,12 @@ export const GPUResultApplySystem: SystemDef = {
           const defaultChannels: ChannelMapping[] = [
             { index: 0, property: 'x' },
             { index: 1, property: 'y' },
-            { index: 2, property: 'rotateX' },
-            { index: 3, property: 'rotateY' },
-            { index: 4, property: 'translateZ' },
+            { index: 2, property: 'rotate' },
+            { index: 3, property: 'scaleX' },
+            { index: 4, property: 'scaleY' },
+            { index: 5, property: 'opacity' },
           ];
           channelsResolved = defaultChannels;
-          // eslint-disable-next-line no-console
         } else {
           channelsResolved = [];
         }
@@ -54,6 +128,8 @@ export const GPUResultApplySystem: SystemDef = {
 
       // Apply values to entities using channel mapping
       const valuesLen = values.length;
+      const valuesU32 =
+        valuesLen > 0 ? new Uint32Array(values.buffer, values.byteOffset, valuesLen) : undefined;
       const firstId = entityIds[0];
       const packetArchetype = firstId != null ? world.getEntityArchetype(firstId) : undefined;
       const stableArchetype =
@@ -82,7 +158,11 @@ export const GPUResultApplySystem: SystemDef = {
 
           const rendererCode = render.rendererCode ?? 0;
           const base = i * stride;
-          if (rendererCode === primitiveCode || render.rendererId === 'primitive' || stride === 1) {
+          const isPrimitiveRenderer =
+            rendererCode === primitiveCode || render.rendererId === 'primitive';
+          const isPrimitivePacket = p.archetypeId.includes('::primitive');
+          const hasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
+          if (isPrimitiveRenderer || (isPrimitivePacket && stride === 1 && !hasNonPrimitiveProp)) {
             const next = values[base];
             if (!Object.is(render.props.__primitive, next)) {
               render.props.__primitive = next;
@@ -97,14 +177,52 @@ export const GPUResultApplySystem: SystemDef = {
           for (const channelMap of channelsResolved) {
             const valueIndex = base + channelMap.index;
             if (valueIndex < valuesLen) {
+              if (channelMap.formatType === OUTPUT_FORMAT.COLOR_RGBA && valuesU32) {
+                const packed = valuesU32[valueIndex] >>> 0;
+                const css = packedRGBAToCSS(packed);
+                const prev = render.props[channelMap.property];
+                if (!Object.is(prev, css)) {
+                  render.props[channelMap.property] = css;
+                  changed = true;
+                }
+                continue;
+              }
+
+              if (channelMap.formatType === OUTPUT_FORMAT.PACKED_HALF2 && valuesU32) {
+                const packed = valuesU32[valueIndex] >>> 0;
+                if (channelMap.packedProps) {
+                  const [a, b] = unpackHalf2(packed);
+                  const prevA = render.props[channelMap.packedProps[0]];
+                  if (!Object.is(prevA, a)) {
+                    render.props[channelMap.packedProps[0]] = a;
+                    changed = true;
+                  }
+                  const prevB = render.props[channelMap.packedProps[1]];
+                  if (!Object.is(prevB, b)) {
+                    render.props[channelMap.packedProps[1]] = b;
+                    changed = true;
+                  }
+                  continue;
+                }
+                if (typeof channelMap.unpackAndAssign === 'function') {
+                  channelMap.unpackAndAssign(packed, { render, index: i });
+                  changed = true;
+                  continue;
+                }
+              }
+
               let value = values[valueIndex];
               if (typeof channelMap.transform === 'function') {
                 try {
                   value = channelMap.transform(value);
                 } catch (e) {
-                  // eslint-disable-next-line no-console
                   console.warn('[GPUResultApplySystem] Channel transform error', e);
                 }
+              }
+              if (typeof channelMap.unpackAndAssign === 'function') {
+                channelMap.unpackAndAssign(value, { render, index: i });
+                changed = true;
+                continue;
               }
               const prev = render.props[channelMap.property];
               if (!Object.is(prev, value)) {
@@ -163,9 +281,94 @@ export const GPUResultApplySystem: SystemDef = {
           continue;
         }
 
+        const writeTransformValue = (prop: string, value: number) => {
+          if (typeof value !== 'number' || !Number.isFinite(value)) return;
+          if (transformBuffer && index !== undefined) {
+            const t = transformBuffer[index] as any;
+            if (t && !Object.is(t[prop], value)) {
+              t[prop] = value;
+            }
+          }
+          let tbuf = typedTransformBuffers[prop];
+          if (tbuf === undefined) {
+            tbuf = archetype.getTypedBuffer?.('Transform', prop) as
+              | Float32Array
+              | Float64Array
+              | Int32Array
+              | undefined;
+            typedTransformBuffers[prop] = tbuf;
+          }
+          if (tbuf && index !== undefined) {
+            tbuf[index] = value;
+          }
+        };
+
         for (const channelMap of channelsResolved) {
           const valueIndex = base + channelMap.index;
           if (valueIndex < valuesLen) {
+            if (channelMap.formatType === OUTPUT_FORMAT.COLOR_RGBA && valuesU32) {
+              const packed = valuesU32[valueIndex] >>> 0;
+              const css = packedRGBAToCSS(packed);
+              const prev = render.props[channelMap.property];
+              if (!Object.is(prev, css)) {
+                render.props[channelMap.property] = css;
+                changed = true;
+              }
+              continue;
+            }
+
+            if (channelMap.formatType === OUTPUT_FORMAT.PACKED_HALF2 && valuesU32) {
+              const packed = valuesU32[valueIndex] >>> 0;
+              if (channelMap.packedProps) {
+                const [a, b] = unpackHalf2(packed);
+                const propA = channelMap.packedProps[0];
+                const propB = channelMap.packedProps[1];
+                writeTransformValue(propA, a);
+                writeTransformValue(propB, b);
+                if (propA === 'translateX') writeTransformValue('x', a);
+                else if (propA === 'translateY') writeTransformValue('y', a);
+                else if (propA === 'translateZ') writeTransformValue('z', a);
+                else if (propA === 'scale') {
+                  writeTransformValue('scaleX', a);
+                  writeTransformValue('scaleY', a);
+                  writeTransformValue('scaleZ', a);
+                } else if (propA === 'rotate') {
+                  writeTransformValue('rotateZ', a);
+                }
+                if (propB === 'translateX') writeTransformValue('x', b);
+                else if (propB === 'translateY') writeTransformValue('y', b);
+                else if (propB === 'translateZ') writeTransformValue('z', b);
+                else if (propB === 'scale') {
+                  writeTransformValue('scaleX', b);
+                  writeTransformValue('scaleY', b);
+                  writeTransformValue('scaleZ', b);
+                } else if (propB === 'rotate') {
+                  writeTransformValue('rotateZ', b);
+                }
+                const prevA = render.props[propA];
+                if (!Object.is(prevA, a)) {
+                  render.props[propA] = a;
+                  changed = true;
+                }
+                const prevB = render.props[propB];
+                if (!Object.is(prevB, b)) {
+                  render.props[propB] = b;
+                  changed = true;
+                }
+                continue;
+              }
+              if (typeof channelMap.unpackAndAssign === 'function') {
+                channelMap.unpackAndAssign(packed, {
+                  render,
+                  transformBuffer,
+                  typedTransformBuffers,
+                  index,
+                });
+                changed = true;
+                continue;
+              }
+            }
+
             let value = values[valueIndex];
             if (typeof channelMap.transform === 'function') {
               try {
@@ -174,41 +377,30 @@ export const GPUResultApplySystem: SystemDef = {
                 console.warn('[GPUResultApplySystem] Channel transform error', e);
               }
             }
-            const writeTransform = (prop: string) => {
-              if (transformBuffer && index !== undefined) {
-                const t = transformBuffer[index] as any;
-                if (t && !Object.is(t[prop], value)) {
-                  t[prop] = value;
-                }
-              }
-              let tbuf = typedTransformBuffers[prop];
-              if (tbuf === undefined) {
-                tbuf = archetype.getTypedBuffer?.('Transform', prop) as
-                  | Float32Array
-                  | Float64Array
-                  | Int32Array
-                  | undefined;
-                typedTransformBuffers[prop] = tbuf;
-              }
-              if (tbuf && index !== undefined) {
-                tbuf[index] = value;
-              }
-            };
-
-            writeTransform(channelMap.property);
+            if (typeof channelMap.unpackAndAssign === 'function') {
+              channelMap.unpackAndAssign(value, {
+                render,
+                transformBuffer,
+                typedTransformBuffers,
+                index,
+              });
+              changed = true;
+              continue;
+            }
+            writeTransformValue(channelMap.property, value);
 
             if (channelMap.property === 'translateX') {
-              writeTransform('x');
+              writeTransformValue('x', value);
             } else if (channelMap.property === 'translateY') {
-              writeTransform('y');
+              writeTransformValue('y', value);
             } else if (channelMap.property === 'translateZ') {
-              writeTransform('z');
+              writeTransformValue('z', value);
             } else if (channelMap.property === 'scale') {
-              writeTransform('scaleX');
-              writeTransform('scaleY');
-              writeTransform('scaleZ');
+              writeTransformValue('scaleX', value);
+              writeTransformValue('scaleY', value);
+              writeTransformValue('scaleZ', value);
             } else if (channelMap.property === 'rotate') {
-              writeTransform('rotateZ');
+              writeTransformValue('rotateZ', value);
             }
 
             const prev = render.props[channelMap.property];

@@ -71,6 +71,12 @@ export interface MotionAppConfig {
     interpolationArchetypesPerFrame?: number;
   };
 
+  keyframePreprocess?: {
+    enabled?: boolean;
+    timeInterval?: number;
+    maxSubdivisionsPerSegment?: number;
+  };
+
   /**
    * Whether to enable GPU-accelerated easing functions.
    * Default: true
@@ -78,6 +84,8 @@ export interface MotionAppConfig {
   gpuEasing?: boolean;
 
   gpuOnlyInterpolation?: boolean;
+
+  keyframeSearchOptimized?: boolean;
 }
 
 export interface EngineServices {

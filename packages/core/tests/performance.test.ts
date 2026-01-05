@@ -4,6 +4,7 @@ import {
   PerformanceProfiler,
   RegressionTestHarness,
 } from '../src/webgpu/benchmark';
+import { SyncManager } from '../src/webgpu/sync-manager';
 
 describe('Performance Benchmarking', () => {
   let benchmark: ComputeBenchmark;
@@ -154,6 +155,159 @@ describe('Performance Benchmarking', () => {
       expect(result.recommendation).toBeDefined();
       expect(result.cpu.avgTime).toBeGreaterThan(0);
       expect(result.gpu.avgTime).toBeGreaterThan(0);
+    });
+  });
+
+  describe('SyncManager readback metrics', () => {
+    it('should track readback time and percentage', () => {
+      const manager = new SyncManager();
+      manager.recordEvent({ type: 'upload', duration: 10, dataSize: 1024 });
+      manager.recordEvent({ type: 'compute', duration: 5 });
+      manager.recordEvent({ type: 'download', duration: 20, dataSize: 2048 });
+
+      const metrics = manager.getMetrics();
+      expect(metrics.downloadTime).toBeGreaterThan(0);
+      expect(metrics.readbackTimeMs).toBeCloseTo(metrics.downloadTime);
+      expect(metrics.readbackPercentage).toBeGreaterThan(0);
+      expect(metrics.readbackPercentage).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe('Keyframe Search Algorithm', () => {
+    it('should benchmark linear vs binary search', async () => {
+      const size = 200000;
+      const values = new Float32Array(size);
+      for (let i = 0; i < size; i++) {
+        values[i] = i;
+      }
+      const targets = new Float32Array(1024);
+      for (let i = 0; i < targets.length; i++) {
+        targets[i] = (i * size) / targets.length;
+      }
+
+      const linearFn = async () => {
+        let sum = 0;
+        for (let i = 0; i < targets.length; i++) {
+          const t = targets[i];
+          let idx = size - 1;
+          for (let j = 0; j < size; j++) {
+            if (values[j] >= t) {
+              idx = j;
+              break;
+            }
+          }
+          sum += idx;
+        }
+        if (sum === -1) {
+          throw new Error('unreachable');
+        }
+      };
+
+      const binaryFn = async () => {
+        let sum = 0;
+        for (let i = 0; i < targets.length; i++) {
+          const t = targets[i];
+          let left = 0;
+          let right = size;
+          let idx = size - 1;
+          while (left < right) {
+            const mid = (left + right) >>> 1;
+            const v = values[mid];
+            if (v < t) {
+              left = mid + 1;
+            } else {
+              idx = mid;
+              right = mid;
+            }
+          }
+          sum += idx;
+        }
+        if (sum === -1) {
+          throw new Error('unreachable');
+        }
+      };
+
+      const linearResult = await benchmark.benchmark('keyframe-linear-search', linearFn, {
+        iterations: 3,
+        warmup: false,
+      });
+      const binaryResult = await benchmark.benchmark('keyframe-binary-search', binaryFn, {
+        iterations: 3,
+        warmup: false,
+      });
+
+      expect(linearResult.avgTime).toBeGreaterThan(0);
+      expect(binaryResult.avgTime).toBeGreaterThan(0);
+      expect(binaryResult.avgTime).toBeLessThan(linearResult.avgTime);
+    });
+
+    it('should benchmark adaptive search strategy across sizes', async () => {
+      const benchmarkSizes = [8, 32, 128, 512];
+
+      for (const size of benchmarkSizes) {
+        const values = new Float32Array(size);
+        for (let i = 0; i < size; i++) {
+          values[i] = i;
+        }
+        const targets = new Float32Array(256);
+        for (let i = 0; i < targets.length; i++) {
+          targets[i] = (i * size) / targets.length;
+        }
+
+        const linearFn = async () => {
+          let sum = 0;
+          for (let i = 0; i < targets.length; i++) {
+            const t = targets[i];
+            let idx = size - 1;
+            for (let j = 0; j < size; j++) {
+              if (values[j] >= t) {
+                idx = j;
+                break;
+              }
+            }
+            sum += idx;
+          }
+          if (sum === -1) {
+            throw new Error('unreachable');
+          }
+        };
+
+        const binaryFn = async () => {
+          let sum = 0;
+          for (let i = 0; i < targets.length; i++) {
+            const t = targets[i];
+            let left = 0;
+            let right = size;
+            let idx = size - 1;
+            while (left < right) {
+              const mid = (left + right) >>> 1;
+              const v = values[mid];
+              if (v < t) {
+                left = mid + 1;
+              } else {
+                idx = mid;
+                right = mid;
+              }
+            }
+            sum += idx;
+          }
+          if (sum === -1) {
+            throw new Error('unreachable');
+          }
+        };
+
+        const linearResult = await benchmark.benchmark(`adaptive-linear-${size}`, linearFn, {
+          iterations: 2,
+          warmup: false,
+        });
+        const binaryResult = await benchmark.benchmark(`adaptive-binary-${size}`, binaryFn, {
+          iterations: 2,
+          warmup: false,
+        });
+
+        expect(linearResult.avgTime).toBeGreaterThan(0);
+        expect(binaryResult.avgTime).toBeGreaterThan(0);
+      }
     });
   });
 });

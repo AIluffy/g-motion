@@ -96,6 +96,10 @@ export class ComputeBatchProcessor {
     statesData: Float32Array,
     keyframesData: Float32Array,
     keyframesVersion?: number, // P0-2: Version signature for fast change detection
+    preprocessedKeyframes?: {
+      rawKeyframesPerEntity: Float32Array[];
+      channelMapPerEntity: Uint32Array[];
+    },
   ): ArchetypeBatchDescriptor {
     if (entityCount === 0) {
       throw new MotionError(
@@ -117,6 +121,7 @@ export class ComputeBatchProcessor {
       statesData,
       keyframesData,
       keyframesVersion, // P0-2: Store version signature
+      preprocessedKeyframes,
       workgroupHint,
       createdAt: Date.now(),
     };

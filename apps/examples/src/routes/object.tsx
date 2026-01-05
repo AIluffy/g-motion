@@ -34,8 +34,15 @@ function ObjectDemo() {
       .mark([{ to: { value: 20 }, at: 1400 }])
       .mark([{ to: { value: 60 }, at: 1800 }])
       .option({
-        onUpdate: (val) => {
-          setDisplay(val);
+        onUpdate: (latest) => {
+          console.log('onUpdate', latest);
+          const numeric =
+            typeof latest === 'number'
+              ? latest
+              : typeof (latest as any)?.value === 'number'
+                ? (latest as any).value
+                : targetRef.current.value;
+          setDisplay(numeric);
         },
       })
       .play();
@@ -54,6 +61,7 @@ function ObjectDemo() {
       .mark([{ to: 60 as any, at: 1800 }])
       .option({
         onUpdate: (val) => {
+          console.log('onUpdate primitive', val);
           setPrimitiveDisplay(val);
         },
       })

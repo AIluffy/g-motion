@@ -31,6 +31,8 @@ export type EngineMetricsSnapshot = {
     dispatchCount: number;
     entityCount: number;
   }>;
+  currentMemoryUsageBytes?: number;
+  peakMemoryUsageBytes?: number;
 };
 
 export const engineMetricsAtom = atom<EngineMetricsSnapshot | null>(null);
