@@ -12,6 +12,20 @@ export interface PendingReadback {
   stride?: number;
   channels?: Array<{ index: number; property: string }>;
   leaseId?: number;
+  tag?: any;
+  decode?: (
+    mappedRange: ArrayBuffer,
+    entry: PendingReadback,
+  ) => {
+    archetypeId?: string;
+    entityIds?: ArrayLike<number>;
+    values?: Float32Array;
+    byteSize?: number;
+    stride?: number;
+    channels?: Array<{ index: number; property: string }>;
+    leaseId?: number;
+    tag?: any;
+  } | null;
   startTime?: number;
   resolveTime?: number;
   expired?: boolean;
@@ -34,6 +48,7 @@ export class AsyncReadbackManager {
     stride = 1,
     channels?: Array<{ index: number; property: string }>,
     leaseId?: number,
+    tag?: any,
   ): void {
     const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const entry: PendingReadback = {
@@ -47,6 +62,7 @@ export class AsyncReadbackManager {
       stride,
       channels,
       leaseId,
+      tag,
       startTime,
     };
 
@@ -59,6 +75,43 @@ export class AsyncReadbackManager {
       })
       .catch(() => {
         // Ignore map errors here, handled in drain
+        (entry.mapPromise as any).settled = true;
+        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      });
+
+    this.pending.push(entry);
+  }
+
+  enqueueMapAsyncDecoded(
+    archetypeId: string,
+    stagingBuffer: GPUBuffer,
+    mapPromise: Promise<void>,
+    byteSize: number,
+    decode: PendingReadback['decode'],
+    timeoutMs = this.defaultTimeoutMs,
+    tag?: any,
+  ): void {
+    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const entry: PendingReadback = {
+      archetypeId,
+      entityIds: [],
+      stagingBuffer,
+      mapPromise,
+      timestamp: Date.now(),
+      timeoutMs,
+      byteSize,
+      decode,
+      tag,
+      startTime,
+    };
+
+    (mapPromise as any).settled = false;
+    mapPromise
+      .then(() => {
+        (entry.mapPromise as any).settled = true;
+        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      })
+      .catch(() => {
         (entry.mapPromise as any).settled = true;
         entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
       });
@@ -82,6 +135,7 @@ export class AsyncReadbackManager {
       stride?: number;
       channels?: Array<{ index: number; property: string }>;
       leaseId?: number;
+      tag?: any;
       syncDurationMs?: number;
       expired?: boolean;
     }>
@@ -95,6 +149,7 @@ export class AsyncReadbackManager {
       stride?: number;
       channels?: Array<{ index: number; property: string }>;
       leaseId?: number;
+      tag?: any;
       syncDurationMs?: number;
       expired?: boolean;
     }> = [];
@@ -128,20 +183,43 @@ export class AsyncReadbackManager {
 
         const expired = !!p.expired;
         const view = p.stagingBuffer.getMappedRange();
-        const bytes = Math.max(0, Math.min(p.byteSize, view.byteLength));
-        const alignedBytes = bytes - (bytes % 4);
-        const values = new Float32Array(view.slice(0, alignedBytes));
+        const decoded = p.decode ? p.decode(view, p) : undefined;
+        if (p.decode && decoded === null) {
+          try {
+            p.stagingBuffer.unmap();
+          } catch {}
+          toRemove.push(i);
+          continue;
+        }
+
+        const finalArchetypeId = decoded?.archetypeId ?? p.archetypeId;
+        const finalEntityIds = decoded?.entityIds ?? p.entityIds;
+        const finalStride = decoded?.stride ?? p.stride;
+        const finalChannels = decoded?.channels ?? p.channels;
+        const finalLeaseId = decoded?.leaseId ?? p.leaseId;
+        const finalTag = decoded?.tag ?? p.tag;
+        const finalByteSize = decoded?.byteSize ?? (p.decode ? 0 : p.byteSize);
+
+        let values: Float32Array | undefined;
+        if (p.decode) {
+          values = decoded?.values;
+        } else {
+          const bytes = Math.max(0, Math.min(p.byteSize, view.byteLength));
+          const alignedBytes = bytes - (bytes % 4);
+          values = new Float32Array(view.slice(0, alignedBytes));
+        }
         p.stagingBuffer.unmap();
 
         results.push({
-          archetypeId: p.archetypeId,
-          entityIds: p.entityIds,
+          archetypeId: finalArchetypeId,
+          entityIds: finalEntityIds,
           values,
           stagingBuffer: p.stagingBuffer,
-          byteSize: p.byteSize,
-          stride: p.stride,
-          channels: p.channels,
-          leaseId: p.leaseId,
+          byteSize: finalByteSize,
+          stride: finalStride,
+          channels: finalChannels,
+          leaseId: finalLeaseId,
+          tag: finalTag,
           syncDurationMs: p.resolveTime && p.startTime ? p.resolveTime - p.startTime : undefined,
           expired,
         });

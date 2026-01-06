@@ -1,4 +1,5 @@
 import { isDev } from '@g-motion/utils';
+import type { OutputFormatPoolStats } from '../systems/webgpu/output-format-pass';
 
 export interface GPUBatchStatus {
   enabled: boolean;
@@ -13,6 +14,7 @@ export interface GPUBatchStatus {
   peakMemoryUsageBytes?: number;
   memoryUsageThresholdBytes?: number;
   memoryAlertActive?: boolean;
+  outputFormatPoolStats?: OutputFormatPoolStats;
 }
 
 export interface GPUBatchMetric {

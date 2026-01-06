@@ -339,4 +339,58 @@ describe('SystemScheduler Logging', () => {
 
     dateNowSpy.mockRestore();
   });
+
+  test('should carry decoded tag metadata for culling-style readbacks', async () => {
+    const manager = new AsyncReadbackManager();
+
+    let latestFrame = 1;
+    const mapped = new ArrayBuffer(12);
+    const u32 = new Uint32Array(mapped);
+    u32[0] = 2;
+    u32[1] = 10;
+    u32[2] = 20;
+
+    let unmapped = false;
+    const buffer = {
+      getMappedRange() {
+        return mapped;
+      },
+      unmap() {
+        unmapped = true;
+      },
+      destroy() {},
+    } as any;
+
+    manager.enqueueMapAsyncDecoded(
+      'a',
+      buffer,
+      Promise.resolve(),
+      12,
+      (range: ArrayBuffer, entry: any) => {
+        const view = new Uint32Array(range);
+        const visibleCount = view[0] >>> 0;
+        return {
+          entityIds: new Int32Array(Array.from(view.subarray(1, 1 + visibleCount))),
+          tag: {
+            ...entry.tag,
+            visibleCount,
+            stale: latestFrame !== entry.tag.frameId,
+          },
+        };
+      },
+      50,
+      { kind: 'culling', frameId: 1 },
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    latestFrame = 2;
+    const results = await manager.drainCompleted(10);
+
+    expect(results).toHaveLength(1);
+    expect((results[0].tag as any).kind).toBe('culling');
+    expect((results[0].tag as any).stale).toBe(true);
+    expect(unmapped).toBe(true);
+  });
 });

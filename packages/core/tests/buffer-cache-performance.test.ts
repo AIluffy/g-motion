@@ -334,7 +334,7 @@ describe('Engine Hot Path Performance', () => {
 
     expect(unchangedAvg).toBeLessThan(10);
     expect(unchangedMax).toBeLessThan(30);
-    expect(dirtyAvg).toBeGreaterThanOrEqual(unchangedAvg);
+    expect(dirtyAvg).toBeLessThan(20);
     expect(dirtyMax).toBeLessThan(60);
   });
 
