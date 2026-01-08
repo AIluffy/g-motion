@@ -19,7 +19,14 @@ export {
   SyncManager,
   DataTransferOptimizer,
   ComputeOrchestrator,
+  enqueueGPUResults,
   drainGPUResults,
+  isPhysicsGPUEntity,
+  markPhysicsGPUEntity,
+  unmarkPhysicsGPUEntity,
+  clearPhysicsGPUEntities,
+  forceGPUStateSync,
+  consumeForcedGPUStateSyncEntityIds,
 } from './sync-manager';
 export type { SyncEvent, PerformanceMetrics, GPUResultPacket } from './sync-manager';
 
@@ -128,6 +135,11 @@ export {
   getGPUChannelMappingRegistry,
   createChannelMapping,
   createBatchChannelTable,
+  createPackedRGBAChannelTable,
+  createMatrix2DTransformChannelTable,
+  createMatrix3DTransformChannelTable,
+  isMatrix2DTransformChannels,
+  isMatrix3DTransformChannels,
 } from './channel-mapping';
 export type { ChannelMapping, BatchChannelTable } from './channel-mapping';
 

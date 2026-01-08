@@ -203,6 +203,15 @@ export interface ArchetypeBatchDescriptor {
     rawKeyframesPerEntity: Float32Array[];
     channelMapPerEntity: Uint32Array[];
   };
+  kind?: 'interpolation' | 'physics';
+  physics?: {
+    baseArchetypeId: string;
+    stride: number;
+    channels: Array<{ index: number; property: string }>;
+    slotCount: number;
+    stateData?: Float32Array;
+    stateVersion?: number;
+  };
   // Optional GPU resources (managed by WebGPUComputeSystem)
   gpuBuffers?: {
     statesBuffer: any; // GPUBuffer

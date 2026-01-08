@@ -1,6 +1,9 @@
 import { MotionError, ErrorCode, ErrorSeverity } from '../errors';
+import { OUTPUT_FORMAT } from './output-format-shader';
 
 const STANDARD_TRANSFORM_PROPERTIES = ['x', 'y', 'rotate', 'scaleX', 'scaleY', 'opacity'] as const;
+const MATRIX2D_SENTINEL_PREFIX = '__matrix2d';
+const MATRIX3D_SENTINEL_PREFIX = '__matrix3d';
 
 /**
  * GPU Channel Mapping Table
@@ -225,6 +228,75 @@ export function createBatchChannelTable(
   };
 }
 
+export function createPackedRGBAChannelTable(
+  batchId: string,
+  rgbaChannels: [string, string, string, string],
+  outputProperty: string,
+): BatchChannelTable {
+  const rawChannels: ChannelMapping[] = rgbaChannels.map((property, index) => ({
+    index,
+    property,
+  }));
+
+  const channels: ChannelMapping[] = [
+    {
+      index: 0,
+      property: outputProperty,
+      sourceIndex: 0,
+      formatType: OUTPUT_FORMAT.COLOR_RGBA,
+      minValue: 0,
+      maxValue: 1,
+    },
+  ];
+
+  return {
+    batchId,
+    rawStride: rawChannels.length,
+    rawChannels,
+    stride: channels.length,
+    channels,
+    kind: 'custom',
+  };
+}
+
+export function createMatrix2DTransformChannelTable(batchId: string): BatchChannelTable {
+  const rawChannels: ChannelMapping[] = new Array(6);
+  const channels: ChannelMapping[] = new Array(6);
+  for (let i = 0; i < 6; i++) {
+    const property = `${MATRIX2D_SENTINEL_PREFIX}${i}`;
+    rawChannels[i] = { index: i, property };
+    channels[i] = { index: i, property, formatType: OUTPUT_FORMAT.MATRIX_2D };
+  }
+
+  return {
+    batchId,
+    rawStride: rawChannels.length,
+    rawChannels,
+    stride: channels.length,
+    channels,
+    kind: 'custom',
+  };
+}
+
+export function createMatrix3DTransformChannelTable(batchId: string): BatchChannelTable {
+  const rawChannels: ChannelMapping[] = new Array(16);
+  const channels: ChannelMapping[] = new Array(16);
+  for (let i = 0; i < 16; i++) {
+    const property = `${MATRIX3D_SENTINEL_PREFIX}${i}`;
+    rawChannels[i] = { index: i, property };
+    channels[i] = { index: i, property, formatType: OUTPUT_FORMAT.MATRIX_3D };
+  }
+
+  return {
+    batchId,
+    rawStride: rawChannels.length,
+    rawChannels,
+    stride: channels.length,
+    channels,
+    kind: 'custom',
+  };
+}
+
 export function isStandardTransformChannels(channels: ChannelMapping[]): boolean {
   if (channels.length !== STANDARD_TRANSFORM_PROPERTIES.length) {
     return false;
@@ -235,6 +307,28 @@ export function isStandardTransformChannels(channels: ChannelMapping[]): boolean
     if (!ch || ch.property !== expected || ch.index !== i) {
       return false;
     }
+  }
+  return true;
+}
+
+export function isMatrix2DTransformChannels(channels: ChannelMapping[]): boolean {
+  if (channels.length !== 6) return false;
+  for (let i = 0; i < 6; i++) {
+    const ch = channels[i];
+    if (!ch || ch.index !== i) return false;
+    if (ch.formatType !== OUTPUT_FORMAT.MATRIX_2D) return false;
+    if (ch.property !== `${MATRIX2D_SENTINEL_PREFIX}${i}`) return false;
+  }
+  return true;
+}
+
+export function isMatrix3DTransformChannels(channels: ChannelMapping[]): boolean {
+  if (channels.length !== 16) return false;
+  for (let i = 0; i < 16; i++) {
+    const ch = channels[i];
+    if (!ch || ch.index !== i) return false;
+    if (ch.formatType !== OUTPUT_FORMAT.MATRIX_3D) return false;
+    if (ch.property !== `${MATRIX3D_SENTINEL_PREFIX}${i}`) return false;
   }
   return true;
 }

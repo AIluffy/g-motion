@@ -24,6 +24,11 @@ export * from './systems/webgpu/delivery';
 export * from './systems/render';
 export * from './webgpu/metrics-provider';
 export * from './webgpu/index';
+export {
+  isPhysicsGPUEntity,
+  markPhysicsGPUEntity,
+  unmarkPhysicsGPUEntity,
+} from './webgpu/sync-manager';
 export * from './app';
 export * from './worldProvider';
 export * from './webgpu/channel-mapping';

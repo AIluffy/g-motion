@@ -2,7 +2,7 @@
 
 import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
 import { ArchetypeBatchDescriptor } from '../../types';
-import { getPipelineForWorkgroup } from './pipeline';
+import { getPipelineForWorkgroup, selectWorkgroupSize } from './pipeline';
 import type { TimingHelper } from '../../webgpu/timing-helper';
 import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-manager';
 
@@ -80,7 +80,7 @@ export async function dispatchGPUBatch(
   });
 
   // 2. Get pipeline (with adaptive workgroup support)
-  const pipeline = await getPipelineForWorkgroup(device, batch.workgroupHint);
+  const pipeline = await getPipelineForWorkgroup(device, batch.workgroupHint, 'interp');
   if (!pipeline) {
     stateGPUBuffer.destroy();
     keyframeGPUBuffer.destroy();
@@ -101,7 +101,7 @@ export async function dispatchGPUBatch(
   });
 
   // 4. Dispatch with adaptive workgroup sizing
-  const workgroupSize = batch.workgroupHint;
+  const workgroupSize = selectWorkgroupSize(batch.workgroupHint);
   const workgroupsX = Math.ceil(batch.entityCount / workgroupSize);
 
   const cmdEncoder = device.createCommandEncoder({
@@ -154,4 +154,92 @@ export async function dispatchGPUBatch(
 
   // Return output buffer for readback via staging pool
   return { outputBuffer, entityCount: batch.entityCount, archetypeId };
+}
+
+export async function dispatchPhysicsBatch(input: {
+  device: GPUDevice;
+  queue: GPUQueue;
+  timingHelper: TimingHelper | null;
+  archetypeId: string;
+  slotCount: number;
+  workgroupHint: number;
+  stateBuffer: GPUBuffer;
+  paramsBuffer: GPUBuffer;
+  outputBuffer: GPUBuffer;
+  finishedBuffer: GPUBuffer;
+}): Promise<{
+  archetypeId: string;
+  slotCount: number;
+  outputBuffer: GPUBuffer;
+  finishedBuffer: GPUBuffer;
+}> {
+  const {
+    device,
+    queue,
+    timingHelper,
+    archetypeId,
+    slotCount,
+    workgroupHint,
+    stateBuffer,
+    paramsBuffer,
+    outputBuffer,
+    finishedBuffer,
+  } = input;
+
+  if (slotCount <= 0) {
+    throw new Error('dispatchPhysicsBatch: slotCount must be > 0');
+  }
+
+  const pipeline = await getPipelineForWorkgroup(device, workgroupHint, 'physics');
+  if (!pipeline) {
+    throw new Error(`dispatchPhysicsBatch: failed to get pipeline for workgroup ${workgroupHint}`);
+  }
+
+  const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: stateBuffer } },
+      { binding: 1, resource: { buffer: paramsBuffer } },
+      { binding: 2, resource: { buffer: outputBuffer } },
+      { binding: 3, resource: { buffer: finishedBuffer } },
+    ],
+  });
+
+  const workgroupSize = selectWorkgroupSize(workgroupHint);
+  const workgroupsX = Math.ceil(slotCount / workgroupSize);
+
+  const cmdEncoder = device.createCommandEncoder({
+    label: `dispatch-physics-${archetypeId}`,
+  });
+
+  const passEncoder = timingHelper
+    ? timingHelper.beginComputePass(cmdEncoder)
+    : cmdEncoder.beginComputePass();
+
+  passEncoder.setPipeline(pipeline);
+  passEncoder.setBindGroup(0, bindGroup);
+  passEncoder.dispatchWorkgroups(workgroupsX, 1, 1);
+  passEncoder.end();
+
+  queue.submit([cmdEncoder.finish()]);
+
+  if (timingHelper && timingHelper.hasTimestampSupport()) {
+    timingHelper
+      .getResult()
+      .then((gpuTimeNs) => {
+        const gpuTimeMs = gpuTimeNs / 1_000_000;
+        getGPUMetricsProvider().recordMetric({
+          batchId: `${archetypeId}-physics-timing`,
+          entityCount: slotCount,
+          timestamp: performance.now(),
+          gpu: true,
+          gpuComputeTimeMs: gpuTimeMs,
+          gpuComputeTimeNs: gpuTimeNs,
+          workgroupsDispatched: workgroupsX,
+        });
+      })
+      .catch(() => {});
+  }
+
+  return { archetypeId, slotCount, outputBuffer, finishedBuffer };
 }

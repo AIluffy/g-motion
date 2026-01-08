@@ -1,4 +1,4 @@
-import { SystemDef, MotionStatus, SystemContext, World } from '@g-motion/core';
+import { SystemDef, MotionStatus, SystemContext, World, isPhysicsGPUEntity } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 
 const debug = createDebugger('SpringSystem');
@@ -82,6 +82,10 @@ export const SpringSystem: SystemDef = {
       if (!springBuffer || !stateBuffer || !timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
+        const entityId = archetype.getEntityId(i);
+        if (entityId >= 0 && isPhysicsGPUEntity(entityId)) {
+          continue;
+        }
         const state = stateBuffer[i] as MotionStateData;
         const timeline = timelineBuffer[i] as TimelineData;
         const spring = springBuffer[i] as SpringData;

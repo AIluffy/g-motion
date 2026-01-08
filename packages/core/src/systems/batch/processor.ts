@@ -133,6 +133,71 @@ export class ComputeBatchProcessor {
     return batch;
   }
 
+  addPhysicsArchetypeBatch(input: {
+    archetypeId: string;
+    baseArchetypeId: string;
+    entityIds: ArrayLike<number>;
+    entityCount: number;
+    entityIdsLeaseId: number | undefined;
+    channels: Array<{ index: number; property: string }>;
+    stride: number;
+    slotCount: number;
+    workgroupHint?: number;
+    stateData?: Float32Array;
+    stateVersion?: number;
+  }): ArchetypeBatchDescriptor {
+    const {
+      archetypeId,
+      baseArchetypeId,
+      entityIds,
+      entityCount,
+      entityIdsLeaseId,
+      channels,
+      stride,
+      slotCount,
+      workgroupHint,
+      stateData,
+      stateVersion,
+    } = input;
+
+    if (entityCount === 0 || slotCount === 0) {
+      throw new MotionError(
+        `Cannot create physics batch for archetype ${archetypeId} with zero entities`,
+        ErrorCode.BATCH_EMPTY,
+        ErrorSeverity.FATAL,
+        { archetypeId, entityCount, slotCount },
+      );
+    }
+
+    const hint =
+      typeof workgroupHint === 'number' ? workgroupHint : this.selectWorkgroup(slotCount);
+    const batch: ArchetypeBatchDescriptor = {
+      archetypeId,
+      entityIds,
+      entityCount,
+      entityIdsLeaseId,
+      statesData: new Float32Array(0),
+      keyframesData: new Float32Array(0),
+      workgroupHint: hint,
+      createdAt: Date.now(),
+      kind: 'physics',
+      physics: {
+        baseArchetypeId,
+        stride,
+        channels,
+        slotCount,
+        stateData,
+        stateVersion,
+      },
+    };
+
+    this.archetypeBatches.set(archetypeId, batch);
+    this.stats.archetypeCount = this.archetypeBatches.size;
+    this.stats.dispatchCount += 1;
+
+    return batch;
+  }
+
   acquireEntityIds(minLength: number): { leaseId: number; buffer: Int32Array } {
     const len = Math.max(1, Math.floor(minLength));
     let pickedIndex = -1;

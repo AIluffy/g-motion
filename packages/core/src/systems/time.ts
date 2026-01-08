@@ -22,6 +22,7 @@ export const TimeSystem: SystemDef = {
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
       if (!stateBuffer) continue;
+      if (archetype.getBuffer('Spring') || archetype.getBuffer('Inertia')) continue;
 
       // Pre-fetch typed buffers for MotionState numeric fields if available
       const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');

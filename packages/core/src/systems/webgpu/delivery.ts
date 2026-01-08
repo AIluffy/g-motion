@@ -1,7 +1,10 @@
 import type { SystemContext, SystemDef } from '../../plugin';
-import { drainGPUResults } from '../../webgpu/sync-manager';
+import { MotionStatus } from '../../components/state';
+import { drainGPUResults, unmarkPhysicsGPUEntity } from '../../webgpu/sync-manager';
 import {
   getGPUChannelMappingRegistry,
+  isMatrix2DTransformChannels,
+  isMatrix3DTransformChannels,
   isStandardTransformChannels,
 } from '../../webgpu/channel-mapping';
 import type { ChannelMapping } from '../../webgpu/channel-mapping';
@@ -9,6 +12,68 @@ import { OUTPUT_FORMAT, packedRGBAToCSS, unpackHalf2 } from '../../webgpu/output
 import { isDev } from '@g-motion/utils';
 import { getRendererCode } from '../../renderer-code';
 import { MotionError, ErrorCode, ErrorSeverity } from '../../errors';
+
+function buildMatrix2DTransformString(
+  values: Float32Array,
+  base: number,
+  stride: number,
+  channelIndices: number[],
+): string | null {
+  if (stride <= 0) return null;
+  if (channelIndices.length !== 6) return null;
+  const maxIndex = Math.max(
+    channelIndices[0],
+    channelIndices[1],
+    channelIndices[2],
+    channelIndices[3],
+    channelIndices[4],
+    channelIndices[5],
+  );
+  const end = base + maxIndex;
+  if (end < 0 || end >= values.length) return null;
+
+  const a = values[base + channelIndices[0]];
+  const b = values[base + channelIndices[1]];
+  const c = values[base + channelIndices[2]];
+  const d = values[base + channelIndices[3]];
+  const e = values[base + channelIndices[4]];
+  const f = values[base + channelIndices[5]];
+  if (
+    !Number.isFinite(a) ||
+    !Number.isFinite(b) ||
+    !Number.isFinite(c) ||
+    !Number.isFinite(d) ||
+    !Number.isFinite(e) ||
+    !Number.isFinite(f)
+  ) {
+    return null;
+  }
+  return `matrix(${a},${-b},${-c},${d},${e},${f})`;
+}
+
+function buildMatrix3DTransformString(
+  values: Float32Array,
+  base: number,
+  stride: number,
+  channelIndices: number[],
+): string | null {
+  if (stride <= 0) return null;
+  if (channelIndices.length !== 16) return null;
+  let maxIndex = 0;
+  for (let i = 0; i < 16; i++) {
+    maxIndex = Math.max(maxIndex, channelIndices[i] ?? 0);
+  }
+  const end = base + maxIndex;
+  if (end < 0 || end >= values.length) return null;
+
+  const parts: string[] = new Array(16);
+  for (let i = 0; i < 16; i++) {
+    const v = values[base + channelIndices[i]];
+    if (!Number.isFinite(v)) return null;
+    parts[i] = String(v);
+  }
+  return `matrix3d(${parts.join(',')})`;
+}
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
@@ -24,6 +89,7 @@ export const GPUResultApplySystem: SystemDef = {
 
     for (const p of packets) {
       const { entityIds, values, stride: packetStride, channels: packetChannels } = p;
+      const finished = (p as any).finished as Uint32Array | undefined;
       const count = entityIds.length;
       if (count === 0 || values.length === 0) continue;
 
@@ -31,7 +97,7 @@ export const GPUResultApplySystem: SystemDef = {
       let channelsResolved: ChannelMapping[] | undefined = undefined;
 
       if (!channelsResolved && packetChannels) {
-        channelsResolved = packetChannels.map((c) => ({ index: c.index, property: c.property }));
+        channelsResolved = packetChannels as unknown as ChannelMapping[];
       }
 
       if (!channelsResolved) {
@@ -59,6 +125,8 @@ export const GPUResultApplySystem: SystemDef = {
           channelsResolved.length === 1 && channelsResolved[0].property === '__primitive';
         const hasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
         const isStandardTransform = isStandardTransformChannels(channelsResolved);
+        const isMatrix2D = isMatrix2DTransformChannels(channelsResolved);
+        const isMatrix3D = isMatrix3DTransformChannels(channelsResolved);
 
         if (isPrimitiveChannels && stride !== 1 && errorHandler) {
           const error = new MotionError(
@@ -92,6 +160,34 @@ export const GPUResultApplySystem: SystemDef = {
         if (isStandardTransform && stride !== channelsResolved.length && errorHandler) {
           const error = new MotionError(
             'GPU result packet has standard transform channel mapping but stride does not match channel count.',
+            ErrorCode.BATCH_VALIDATION_FAILED,
+            ErrorSeverity.WARNING,
+            {
+              archetypeId: p.archetypeId,
+              stride,
+              channelCount: channelsResolved.length,
+            },
+          );
+          errorHandler.handle(error);
+        }
+
+        if (isMatrix2D && stride !== 6 && errorHandler) {
+          const error = new MotionError(
+            'GPU result packet has matrix2d channel mapping but stride is not 6.',
+            ErrorCode.BATCH_VALIDATION_FAILED,
+            ErrorSeverity.WARNING,
+            {
+              archetypeId: p.archetypeId,
+              stride,
+              channelCount: channelsResolved.length,
+            },
+          );
+          errorHandler.handle(error);
+        }
+
+        if (isMatrix3D && stride !== 16 && errorHandler) {
+          const error = new MotionError(
+            'GPU result packet has matrix3d channel mapping but stride is not 16.',
             ErrorCode.BATCH_VALIDATION_FAILED,
             ErrorSeverity.WARNING,
             {
@@ -142,6 +238,15 @@ export const GPUResultApplySystem: SystemDef = {
         ? stableArchetype.getTypedBuffer('Render', 'rendererCode')
         : undefined;
 
+      const isMatrix2DChannels = isMatrix2DTransformChannels(channelsResolved);
+      const isMatrix3DChannels = isMatrix3DTransformChannels(channelsResolved);
+      const matrix2dChannelIndices = isMatrix2DChannels
+        ? channelsResolved.map((c) => c.index)
+        : undefined;
+      const matrix3dChannelIndices = isMatrix3DChannels
+        ? channelsResolved.map((c) => c.index)
+        : undefined;
+
       for (let i = 0; i < count; i++) {
         const id = entityIds[i];
         const archetype = stableArchetype ?? world.getEntityArchetype(id);
@@ -174,61 +279,109 @@ export const GPUResultApplySystem: SystemDef = {
             continue;
           }
 
+          if (isMatrix2DChannels && matrix2dChannelIndices) {
+            const css = buildMatrix2DTransformString(values, base, stride, matrix2dChannelIndices);
+            if (css !== null) {
+              const prev = render.props.transform;
+              if (!Object.is(prev, css)) {
+                render.props.transform = css;
+                changed = true;
+              }
+              if (changed) {
+                render.version = (render.version ?? 0) + 1;
+              }
+              continue;
+            }
+          }
+
+          if (isMatrix3DChannels && matrix3dChannelIndices) {
+            const css = buildMatrix3DTransformString(values, base, stride, matrix3dChannelIndices);
+            if (css !== null) {
+              const prev = render.props.transform;
+              if (!Object.is(prev, css)) {
+                render.props.transform = css;
+                changed = true;
+              }
+              if (changed) {
+                render.version = (render.version ?? 0) + 1;
+              }
+              continue;
+            }
+          }
+
           for (const channelMap of channelsResolved) {
             const valueIndex = base + channelMap.index;
-            if (valueIndex < valuesLen) {
-              if (channelMap.formatType === OUTPUT_FORMAT.COLOR_RGBA && valuesU32) {
-                const packed = valuesU32[valueIndex] >>> 0;
-                const css = packedRGBAToCSS(packed);
-                const prev = render.props[channelMap.property];
-                if (!Object.is(prev, css)) {
-                  render.props[channelMap.property] = css;
+            if (valueIndex >= valuesLen) continue;
+
+            if (channelMap.formatType === OUTPUT_FORMAT.COLOR_RGBA && valuesU32) {
+              const packed = valuesU32[valueIndex] >>> 0;
+              const css = packedRGBAToCSS(packed);
+              const prev = render.props[channelMap.property];
+              if (!Object.is(prev, css)) {
+                render.props[channelMap.property] = css;
+                changed = true;
+              }
+              continue;
+            }
+
+            if (channelMap.formatType === OUTPUT_FORMAT.PACKED_HALF2 && valuesU32) {
+              const packed = valuesU32[valueIndex] >>> 0;
+              if (channelMap.packedProps) {
+                const [a, b] = unpackHalf2(packed);
+                const prevA = render.props[channelMap.packedProps[0]];
+                if (!Object.is(prevA, a)) {
+                  render.props[channelMap.packedProps[0]] = a;
+                  changed = true;
+                }
+                const prevB = render.props[channelMap.packedProps[1]];
+                if (!Object.is(prevB, b)) {
+                  render.props[channelMap.packedProps[1]] = b;
                   changed = true;
                 }
                 continue;
-              }
-
-              if (channelMap.formatType === OUTPUT_FORMAT.PACKED_HALF2 && valuesU32) {
-                const packed = valuesU32[valueIndex] >>> 0;
-                if (channelMap.packedProps) {
-                  const [a, b] = unpackHalf2(packed);
-                  const prevA = render.props[channelMap.packedProps[0]];
-                  if (!Object.is(prevA, a)) {
-                    render.props[channelMap.packedProps[0]] = a;
-                    changed = true;
-                  }
-                  const prevB = render.props[channelMap.packedProps[1]];
-                  if (!Object.is(prevB, b)) {
-                    render.props[channelMap.packedProps[1]] = b;
-                    changed = true;
-                  }
-                  continue;
-                }
-                if (typeof channelMap.unpackAndAssign === 'function') {
-                  channelMap.unpackAndAssign(packed, { render, index: i });
-                  changed = true;
-                  continue;
-                }
-              }
-
-              let value = values[valueIndex];
-              if (typeof channelMap.transform === 'function') {
-                try {
-                  value = channelMap.transform(value);
-                } catch (e) {
-                  console.warn('[GPUResultApplySystem] Channel transform error', e);
-                }
               }
               if (typeof channelMap.unpackAndAssign === 'function') {
-                channelMap.unpackAndAssign(value, { render, index: i });
+                channelMap.unpackAndAssign(packed, {
+                  render,
+                  index: i,
+                  values,
+                  valuesU32,
+                  stride,
+                  base,
+                  valuesLen,
+                  channel: channelMap,
+                });
                 changed = true;
                 continue;
               }
-              const prev = render.props[channelMap.property];
-              if (!Object.is(prev, value)) {
-                render.props[channelMap.property] = value;
-                changed = true;
+            }
+
+            let value = values[valueIndex];
+            if (typeof channelMap.transform === 'function') {
+              try {
+                value = channelMap.transform(value);
+              } catch (e) {
+                console.warn('[GPUResultApplySystem] Channel transform error', e);
               }
+            }
+            if (typeof channelMap.unpackAndAssign === 'function') {
+              channelMap.unpackAndAssign(value, {
+                render,
+                index: i,
+                values,
+                valuesU32,
+                stride,
+                base,
+                valuesLen,
+                channel: channelMap,
+              });
+              changed = true;
+              continue;
+            }
+            const prev = render.props[channelMap.property];
+            if (!Object.is(prev, value)) {
+              render.props[channelMap.property] = value;
+              changed = true;
             }
           }
 
@@ -266,6 +419,29 @@ export const GPUResultApplySystem: SystemDef = {
         > = {};
 
         const base = i * stride;
+        const maybeFinish = () => {
+          if (!finished || stride <= 0) return;
+          let allFinished = true;
+          for (let c = 0; c < stride; c++) {
+            if ((finished[base + c] ?? 0) !== 1) {
+              allFinished = false;
+              break;
+            }
+          }
+          if (!allFinished) return;
+          const stateBuffer = archetype.getBuffer?.('MotionState');
+          const typedStatus = archetype.getTypedBuffer?.('MotionState', 'status') as
+            | Int32Array
+            | undefined;
+          if (stateBuffer && index !== undefined) {
+            const state = stateBuffer[index] as any;
+            state.status = MotionStatus.Finished;
+            if (typedStatus) {
+              typedStatus[index] = MotionStatus.Finished as unknown as number;
+            }
+          }
+          unmarkPhysicsGPUEntity(id);
+        };
         if (
           (rendererCode === primitiveCode || render.rendererId === 'primitive' || stride === 1) &&
           !channelsResolved.some((c) => c.property !== '__primitive')
@@ -278,7 +454,40 @@ export const GPUResultApplySystem: SystemDef = {
           if (changed) {
             render.version = (render.version ?? 0) + 1;
           }
+          maybeFinish();
           continue;
+        }
+
+        if (isMatrix2DChannels && matrix2dChannelIndices) {
+          const css = buildMatrix2DTransformString(values, base, stride, matrix2dChannelIndices);
+          if (css !== null) {
+            const prev = render.props.transform;
+            if (!Object.is(prev, css)) {
+              render.props.transform = css;
+              changed = true;
+            }
+            if (changed) {
+              render.version = (render.version ?? 0) + 1;
+            }
+            maybeFinish();
+            continue;
+          }
+        }
+
+        if (isMatrix3DChannels && matrix3dChannelIndices) {
+          const css = buildMatrix3DTransformString(values, base, stride, matrix3dChannelIndices);
+          if (css !== null) {
+            const prev = render.props.transform;
+            if (!Object.is(prev, css)) {
+              render.props.transform = css;
+              changed = true;
+            }
+            if (changed) {
+              render.version = (render.version ?? 0) + 1;
+            }
+            maybeFinish();
+            continue;
+          }
         }
 
         const writeTransformValue = (prop: string, value: number) => {
@@ -363,6 +572,12 @@ export const GPUResultApplySystem: SystemDef = {
                   transformBuffer,
                   typedTransformBuffers,
                   index,
+                  values,
+                  valuesU32,
+                  stride,
+                  base,
+                  valuesLen,
+                  channel: channelMap,
                 });
                 changed = true;
                 continue;
@@ -383,6 +598,12 @@ export const GPUResultApplySystem: SystemDef = {
                 transformBuffer,
                 typedTransformBuffers,
                 index,
+                values,
+                valuesU32,
+                stride,
+                base,
+                valuesLen,
+                channel: channelMap,
               });
               changed = true;
               continue;
@@ -414,6 +635,7 @@ export const GPUResultApplySystem: SystemDef = {
         if (changed) {
           render.version = (render.version ?? 0) + 1;
         }
+        maybeFinish();
       }
     }
   },

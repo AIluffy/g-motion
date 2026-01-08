@@ -247,7 +247,10 @@ export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
 
     const tt = getTransformTyped?.();
 
-    if (transform || tt) {
+    const rawTransform = props?.transform;
+    if (typeof rawTransform === 'string') {
+      styleBatcher.queueTransform(el, rawTransform);
+    } else if (transform || tt) {
       const { tx, ty, tz, perspective, rx, ry, rz, rotate, sx, sy, sz } = resolveTransformValues(
         transform,
         tt as TransformTyped | undefined,

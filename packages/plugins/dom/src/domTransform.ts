@@ -24,6 +24,7 @@ export type TransformResolvedValues = {
 
 export const excludedStyleKeys: Record<string, true> = {
   __primitive: true,
+  transform: true,
   x: true,
   y: true,
   z: true,

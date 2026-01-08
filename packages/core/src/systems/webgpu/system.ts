@@ -27,12 +27,18 @@ import {
   resetPersistentGPUBufferManager,
 } from '../../webgpu/persistent-buffer-manager';
 import { buildInterpolationShader } from '../../webgpu/shader';
+import { PHYSICS_COMBINED_SHADER, PHYSICS_STATE_STRIDE } from '../../webgpu/physics-shader';
 import { StagingBufferPool } from '../../webgpu/staging-pool';
-import { enqueueGPUResults, setPendingReadbackCount } from '../../webgpu/sync-manager';
+import {
+  clearPhysicsGPUEntities,
+  enqueueGPUResults,
+  markPhysicsGPUEntity,
+  setPendingReadbackCount,
+} from '../../webgpu/sync-manager';
 import { getTimingHelper, TimingHelper } from '../../webgpu/timing-helper';
-import { dispatchGPUBatch } from './dispatch';
+import { dispatchGPUBatch, dispatchPhysicsBatch } from './dispatch';
 import { initWebGPUCompute } from './initialization';
-import { cachePipeline } from './pipeline';
+import { precompileWorkgroupPipelines } from './pipeline';
 import {
   isWebGPUIODebugEnabled,
   isWebGPUViewportCullingEnabled,
@@ -87,11 +93,131 @@ function firstEntityChannelPreview(
   return out;
 }
 
+const physicsValidationShadow = new Map<
+  string,
+  { slotCount: number; state: Float32Array; lastWarnFrame: number }
+>();
+
+function f32(n: number): number {
+  return Math.fround(n);
+}
+
+function stepPhysicsShadow(
+  state: Float32Array,
+  dtMs: number,
+  dtSec: number,
+  maxVelocity: number,
+): void {
+  const slots = Math.floor(state.length / PHYSICS_STATE_STRIDE);
+  const maxVel = f32(maxVelocity);
+  for (let s = 0; s < slots; s++) {
+    const base = s * PHYSICS_STATE_STRIDE;
+    const kind = state[base + 14] ?? 0;
+
+    if (kind < 0.5) {
+      const position = f32(state[base + 0] ?? 0);
+      const velocity = f32(state[base + 1] ?? 0);
+      const target = f32(state[base + 2] ?? position);
+      const stiffness = f32(state[base + 4] ?? 0);
+      const damping = f32(state[base + 5] ?? 0);
+      const mass = Math.max(0.001, f32(state[base + 6] ?? 1));
+      const restSpeed = f32(state[base + 7] ?? 0);
+      const restDelta = f32(state[base + 8] ?? 0);
+
+      const displacement = f32(position - target);
+      const force = f32(-stiffness * displacement - damping * velocity);
+      const acceleration = f32(force / mass);
+      let v = f32(velocity + acceleration * f32(dtSec));
+      v = f32(Math.max(-maxVel, Math.min(maxVel, v)));
+      let p = f32(position + v * f32(dtSec));
+
+      const done = Math.abs(v) < restSpeed && Math.abs(displacement) < restDelta;
+      if (done) {
+        p = target;
+        v = 0;
+      }
+      state[base + 0] = p;
+      state[base + 1] = v;
+      continue;
+    }
+
+    let position = f32(state[base + 0] ?? 0);
+    let velocity = f32(state[base + 1] ?? 0);
+    let mode = f32(state[base + 15] ?? 0);
+
+    const timeConstant = Math.max(0.001, f32(state[base + 4] ?? 0));
+    const minB = state[base + 5];
+    const maxB = state[base + 6];
+    const restSpeed = f32(state[base + 7] ?? 0);
+    const restDelta = f32(state[base + 8] ?? 0);
+    const clampOn = (state[base + 9] ?? 0) >= 0.5;
+    const bounceOn = (state[base + 10] ?? 0) >= 0.5;
+    const hasMin = Number.isFinite(minB);
+    const hasMax = Number.isFinite(maxB);
+
+    if (mode < 0.5) {
+      const decayFactor = f32(Math.exp(-dtMs / timeConstant));
+      velocity = f32(velocity * decayFactor);
+      position = f32(position + velocity * f32(dtSec));
+
+      let hit = false;
+      let boundary = position;
+      if (hasMax && position >= (maxB as number)) {
+        hit = true;
+        boundary = maxB as number;
+      } else if (hasMin && position <= (minB as number)) {
+        hit = true;
+        boundary = minB as number;
+      }
+      if (hit) {
+        position = f32(boundary);
+        if (clampOn || !bounceOn) {
+          velocity = 0;
+        } else {
+          mode = 1;
+        }
+      }
+      state[base + 0] = position;
+      state[base + 1] = velocity;
+      state[base + 15] = mode;
+      continue;
+    }
+
+    let springTarget = position;
+    if (hasMax && position >= (maxB as number) - restDelta) {
+      springTarget = maxB as number;
+    } else if (hasMin && position <= (minB as number) + restDelta) {
+      springTarget = minB as number;
+    }
+
+    const displacement = f32(position - f32(springTarget));
+    const stiffness = f32(state[base + 11] ?? 0);
+    const damping = f32(state[base + 12] ?? 0);
+    const mass = Math.max(0.001, f32(state[base + 13] ?? 1));
+    const force = f32(-stiffness * displacement - damping * velocity);
+    const acceleration = f32(force / mass);
+    velocity = f32(velocity + acceleration * f32(dtSec));
+    position = f32(position + velocity * f32(dtSec));
+
+    const done = Math.abs(velocity) < restSpeed && Math.abs(displacement) < restDelta;
+    if (done) {
+      mode = 0;
+      velocity = 0;
+      position = f32(springTarget);
+    }
+
+    state[base + 0] = position;
+    state[base + 1] = velocity;
+    state[base + 15] = mode;
+  }
+}
+
 // Sentinel value to track initialization
 let bufferManager: WebGPUBufferManager | null = null;
 let isInitialized = false;
 let deviceAvailable = false;
 let shaderVersion = -1;
+let physicsPipelinesReady = false;
 let timingHelper: TimingHelper | null = null;
 let stagingPool: StagingBufferPool | null = null;
 let readbackManager: AsyncReadbackManager | null = null;
@@ -107,6 +233,7 @@ export function __resetWebGPUComputeSystemForTests(): void {
   isInitialized = false;
   deviceAvailable = false;
   shaderVersion = -1;
+  physicsPipelinesReady = false;
   timingHelper = null;
   stagingPool = null;
   readbackManager = null;
@@ -167,10 +294,6 @@ export const WebGPUComputeSystem: SystemDef = {
       if (deviceAvailable && bufferManager) {
         const device = bufferManager.getDevice();
         timingHelper = getTimingHelper(device);
-        const pipeline = (bufferManager as any).computePipeline;
-        if (pipeline) {
-          cachePipeline(64, pipeline);
-        }
         stagingPool = new StagingBufferPool(device);
         readbackManager = new AsyncReadbackManager();
         // Initialize persistent buffer manager
@@ -200,6 +323,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     // GPU not available - InterpolationSystem handles CPU fallback
     if (!bufferManager || !deviceAvailable) {
+      clearPhysicsGPUEntities();
       setPendingReadbackCount(0);
       return;
     }
@@ -208,6 +332,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     if (!device) {
       metricsProvider.updateStatus({ cpuFallbackActive: true });
+      clearPhysicsGPUEntities();
       setPendingReadbackCount(0);
       return;
     }
@@ -246,17 +371,35 @@ export const WebGPUComputeSystem: SystemDef = {
         },
       ];
 
-      const success = await bufferManager.initComputePipeline({
-        shaderCode: buildInterpolationShader(getCustomGpuEasings()),
+      const success = await precompileWorkgroupPipelines(
+        device,
+        buildInterpolationShader(getCustomGpuEasings()),
         bindGroupLayoutEntries,
-      });
+        'main',
+        'interp',
+      );
 
       if (success) {
-        const pipeline = (bufferManager as any).computePipeline;
-        if (pipeline) {
-          cachePipeline(64, pipeline);
-        }
         shaderVersion = currentVersion;
+      }
+    }
+
+    if (!physicsPipelinesReady) {
+      const bindGroupLayoutEntries = [
+        { binding: 0, visibility: 4, buffer: { type: 'storage' as const } },
+        { binding: 1, visibility: 4, buffer: { type: 'uniform' as const } },
+        { binding: 2, visibility: 4, buffer: { type: 'storage' as const } },
+        { binding: 3, visibility: 4, buffer: { type: 'storage' as const } },
+      ];
+      const ok = await precompileWorkgroupPipelines(
+        device,
+        PHYSICS_COMBINED_SHADER,
+        bindGroupLayoutEntries,
+        'updatePhysics',
+        'physics',
+      );
+      if (ok) {
+        physicsPipelinesReady = true;
       }
     }
 
@@ -341,6 +484,48 @@ export const WebGPUComputeSystem: SystemDef = {
           }
 
           const values = res.values;
+          if (tag && tag.kind === 'physics' && values && values.length) {
+            const validateEnabled =
+              (config as any)?.physicsValidation === true ||
+              (config as any)?.debug?.physicsValidation === true;
+            if (validateEnabled) {
+              const shadow = physicsValidationShadow.get(res.archetypeId);
+              const slotCount = typeof tag.slotCount === 'number' ? tag.slotCount : values.length;
+              if (shadow && shadow.slotCount === slotCount) {
+                stepPhysicsShadow(
+                  shadow.state,
+                  Number(tag.dtMs ?? 0),
+                  Number(tag.dtSec ?? 0),
+                  Number(tag.maxVelocity ?? 10000),
+                );
+                const limit = Math.min(slotCount, 2048);
+                let maxAbs = 0;
+                for (let s = 0; s < limit; s++) {
+                  const expected = shadow.state[s * PHYSICS_STATE_STRIDE] ?? 0;
+                  const got = values[s] ?? 0;
+                  const abs = Math.abs(got - expected);
+                  if (abs > maxAbs) maxAbs = abs;
+                }
+                const threshold = 1e-3;
+                if (maxAbs > threshold) {
+                  if (webgpuFrameId - shadow.lastWarnFrame >= 60) {
+                    shadow.lastWarnFrame = webgpuFrameId;
+                    try {
+                      console.warn(
+                        '[Motion][WebGPUComputeSystem] physics GPU validation mismatch',
+                        {
+                          archetypeId: res.archetypeId,
+                          maxAbsError: maxAbs,
+                          threshold,
+                          sampleSlots: limit,
+                        },
+                      );
+                    } catch {}
+                  }
+                }
+              }
+            }
+          }
           if (debugIOEnabled && values && values.length) {
             const stride = typeof res.stride === 'number' ? res.stride : 1;
             debugIO('output', {
@@ -360,6 +545,7 @@ export const WebGPUComputeSystem: SystemDef = {
               values,
               stride: res.stride,
               channels: res.channels,
+              finished: tag && tag.kind === 'physics' ? (tag.finished as any) : undefined,
             });
           }
 
@@ -406,6 +592,23 @@ export const WebGPUComputeSystem: SystemDef = {
     const viewportCullingAsyncEnabled =
       viewportCullingEnabled && isWebGPUViewportCullingAsyncEnabled(config);
     webgpuFrameId++;
+    const globalSpeed = (config as any)?.globalSpeed ?? (world as any)?.config?.globalSpeed ?? 1;
+    const samplingMode = ((config as any)?.samplingMode ?? 'time') as 'time' | 'frame';
+    const baseDtMs =
+      samplingMode === 'frame' && typeof ctx?.sampling?.deltaTimeMs === 'number'
+        ? ctx!.sampling!.deltaTimeMs
+        : _dt;
+    const dtMs = baseDtMs * globalSpeed;
+    const dtSec = dtMs / 1000;
+    const maxVelocity = (config as any)?.physicsMaxVelocity ?? 10000;
+    const physicsParams = new Float32Array([dtMs, dtSec, maxVelocity, 0]);
+    const persistentBufferManager = getPersistentGPUBufferManager(device);
+    const physicsParamsBuffer = persistentBufferManager.getOrCreateBuffer(
+      'physics:params',
+      physicsParams,
+      (GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST) as any,
+      { label: 'physics-params', skipChangeDetection: true },
+    );
 
     const processOutputBuffer = async (input: {
       archetypeId: string;
@@ -510,6 +713,151 @@ export const WebGPUComputeSystem: SystemDef = {
 
     for (const [archetypeId, batch] of archetypeBatches) {
       let leaseId = (batch as any).entityIdsLeaseId as number | undefined;
+      if ((batch as any).kind === 'physics' && (batch as any).physics) {
+        const physics = (batch as any).physics as NonNullable<(typeof batch)['physics']>;
+        const baseArchetypeId = physics.baseArchetypeId;
+        const slotCount = physics.slotCount | 0;
+        const stride = physics.stride | 0;
+        const channels = physics.channels;
+
+        try {
+          const ids = batch.entityIds as ArrayLike<number>;
+          for (let i = 0; i < ids.length; i++) {
+            const id = ids[i] as number;
+            if (typeof id === 'number' && Number.isFinite(id)) {
+              markPhysicsGPUEntity(id);
+            }
+          }
+
+          const requiredBytes = Math.max(0, slotCount) * PHYSICS_STATE_STRIDE * 4;
+          let stateBuffer: GPUBuffer;
+          if (physics.stateData && physics.stateVersion !== undefined) {
+            stateBuffer = persistentBufferManager.getOrCreateBuffer(
+              `physics:states:${baseArchetypeId}`,
+              physics.stateData,
+              (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as any,
+              {
+                label: `physics-states-${baseArchetypeId}`,
+                allowGrowth: true,
+                contentVersion: physics.stateVersion,
+              },
+            );
+          } else {
+            stateBuffer = persistentBufferManager.getOrCreateEmptyBuffer(
+              `physics:states:${baseArchetypeId}`,
+              requiredBytes,
+              (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as any,
+              {
+                label: `physics-states-${baseArchetypeId}`,
+                allowGrowth: true,
+                contentVersion: physics.stateVersion,
+              },
+            ).buffer;
+          }
+
+          const validateEnabled =
+            (config as any)?.physicsValidation === true ||
+            (config as any)?.debug?.physicsValidation === true;
+          if (validateEnabled && physics.stateData) {
+            physicsValidationShadow.set(baseArchetypeId, {
+              slotCount,
+              state: new Float32Array(physics.stateData),
+              lastWarnFrame: -1,
+            });
+          }
+
+          const outputBytes = Math.max(0, slotCount) * 4;
+          const finishedBytes = Math.max(0, slotCount) * 4;
+          const outputBuffer = device.createBuffer({
+            size: outputBytes,
+            usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as any,
+            label: `physics-output-${baseArchetypeId}`,
+          });
+          const finishedBuffer = device.createBuffer({
+            size: finishedBytes,
+            usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as any,
+            label: `physics-finished-${baseArchetypeId}`,
+          });
+
+          await dispatchPhysicsBatch({
+            device,
+            queue,
+            timingHelper,
+            archetypeId: baseArchetypeId,
+            slotCount,
+            workgroupHint: batch.workgroupHint,
+            stateBuffer,
+            paramsBuffer: physicsParamsBuffer,
+            outputBuffer,
+            finishedBuffer,
+          });
+
+          const stagingSize = outputBytes + finishedBytes;
+          const stagingBuffer = sp.acquire(archetypeId, stagingSize);
+          if (!stagingBuffer) {
+            outputBuffer.destroy();
+            finishedBuffer.destroy();
+            if (typeof leaseId === 'number') {
+              processor.releaseEntityIds(leaseId);
+            }
+            continue;
+          }
+          if (typeof leaseId === 'number') {
+            processor.markEntityIdsInFlight(leaseId);
+          }
+          sp.markInFlight(stagingBuffer);
+
+          const copyEncoder = device.createCommandEncoder({
+            label: `copy-physics-${baseArchetypeId}`,
+          });
+          copyEncoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputBytes);
+          copyEncoder.copyBufferToBuffer(
+            finishedBuffer,
+            0,
+            stagingBuffer,
+            outputBytes,
+            finishedBytes,
+          );
+          queue.submit([copyEncoder.finish()]);
+          outputBuffer.destroy();
+          finishedBuffer.destroy();
+
+          const decode = (mappedRange: ArrayBuffer) => {
+            const outValues = new Float32Array(mappedRange.slice(0, outputBytes));
+            const finished = new Uint32Array(
+              mappedRange.slice(outputBytes, outputBytes + finishedBytes),
+            );
+            return {
+              archetypeId: baseArchetypeId,
+              entityIds: batch.entityIds,
+              values: outValues,
+              stride,
+              channels,
+              leaseId,
+              byteSize: stagingSize,
+              tag: { kind: 'physics' as const, finished, dtMs, dtSec, maxVelocity, slotCount },
+            };
+          };
+
+          const mapPromise = stagingBuffer.mapAsync((GPUMapMode as any).READ);
+          readbackManager?.enqueueMapAsyncDecoded(
+            baseArchetypeId,
+            stagingBuffer,
+            mapPromise,
+            stagingSize,
+            decode as any,
+            200,
+            { kind: 'physics' as const },
+          );
+          setPendingReadbackCount(readbackManager?.getPendingCount?.() ?? 0);
+          continue;
+        } catch {
+          if (typeof leaseId === 'number') {
+            processor.releaseEntityIds(leaseId);
+          }
+          continue;
+        }
+      }
       const table = channelRegistry.getChannels(archetypeId);
       const outputChannels = table?.channels ?? [];
       const rawChannels = table?.rawChannels ?? outputChannels;

@@ -11,12 +11,12 @@ export const SPRING_SHADER = `
 struct SpringState {
     position: f32,      // Current position
     velocity: f32,      // Current velocity
-    target: f32,        // Target position
+    targetValue: f32,   // Target position
     stiffness: f32,     // Spring stiffness (k)
     damping: f32,       // Damping coefficient (c)
     mass: f32,          // Mass (m)
-    restLength: f32,    // Rest length (for offset springs)
-    _pad: f32,
+    restDelta: f32,
+    restSpeed: f32,
 }
 
 // Simulation parameters
@@ -47,7 +47,7 @@ fn updateSprings(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let dt = params.deltaTime;
 
     // Calculate spring force: F = -k * (x - target) - c * v
-    let displacement = spring.position - spring.target - spring.restLength;
+    let displacement = spring.position - spring.targetValue;
     let springForce = -spring.stiffness * displacement;
     let dampingForce = -spring.damping * spring.velocity;
     let totalForce = springForce + dampingForce;
@@ -64,12 +64,10 @@ fn updateSprings(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Update position
     spring.position = spring.position + spring.velocity * dt;
 
-    // Check if spring has settled
-    let isSettled = abs(displacement) < params.settleThreshold &&
-                    abs(spring.velocity) < params.settleThreshold;
+    let isSettled = abs(displacement) < spring.restDelta && abs(spring.velocity) < spring.restSpeed;
 
     if (isSettled) {
-        spring.position = spring.target + spring.restLength;
+        spring.position = spring.targetValue;
         spring.velocity = 0.0;
         settled[index] = 1u;
     } else {
@@ -96,7 +94,7 @@ fn updateSpringsVerlet(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let dt2 = dt * dt;
 
     // Calculate spring force
-    let displacement = spring.position - spring.target - spring.restLength;
+    let displacement = spring.position - spring.targetValue;
     let springForce = -spring.stiffness * displacement;
     let dampingForce = -spring.damping * spring.velocity;
     let totalForce = springForce + dampingForce;
@@ -112,11 +110,10 @@ fn updateSpringsVerlet(@builtin(global_invocation_id) global_id: vec3<u32>) {
     spring.velocity = clamp(newVelocity, -params.maxVelocity, params.maxVelocity);
 
     // Check settlement
-    let isSettled = abs(displacement) < params.settleThreshold &&
-                    abs(spring.velocity) < params.settleThreshold;
+    let isSettled = abs(displacement) < spring.restDelta && abs(spring.velocity) < spring.restSpeed;
 
     if (isSettled) {
-        spring.position = spring.target + spring.restLength;
+        spring.position = spring.targetValue;
         spring.velocity = 0.0;
         settled[index] = 1u;
     } else {
@@ -132,19 +129,27 @@ fn updateSpringsVerlet(@builtin(global_invocation_id) global_id: vec3<u32>) {
 export const INERTIA_SHADER = `
 // Inertia state per entity per channel
 struct InertiaState {
-    position: f32,      // Current position
-    velocity: f32,      // Current velocity
-    friction: f32,      // Friction coefficient (0-1, higher = more friction)
-    bounciness: f32,    // Bounce factor for boundaries (0-1)
-    minBound: f32,      // Minimum boundary
-    maxBound: f32,      // Maximum boundary
-    _pad1: f32,
-    _pad2: f32,
+    position: f32,
+    velocity: f32,
+    bounceVelocity: f32,
+    inBounce: f32,
+    boundTarget: f32,
+    timeConstantMs: f32,
+    minBound: f32,
+    maxBound: f32,
+    clamp: f32,
+    bounceEnabled: f32,
+    bounceStiffness: f32,
+    bounceDamping: f32,
+    bounceMass: f32,
+    restSpeed: f32,
+    restDelta: f32,
+    _pad: f32,
 }
 
 struct SimParams {
-    deltaTime: f32,
-    stopThreshold: f32, // Velocity threshold to stop
+    deltaTimeMs: f32,
+    _pad0: f32,
     _pad1: f32,
     _pad2: f32,
 }
@@ -154,7 +159,6 @@ struct SimParams {
 @group(0) @binding(2) var<storage, read_write> outputs: array<f32>;
 @group(0) @binding(3) var<storage, read_write> stopped: array<u32>;
 
-// Update inertia with friction and optional boundaries
 @compute @workgroup_size(64)
 fn updateInertia(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
@@ -165,34 +169,60 @@ fn updateInertia(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     var state = inertias[index];
-    let dt = params.deltaTime;
+    let dtMs = params.deltaTimeMs;
+    let dt = dtMs / 1000.0;
 
-    // Apply friction (exponential decay)
-    let frictionFactor = pow(1.0 - state.friction, dt * 60.0);
-    state.velocity = state.velocity * frictionFactor;
+    var isStopped = false;
+    if (state.inBounce < 0.5) {
+        let decayFactor = exp(-dtMs / max(state.timeConstantMs, 0.001));
+        state.velocity = state.velocity * decayFactor;
+        state.position = state.position + state.velocity * dt;
 
-    // Update position
-    state.position = state.position + state.velocity * dt;
+        var hitBoundary = false;
+        var boundaryValue = 0.0;
+        if (state.minBound < state.maxBound) {
+            if (state.position >= state.maxBound) {
+                hitBoundary = true;
+                boundaryValue = state.maxBound;
+            } else if (state.position <= state.minBound) {
+                hitBoundary = true;
+                boundaryValue = state.minBound;
+            }
+        }
 
-    // Handle boundaries with bounce
-    if (state.minBound < state.maxBound) {
-        if (state.position < state.minBound) {
-            state.position = state.minBound + (state.minBound - state.position) * state.bounciness;
-            state.velocity = -state.velocity * state.bounciness;
-        } else if (state.position > state.maxBound) {
-            state.position = state.maxBound - (state.position - state.maxBound) * state.bounciness;
-            state.velocity = -state.velocity * state.bounciness;
+        if (hitBoundary) {
+            state.position = boundaryValue;
+            state.boundTarget = boundaryValue;
+
+            if (state.clamp >= 0.5 || state.bounceEnabled < 0.5) {
+                state.velocity = 0.0;
+                state.bounceVelocity = 0.0;
+                state.inBounce = 0.0;
+                isStopped = true;
+            } else {
+                state.inBounce = 1.0;
+                state.bounceVelocity = state.velocity;
+                state.velocity = 0.0;
+            }
+        }
+    } else {
+        let displacement = state.position - state.boundTarget;
+        let force = -state.bounceStiffness * displacement - state.bounceDamping * state.bounceVelocity;
+        let acceleration = force / max(state.bounceMass, 0.001);
+
+        state.bounceVelocity = state.bounceVelocity + acceleration * dt;
+        state.position = state.position + state.bounceVelocity * dt;
+
+        if (abs(state.bounceVelocity) < state.restSpeed && abs(displacement) < state.restDelta) {
+            state.inBounce = 0.0;
+            state.bounceVelocity = 0.0;
+            state.velocity = 0.0;
+            state.position = state.boundTarget;
+            isStopped = true;
         }
     }
 
-    // Check if stopped
-    let isStopped = abs(state.velocity) < params.stopThreshold;
-    if (isStopped) {
-        state.velocity = 0.0;
-        stopped[index] = 1u;
-    } else {
-        stopped[index] = 0u;
-    }
+    stopped[index] = select(0u, 1u, isStopped);
 
     inertias[index] = state;
     outputs[index] = state.position;
@@ -201,26 +231,32 @@ fn updateInertia(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
 // Combined physics shader with both spring and inertia
 export const PHYSICS_COMBINED_SHADER = `
-// Physics type enum
-const PHYSICS_SPRING: u32 = 0u;
-const PHYSICS_INERTIA: u32 = 1u;
+const KIND_SPRING: f32 = 0.0;
+const KIND_INERTIA: f32 = 1.0;
 
-// Unified physics state
 struct PhysicsState {
-    position: f32,
-    velocity: f32,
-    target: f32,        // Spring target or unused for inertia
-    param1: f32,        // Spring: stiffness, Inertia: friction
-    param2: f32,        // Spring: damping, Inertia: bounciness
-    param3: f32,        // Spring: mass, Inertia: minBound
-    param4: f32,        // Spring: restLength, Inertia: maxBound
-    physicsType: u32,   // 0: spring, 1: inertia
+    position: f32,          // 0
+    velocity: f32,          // 1
+    targetValue: f32,       // 2 (spring target / inertia toValue)
+    fromValue: f32,         // 3 (inertia fromValue)
+    p0: f32,                // 4 (spring stiffness / inertia timeConstantMs)
+    p1: f32,                // 5 (spring damping / inertia minBound)
+    p2: f32,                // 6 (spring mass / inertia maxBound)
+    p3: f32,                // 7 (spring restSpeed / inertia restSpeed)
+    p4: f32,                // 8 (spring restDelta / inertia restDelta)
+    p5: f32,                // 9 (inertia clamp 0/1)
+    p6: f32,                // 10 (inertia bounceEnabled 0/1)
+    p7: f32,                // 11 (inertia bounceStiffness)
+    p8: f32,                // 12 (inertia bounceDamping)
+    p9: f32,                // 13 (inertia bounceMass)
+    kind: f32,              // 14
+    mode: f32,              // 15 (inertia: 0 decay, 1 bounce)
 }
 
 struct SimParams {
-    deltaTime: f32,
+    deltaMs: f32,
+    deltaSec: f32,
     maxVelocity: f32,
-    settleThreshold: f32,
     _pad: f32,
 }
 
@@ -229,37 +265,82 @@ struct SimParams {
 @group(0) @binding(2) var<storage, read_write> outputs: array<f32>;
 @group(0) @binding(3) var<storage, read_write> finished: array<u32>;
 
-fn updateSpringState(state: ptr<function, PhysicsState>, dt: f32, maxVel: f32, threshold: f32) -> bool {
-    let displacement = (*state).position - (*state).target - (*state).param4;
-    let springForce = -(*state).param1 * displacement;
-    let dampingForce = -(*state).param2 * (*state).velocity;
-    let acceleration = (springForce + dampingForce) / max((*state).param3, 0.001);
-
-    (*state).velocity = clamp((*state).velocity + acceleration * dt, -maxVel, maxVel);
-    (*state).position = (*state).position + (*state).velocity * dt;
-
-    return abs(displacement) < threshold && abs((*state).velocity) < threshold;
+fn isFinite(value: f32) -> bool {
+    return (value - value) == 0.0;
 }
 
-fn updateInertiaState(state: ptr<function, PhysicsState>, dt: f32, threshold: f32) -> bool {
-    let frictionFactor = pow(1.0 - (*state).param1, dt * 60.0);
-    (*state).velocity = (*state).velocity * frictionFactor;
-    (*state).position = (*state).position + (*state).velocity * dt;
+fn springStep(state: ptr<function, PhysicsState>, dtSec: f32, maxVel: f32) -> bool {
+    let displacement = (*state).position - (*state).targetValue;
+    let force = -(*state).p0 * displacement - (*state).p1 * (*state).velocity;
+    let acceleration = force / max((*state).p2, 0.001);
 
-    // Boundary handling
-    let minB = (*state).param3;
-    let maxB = (*state).param4;
-    if (minB < maxB) {
-        if ((*state).position < minB) {
-            (*state).position = minB + (minB - (*state).position) * (*state).param2;
-            (*state).velocity = -(*state).velocity * (*state).param2;
-        } else if ((*state).position > maxB) {
-            (*state).position = maxB - ((*state).position - maxB) * (*state).param2;
-            (*state).velocity = -(*state).velocity * (*state).param2;
+    (*state).velocity = clamp((*state).velocity + acceleration * dtSec, -maxVel, maxVel);
+    (*state).position = (*state).position + (*state).velocity * dtSec;
+
+    return abs((*state).velocity) < (*state).p3 && abs(displacement) < (*state).p4;
+}
+
+fn inertiaStep(state: ptr<function, PhysicsState>, dtMs: f32, dtSec: f32) -> bool {
+    let timeConstant = max((*state).p0, 0.001);
+    let restSpeed = (*state).p3;
+    let restDelta = (*state).p4;
+    let clampOn = (*state).p5 >= 0.5;
+    let bounceOn = (*state).p6 >= 0.5;
+    let minB = (*state).p1;
+    let maxB = (*state).p2;
+
+    let hasMin = isFinite(minB);
+    let hasMax = isFinite(maxB);
+
+    if ((*state).mode < 0.5) {
+        let decayFactor = exp(-dtMs / timeConstant);
+        (*state).velocity = (*state).velocity * decayFactor;
+        (*state).position = (*state).position + (*state).velocity * dtSec;
+
+        var hit = false;
+        var boundary = (*state).position;
+
+        if (hasMax && (*state).position >= maxB) {
+            hit = true;
+            boundary = maxB;
+        } else if (hasMin && (*state).position <= minB) {
+            hit = true;
+            boundary = minB;
         }
+
+        if (hit) {
+            (*state).position = boundary;
+            if (clampOn || !bounceOn) {
+                (*state).velocity = 0.0;
+            } else {
+                (*state).mode = 1.0;
+            }
+        }
+
+        return abs((*state).velocity) < restSpeed;
     }
 
-    return abs((*state).velocity) < threshold;
+    var springTarget = (*state).position;
+    if (hasMax && (*state).position >= maxB - restDelta) {
+        springTarget = maxB;
+    } else if (hasMin && (*state).position <= minB + restDelta) {
+        springTarget = minB;
+    }
+
+    let displacement = (*state).position - springTarget;
+    let force = -(*state).p7 * displacement - (*state).p8 * (*state).velocity;
+    let acceleration = force / max((*state).p9, 0.001);
+
+    (*state).velocity = (*state).velocity + acceleration * dtSec;
+    (*state).position = (*state).position + (*state).velocity * dtSec;
+
+    let isSettled = abs((*state).velocity) < restSpeed && abs(displacement) < restDelta;
+    if (isSettled) {
+        (*state).mode = 0.0;
+        (*state).velocity = 0.0;
+        (*state).position = springTarget;
+    }
+    return isSettled;
 }
 
 @compute @workgroup_size(64)
@@ -272,14 +353,14 @@ fn updatePhysics(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var state = states[index];
     var isFinished = false;
 
-    if (state.physicsType == PHYSICS_SPRING) {
-        isFinished = updateSpringState(&state, params.deltaTime, params.maxVelocity, params.settleThreshold);
+    if (state.kind < 0.5) {
+        isFinished = springStep(&state, params.deltaSec, params.maxVelocity);
         if (isFinished) {
-            state.position = state.target + state.param4;
+            state.position = state.targetValue;
             state.velocity = 0.0;
         }
     } else {
-        isFinished = updateInertiaState(&state, params.deltaTime, params.settleThreshold);
+        isFinished = inertiaStep(&state, params.deltaMs, params.deltaSec);
         if (isFinished) {
             state.velocity = 0.0;
         }
@@ -328,7 +409,7 @@ export interface PhysicsSimParams {
 // Data layout constants
 export const SPRING_STATE_STRIDE = 8;
 export const INERTIA_STATE_STRIDE = 8;
-export const PHYSICS_STATE_STRIDE = 8;
+export const PHYSICS_STATE_STRIDE = 16;
 export const SIM_PARAMS_SIZE = 16; // 4 floats
 
 /**

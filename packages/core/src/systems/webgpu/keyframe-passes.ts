@@ -9,6 +9,7 @@ import {
   RAW_KEYFRAME_STRIDE,
   SEARCH_RESULT_STRIDE,
 } from '../../webgpu/keyframe-preprocess-shader';
+import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-manager';
 
 let keyframePreprocessPipeline: GPUComputePipeline | null = null;
 let keyframePreprocessBindGroupLayout: GPUBindGroupLayout | null = null;
@@ -338,7 +339,6 @@ export async function runKeyframeInterpPass(
 
   const pipeline = await getKeyframeInterpPipeline(device);
   if (!pipeline || !keyframeInterpBindGroupLayout) {
-    packedKeyframesBuffer.destroy();
     searchResultsBuffer.destroy();
     outputIndicesBuffer.destroy();
     outputBuffer.destroy();
@@ -366,7 +366,6 @@ export async function runKeyframeInterpPass(
   pass.end();
   queue.submit([cmdEncoder.finish()]);
 
-  packedKeyframesBuffer.destroy();
   searchResultsBuffer.destroy();
   outputIndicesBuffer.destroy();
 
@@ -442,26 +441,53 @@ export async function runKeyframePreprocessPass(
     rawBase += rawCount;
   }
 
-  const rawKeyframesBuffer = device.createBuffer({
-    size: rawData.byteLength,
-    usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as number,
-    mappedAtCreation: false,
-    label: `motion-raw-keyframes-${batch.archetypeId}`,
-  });
+  const persistent = getPersistentGPUBufferManager(device);
+  const packedKey = `keyframePreprocessPacked:${batch.archetypeId}`;
+  const packedBytes = totalRawKeyframes * PACKED_KEYFRAME_STRIDE * 4;
+  const packedRes = persistent.getOrCreateEmptyBuffer(
+    packedKey,
+    packedBytes,
+    (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as number,
+    {
+      label: `motion-packed-keyframes-${batch.archetypeId}`,
+      allowGrowth: true,
+      contentVersion: batch.keyframesVersion,
+    },
+  );
 
-  const channelMapsBuffer = device.createBuffer({
-    size: mapData.byteLength,
-    usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as number,
-    mappedAtCreation: false,
-    label: `motion-channel-maps-${batch.archetypeId}`,
-  });
+  if (packedRes.upToDate) {
+    return {
+      packedKeyframesBuffer: packedRes.buffer,
+      rawKeyframeData: rawData,
+      mapData,
+      entityIndexByEntry,
+      channelIndexByEntry,
+    };
+  }
 
-  const packedKeyframesBuffer = device.createBuffer({
-    size: totalRawKeyframes * PACKED_KEYFRAME_STRIDE * 4,
-    usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as number,
-    mappedAtCreation: false,
-    label: `motion-packed-keyframes-${batch.archetypeId}`,
-  });
+  const rawKeyframesBuffer = persistent.getOrCreateBuffer(
+    `keyframePreprocessRaw:${batch.archetypeId}`,
+    rawData,
+    (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as number,
+    {
+      label: `motion-raw-keyframes-${batch.archetypeId}`,
+      allowGrowth: true,
+      contentVersion: batch.keyframesVersion,
+    },
+  );
+
+  const channelMapsBuffer = persistent.getOrCreateBuffer(
+    `keyframePreprocessMaps:${batch.archetypeId}`,
+    mapData,
+    (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as number,
+    {
+      label: `motion-channel-maps-${batch.archetypeId}`,
+      allowGrowth: true,
+      contentVersion: batch.keyframesVersion,
+    },
+  );
+
+  const packedKeyframesBuffer = packedRes.buffer;
 
   const keyframeIndicesBuffer = device.createBuffer({
     size: Math.max(totalRawKeyframes * 4, 4),
@@ -470,14 +496,8 @@ export async function runKeyframePreprocessPass(
     label: `motion-keyframe-indices-${batch.archetypeId}`,
   });
 
-  queue.writeBuffer(rawKeyframesBuffer, 0, rawData.buffer as ArrayBuffer, 0, rawData.byteLength);
-  queue.writeBuffer(channelMapsBuffer, 0, mapData.buffer as ArrayBuffer, 0, mapData.byteLength);
-
   const pipeline = await getKeyframePreprocessPipeline(device);
   if (!pipeline || !keyframePreprocessBindGroupLayout) {
-    rawKeyframesBuffer.destroy();
-    channelMapsBuffer.destroy();
-    packedKeyframesBuffer.destroy();
     keyframeIndicesBuffer.destroy();
     return null;
   }
@@ -503,9 +523,8 @@ export async function runKeyframePreprocessPass(
   pass.end();
   queue.submit([cmdEncoder.finish()]);
 
-  rawKeyframesBuffer.destroy();
-  channelMapsBuffer.destroy();
   keyframeIndicesBuffer.destroy();
+  persistent.markBufferClean(packedKey, batch.keyframesVersion);
 
   return {
     packedKeyframesBuffer,

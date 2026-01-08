@@ -10,6 +10,7 @@ import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom
 import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
 import { getAppContext, getErrorHandler } from '../../context';
 import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
+import { precompileWorkgroupPipelines } from './pipeline';
 
 const bindGroupLayoutEntries = [
   {
@@ -50,11 +51,13 @@ export async function initWebGPUCompute(
     return { success: false, deviceAvailable: false, shaderVersion: -1 };
   }
 
-  // Initialize compute pipeline for default workgroup size (64)
-  const success = await bufferManager.initComputePipeline({
-    shaderCode: buildInterpolationShader(getCustomGpuEasings()),
+  const success = await precompileWorkgroupPipelines(
+    device,
+    buildInterpolationShader(getCustomGpuEasings()),
     bindGroupLayoutEntries,
-  });
+    'main',
+    'interp',
+  );
 
   const shaderVersion = getCustomEasingVersion();
 

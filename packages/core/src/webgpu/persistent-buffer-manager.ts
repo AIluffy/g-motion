@@ -29,7 +29,7 @@ export interface PersistentBuffer {
 }
 
 export interface BufferUpdateDescriptor {
-  data: Float32Array;
+  data: ArrayBufferView;
   offset?: number; // Byte offset for partial updates
   size?: number; // Byte size for partial updates
 }
@@ -85,7 +85,7 @@ export function setBufferAlignmentConfig(overrides: Partial<BufferAlignmentConfi
 export class PersistentGPUBufferManager {
   private device: GPUDevice;
   private buffers = new Map<string, PersistentBuffer>();
-  private previousData = new Map<string, Float32Array>(); // For change detection
+  private previousData = new Map<string, Uint8Array>(); // For change detection
   private currentFrame = 0;
   private readonly recycleThreshold = 120; // Frames (~2 seconds at 60fps)
   private stats: IncrementalUpdateStats = {
@@ -111,7 +111,7 @@ export class PersistentGPUBufferManager {
    */
   getOrCreateBuffer(
     key: string,
-    data: Float32Array,
+    data: ArrayBufferView,
     usage: GPUBufferUsageFlags,
     options?: {
       label?: string;
@@ -149,6 +149,10 @@ export class PersistentGPUBufferManager {
         // Version differs, update data
         (existing as any).contentVersion = options.contentVersion;
         this.uploadData(existing.buffer, data, key);
+        this.previousData.set(
+          key,
+          new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(),
+        );
         existing.version++;
         existing.isDirty = false;
         this.stats.totalUpdates++;
@@ -200,7 +204,9 @@ export class PersistentGPUBufferManager {
     });
 
     // Initial data upload
-    new Float32Array(buffer.getMappedRange()).set(data);
+    new Uint8Array(buffer.getMappedRange()).set(
+      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+    );
     buffer.unmap();
 
     // Store persistent buffer
@@ -216,12 +222,86 @@ export class PersistentGPUBufferManager {
     };
 
     this.buffers.set(key, persistentBuffer);
-    this.previousData.set(key, new Float32Array(data));
+    this.previousData.set(
+      key,
+      new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(),
+    );
 
     this.stats.totalUpdates++;
     this.stats.totalBytesProcessed += requiredSize;
 
     return buffer;
+  }
+
+  getOrCreateEmptyBuffer(
+    key: string,
+    requiredSize: number,
+    usage: GPUBufferUsageFlags,
+    options?: {
+      label?: string;
+      allowGrowth?: boolean;
+      contentVersion?: number;
+    },
+  ): { buffer: GPUBuffer; upToDate: boolean } {
+    const existing = this.buffers.get(key);
+    if (existing && existing.size >= requiredSize) {
+      existing.lastUsedFrame = this.currentFrame;
+      const upToDate =
+        options?.contentVersion !== undefined &&
+        existing.contentVersion === options.contentVersion &&
+        !existing.isDirty;
+      if (!upToDate) {
+        existing.isDirty = true;
+      }
+      return { buffer: existing.buffer, upToDate };
+    }
+
+    if (existing && existing.size < requiredSize) {
+      if (options?.allowGrowth !== false) {
+        existing.buffer.destroy();
+        this.buffers.delete(key);
+        this.previousData.delete(key);
+      } else {
+        throw new Error(
+          `Buffer '${key}' size mismatch: has ${existing.size}, needs ${requiredSize}`,
+        );
+      }
+    }
+
+    const newSize = this.calculateOptimalSize(requiredSize);
+    const buffer = this.device.createBuffer({
+      size: newSize,
+      usage: usage | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: false,
+      label: options?.label || key,
+    });
+
+    const persistentBuffer: PersistentBuffer = {
+      buffer,
+      size: newSize,
+      usage,
+      lastUsedFrame: this.currentFrame,
+      version: 0,
+      isDirty: true,
+      label: options?.label,
+      contentVersion: options?.contentVersion,
+    };
+
+    this.buffers.set(key, persistentBuffer);
+
+    return { buffer, upToDate: false };
+  }
+
+  markBufferClean(key: string, contentVersion?: number): void {
+    const existing = this.buffers.get(key);
+    if (!existing) {
+      return;
+    }
+    existing.lastUsedFrame = this.currentFrame;
+    existing.isDirty = false;
+    if (contentVersion !== undefined) {
+      existing.contentVersion = contentVersion;
+    }
   }
 
   /**
@@ -231,7 +311,7 @@ export class PersistentGPUBufferManager {
    */
   updateBuffer(
     key: string,
-    data: Float32Array,
+    data: ArrayBufferView,
     options?: {
       offset?: number; // Byte offset
       size?: number; // Byte size to update
@@ -270,18 +350,19 @@ export class PersistentGPUBufferManager {
    *
    * @returns true if data changed, false if identical
    */
-  private detectChanges(key: string, newData: Float32Array): boolean {
+  private detectChanges(key: string, newData: ArrayBufferView): boolean {
+    const bytes = new Uint8Array(newData.buffer, newData.byteOffset, newData.byteLength);
     const prevData = this.previousData.get(key);
-    if (!prevData || prevData.length !== newData.length) {
-      this.previousData.set(key, new Float32Array(newData));
+    if (!prevData || prevData.byteLength !== bytes.byteLength) {
+      this.previousData.set(key, bytes.slice());
       this.stats.incrementalUpdates++;
       return true;
     }
 
     // Fast path: compare buffers
-    for (let i = 0; i < newData.length; i++) {
-      if (prevData[i] !== newData[i]) {
-        this.previousData.set(key, new Float32Array(newData));
+    for (let i = 0; i < bytes.byteLength; i++) {
+      if (prevData[i] !== bytes[i]) {
+        this.previousData.set(key, bytes.slice());
         this.stats.incrementalUpdates++;
         return true;
       }
@@ -295,7 +376,7 @@ export class PersistentGPUBufferManager {
    */
   private uploadData(
     buffer: GPUBuffer,
-    data: Float32Array,
+    data: ArrayBufferView,
     _key: string,
     offset = 0,
     size?: number,
@@ -305,7 +386,7 @@ export class PersistentGPUBufferManager {
     // Use queue.writeBuffer for small updates (more efficient)
     if (uploadSize < 64 * 1024) {
       // < 64KB
-      this.device.queue.writeBuffer(buffer, offset, data.buffer, 0, uploadSize);
+      this.device.queue.writeBuffer(buffer, offset, data.buffer, data.byteOffset, uploadSize);
     } else {
       // For larger updates, use mapped buffer (single allocation)
       const tempBuffer = this.device.createBuffer({
@@ -314,8 +395,8 @@ export class PersistentGPUBufferManager {
         mappedAtCreation: true,
       });
 
-      new Float32Array(tempBuffer.getMappedRange()).set(
-        new Float32Array(data.buffer, 0, uploadSize / 4),
+      new Uint8Array(tempBuffer.getMappedRange()).set(
+        new Uint8Array(data.buffer, data.byteOffset, uploadSize),
       );
       tempBuffer.unmap();
 
