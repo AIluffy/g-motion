@@ -1,13 +1,10 @@
-import type { SystemContext } from '../../plugin';
-import { SystemDef } from '../../plugin';
+import type { SystemContext, SystemDef } from '../../plugin';
 import { MotionStatus } from '../../components/state';
 import { getEasingId } from '../easing-registry';
-import { BatchBufferCache } from './buffer-cache';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import type { TimelineData, Track, Keyframe } from '../../types';
 import { getRendererCode } from '../../renderer-code';
-import { getArchetypeBufferCache, resetArchetypeBufferCache } from './archetype-buffer-cache'; // P1-2: Buffer cache
-import { KEYFRAME_STRIDE } from '../../webgpu/shader'; // Phase 1.1: Extended keyframe support
+import { getArchetypeBufferCache } from './archetype-buffer-cache';
 import { consumeForcedGPUStateSyncEntityIds, isPhysicsGPUEntity } from '../../webgpu/sync-manager';
 import { PHYSICS_STATE_STRIDE } from '../../webgpu/physics-shader';
 import {
@@ -18,56 +15,29 @@ import {
   packChannelMaps,
 } from '../../webgpu/keyframe-preprocess-shader';
 
-// Easing mode constants (matching shader EASING_MODE)
-const EASING_MODE_STANDARD = 0;
-const EASING_MODE_BEZIER = 1;
-const EASING_MODE_HOLD = 2;
+import {
+  EASING_MODE_STANDARD,
+  EASING_MODE_BEZIER,
+  EASING_MODE_HOLD,
+  MAX_KEYFRAMES_PER_CHANNEL,
+  MIN_GPU_KEYFRAME_DURATION,
+  KEYFRAME_FLOATS,
+} from './constants';
 
-const bufferCache = new BatchBufferCache();
-const MAX_KEYFRAMES_PER_CHANNEL = 4;
-const MIN_GPU_KEYFRAME_DURATION = 0.0001;
+import {
+  bufferCache,
+  __resetBatchSamplingCachesForTests,
+  hashEntityIndices,
+  getKeyframesPackedCache,
+  getEntityIndicesScratchByArchetype,
+  getArchetypeCursor,
+  setArchetypeCursor,
+  incrementFrameId,
+  getPickedArchetypesScratch,
+  getArchetypeScratch,
+} from './utils';
 
-// Use extended keyframe stride (10 floats) for Bezier support
-const KEYFRAME_FLOATS = KEYFRAME_STRIDE; // 10 floats per keyframe
-
-const archetypeScratch: any[] = [];
-const pickedArchetypesScratch: any[] = [];
-let archetypeCursor = 0;
-
-const entityIndicesScratchByArchetype = new Map<string, Int32Array>();
-
-let frameId = 0;
-
-const keyframesPackedCache = new Map<
-  string,
-  { versionSig: number; entitySig: number; channelCount: number; buffer: Float32Array }
->();
-
-const physicsStateVersionByArchetype = new Map<string, number>();
-const physicsLayoutSigByArchetype = new Map<string, number>();
-
-/**
- * Clear all internal caches. Useful for testing.
- */
-export function __resetBatchSamplingCachesForTests(): void {
-  keyframesPackedCache.clear();
-  entityIndicesScratchByArchetype.clear();
-  archetypeScratch.length = 0;
-  pickedArchetypesScratch.length = 0;
-  archetypeCursor = 0;
-  frameId = 0;
-  bufferCache.clear();
-  resetArchetypeBufferCache();
-}
-
-function hashEntityIndices(buf: Int32Array, len: number): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < len; i++) {
-    h ^= buf[i] >>> 0;
-    h = (h * 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
+import { getPhysicsStateVersionByArchetype, getPhysicsLayoutSigByArchetype } from './physics-state';
 
 /**
  * Batch Sampling System
@@ -115,7 +85,9 @@ export const BatchSamplingSystem: SystemDef = {
     const now = performance.now();
     const config = world.config;
     const engineFrame =
-      typeof ctx?.sampling?.engineFrame === 'number' ? ctx!.sampling!.engineFrame : frameId++;
+      typeof ctx?.sampling?.engineFrame === 'number'
+        ? ctx!.sampling!.engineFrame
+        : incrementFrameId();
     const tickFrame =
       (config as any).samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number'
         ? ctx!.sampling!.frame
@@ -165,6 +137,9 @@ export const BatchSamplingSystem: SystemDef = {
     const perFrame = slice?.enabled ? slice.batchSamplingArchetypesPerFrame : undefined;
     let toProcess: Iterable<any>;
     if (typeof perFrame === 'number' && Number.isFinite(perFrame)) {
+      const archetypeScratch = getArchetypeScratch();
+      const pickedArchetypesScratch = getPickedArchetypesScratch();
+      let archetypeCursor = getArchetypeCursor();
       archetypeScratch.length = 0;
       for (const a of world.getArchetypes()) archetypeScratch.push(a);
       const len = archetypeScratch.length;
@@ -177,6 +152,7 @@ export const BatchSamplingSystem: SystemDef = {
         picked.push(archetypeScratch[(start + n) % len]);
       }
       archetypeCursor = (start + limit) % len;
+      setArchetypeCursor(archetypeCursor);
       toProcess = picked;
     } else {
       toProcess = world.getArchetypes();
@@ -265,10 +241,11 @@ export const BatchSamplingSystem: SystemDef = {
       const channelCount = rawChannels.length;
       const transformBuffer: Array<unknown> | undefined = archetype.getBuffer?.('Transform');
 
+      const entityIndicesScratchByArchetypeMap = getEntityIndicesScratchByArchetype();
       let entityIndicesBuf: Int32Array =
-        entityIndicesScratchByArchetype.get(archetype.id) ?? new Int32Array(64);
-      if (!entityIndicesScratchByArchetype.has(archetype.id)) {
-        entityIndicesScratchByArchetype.set(archetype.id, entityIndicesBuf);
+        entityIndicesScratchByArchetypeMap.get(archetype.id) ?? new Int32Array(64);
+      if (!entityIndicesScratchByArchetypeMap.has(archetype.id)) {
+        entityIndicesScratchByArchetypeMap.set(archetype.id, entityIndicesBuf);
       }
       let entityCount = 0;
 
@@ -317,7 +294,7 @@ export const BatchSamplingSystem: SystemDef = {
           const nextBuf: Int32Array = new Int32Array(entityIndicesBuf.length * 2);
           nextBuf.set(entityIndicesBuf);
           entityIndicesBuf = nextBuf;
-          entityIndicesScratchByArchetype.set(archetype.id, entityIndicesBuf);
+          entityIndicesScratchByArchetypeMap.set(archetype.id, entityIndicesBuf);
         }
         entityIndicesBuf[entityCount] = i;
         entityCount++;
@@ -448,7 +425,8 @@ export const BatchSamplingSystem: SystemDef = {
 
         if (channelCount > 0) {
           const required = entityCount * channelCount * MAX_KEYFRAMES_PER_CHANNEL * KEYFRAME_FLOATS;
-          const cached = keyframesPackedCache.get(archetype.id);
+          const keyframesPackedCacheMap = getKeyframesPackedCache();
+          const cached = keyframesPackedCacheMap.get(archetype.id);
           const canReuse =
             cached &&
             cached.versionSig === versionSig &&
@@ -477,7 +455,7 @@ export const BatchSamplingSystem: SystemDef = {
                     KEYFRAME_FLOATS;
 
                   if (track && kIndex < count) {
-                    const kf = track[kIndex] as Keyframe & {
+                    const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
                     const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
@@ -490,8 +468,10 @@ export const BatchSamplingSystem: SystemDef = {
                       easingMode = EASING_MODE_BEZIER;
                     }
 
-                    keyframesData[globalIndex] = kf.startTime;
-                    const dur = kf.time - kf.startTime;
+                    const startTime = kf.startTime ?? 0;
+                    const endTime = kf.time ?? 0;
+                    keyframesData[globalIndex] = startTime;
+                    const dur = endTime - startTime;
                     keyframesData[globalIndex + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
                     keyframesData[globalIndex + 2] = kf.startValue;
                     keyframesData[globalIndex + 3] = kf.endValue;
@@ -512,7 +492,7 @@ export const BatchSamplingSystem: SystemDef = {
               }
             }
 
-            keyframesPackedCache.set(archetype.id, {
+            keyframesPackedCacheMap.set(archetype.id, {
               versionSig,
               entitySig,
               channelCount,
@@ -532,7 +512,8 @@ export const BatchSamplingSystem: SystemDef = {
           }
 
           const size = Math.max(KEYFRAME_FLOATS, totalKeyframes * KEYFRAME_FLOATS);
-          const cached = keyframesPackedCache.get(archetype.id);
+          const keyframesPackedCacheMap = getKeyframesPackedCache();
+          const cached = keyframesPackedCacheMap.get(archetype.id);
           const canReuse =
             cached &&
             cached.versionSig === versionSig &&
@@ -552,7 +533,7 @@ export const BatchSamplingSystem: SystemDef = {
               for (const [, track] of tracks) {
                 if (!Array.isArray(track) || track.length === 0) continue;
                 for (let kIndex = 0; kIndex < track.length; kIndex++) {
-                  const kf = track[kIndex] as Keyframe & {
+                  const kf = track[kIndex] as unknown as Keyframe & {
                     bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                   };
                   const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
@@ -565,8 +546,10 @@ export const BatchSamplingSystem: SystemDef = {
                     easingMode = EASING_MODE_BEZIER;
                   }
 
-                  keyframesData[w] = kf.startTime;
-                  const dur = kf.time - kf.startTime;
+                  const startTime = kf.startTime ?? 0;
+                  const endTime = kf.time ?? 0;
+                  keyframesData[w] = startTime;
+                  const dur = endTime - startTime;
                   keyframesData[w + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
                   keyframesData[w + 2] = kf.startValue;
                   keyframesData[w + 3] = kf.endValue;
@@ -583,7 +566,7 @@ export const BatchSamplingSystem: SystemDef = {
             for (; w < size; w++) {
               keyframesData[w] = 0;
             }
-            keyframesPackedCache.set(archetype.id, {
+            keyframesPackedCacheMap.set(archetype.id, {
               versionSig,
               entitySig,
               channelCount: 0,
@@ -657,10 +640,11 @@ export const BatchSamplingSystem: SystemDef = {
       }
 
       const physicsArchetypeId = `${archetype.id}::physics`;
+      const entityIndicesScratchMap = getEntityIndicesScratchByArchetype();
       let physicsIndicesBuf: Int32Array =
-        entityIndicesScratchByArchetype.get(physicsArchetypeId) ?? new Int32Array(64);
-      if (!entityIndicesScratchByArchetype.has(physicsArchetypeId)) {
-        entityIndicesScratchByArchetype.set(physicsArchetypeId, physicsIndicesBuf);
+        entityIndicesScratchMap.get(physicsArchetypeId) ?? new Int32Array(64);
+      if (!entityIndicesScratchMap.has(physicsArchetypeId)) {
+        entityIndicesScratchMap.set(physicsArchetypeId, physicsIndicesBuf);
       }
 
       let physicsEntityCount = 0;
@@ -702,7 +686,7 @@ export const BatchSamplingSystem: SystemDef = {
           const nextBuf: Int32Array = new Int32Array(physicsIndicesBuf.length * 2);
           nextBuf.set(physicsIndicesBuf);
           physicsIndicesBuf = nextBuf;
-          entityIndicesScratchByArchetype.set(physicsArchetypeId, physicsIndicesBuf);
+          entityIndicesScratchMap.set(physicsArchetypeId, physicsIndicesBuf);
         }
         physicsIndicesBuf[physicsEntityCount] = i;
         physicsEntityCount++;
@@ -729,18 +713,20 @@ export const BatchSamplingSystem: SystemDef = {
         (hashEntityIndices(physicsIndicesBuf, physicsEntityCount) ^
           (physicsStride * 2654435761)) >>>
         0;
-      const prevLayoutSig = physicsLayoutSigByArchetype.get(physicsArchetypeId);
+      const physicsLayoutSigMap = getPhysicsLayoutSigByArchetype();
+      const prevLayoutSig = physicsLayoutSigMap.get(physicsArchetypeId);
       if (prevLayoutSig !== layoutSig) {
         needsUpload = true;
-        physicsLayoutSigByArchetype.set(physicsArchetypeId, layoutSig);
+        physicsLayoutSigMap.set(physicsArchetypeId, layoutSig);
       }
 
       let stateData: Float32Array | undefined;
-      let stateVersion = physicsStateVersionByArchetype.get(physicsArchetypeId) ?? 0;
+      const physicsStateVersionMap = getPhysicsStateVersionByArchetype();
+      let stateVersion = physicsStateVersionMap.get(physicsArchetypeId) ?? 0;
       const slotCount = physicsEntityCount * physicsStride;
       if (needsUpload) {
         stateVersion = (stateVersion + 1) >>> 0;
-        physicsStateVersionByArchetype.set(physicsArchetypeId, stateVersion);
+        physicsStateVersionMap.set(physicsArchetypeId, stateVersion);
 
         stateData = new Float32Array(slotCount * PHYSICS_STATE_STRIDE);
         const typedTransformByProp: Record<

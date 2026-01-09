@@ -1,5 +1,5 @@
 import { isDev } from '@g-motion/utils';
-import type { OutputFormatPoolStats } from '../systems/webgpu/output-format-pass';
+import type { OutputFormatPoolStats } from '../systems/webgpu/output-format';
 
 export interface GPUBatchStatus {
   enabled: boolean;

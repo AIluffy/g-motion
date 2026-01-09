@@ -19,7 +19,6 @@
 import type { SystemContext, SystemDef } from '../../plugin';
 import { AsyncReadbackManager } from '../../webgpu/async-readback';
 import { getWebGPUBufferManager, WebGPUBufferManager } from '../../webgpu/buffer';
-import { createDebugger } from '@g-motion/utils';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
 import {
@@ -45,172 +44,36 @@ import {
   isWebGPUViewportCullingAsyncEnabled,
   resolveKeyframeSearchOptimizedFlag,
 } from './system-config';
-import {
-  __resetOutputFormatPassForTests,
-  getOutputFormatBufferPoolStats,
-  releaseOutputFormatBuffer,
-  runOutputFormatPass,
-} from './output-format-pass';
+import { __resetOutputFormatPassForTests, getOutputFormatBufferPoolStats } from './output-format';
 import {
   __resetViewportCullingPassForTests,
   runViewportCullingCompactionPassAsync,
   runViewportCullingCompactionPass,
-} from './viewport-culling-pass';
+} from './viewport';
 import {
   __resetKeyframePassesForTests,
   runKeyframeInterpPass,
   runKeyframePreprocessPass,
   runKeyframeSearchPass,
-} from './keyframe-passes';
+} from './keyframe';
 
-export { enableGPUOutputFormatPass, disableGPUOutputFormatPass } from './output-format-pass';
+import { debugIO, float32Preview, firstEntityChannelPreview } from './debug';
+import { stepPhysicsShadow, physicsValidationShadow } from './physics-validation';
+import { processOutputBuffer } from './output-buffer-processing';
+
+export { enableGPUOutputFormatPass, disableGPUOutputFormatPass } from './output-format';
 export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
-export { __getKeyframeSearchShaderModeForTests } from './keyframe-passes';
-
-const debugIO = createDebugger('WebGPU IO');
-/**
- * Debug helpers are kept local to the system to avoid polluting internal pass modules.
- */
-
-function float32Preview(values: Float32Array, max: number): number[] {
-  const n = Math.max(0, Math.min(values.length, max));
-  return Array.from(values.subarray(0, n));
-}
-
-function firstEntityChannelPreview(
-  values: Float32Array,
-  stride: number,
-  channels?: Array<{ index: number; property: string }>,
-  maxChannels = 12,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  const s = Math.max(1, stride | 0);
-  const count = Math.min(s, maxChannels);
-  for (let i = 0; i < count; i++) {
-    const prop = channels?.[i]?.property ?? `ch${i}`;
-    out[prop] = values[i] ?? 0;
-  }
-  return out;
-}
-
-const physicsValidationShadow = new Map<
-  string,
-  { slotCount: number; state: Float32Array; lastWarnFrame: number }
->();
-
-function f32(n: number): number {
-  return Math.fround(n);
-}
-
-function stepPhysicsShadow(
-  state: Float32Array,
-  dtMs: number,
-  dtSec: number,
-  maxVelocity: number,
-): void {
-  const slots = Math.floor(state.length / PHYSICS_STATE_STRIDE);
-  const maxVel = f32(maxVelocity);
-  for (let s = 0; s < slots; s++) {
-    const base = s * PHYSICS_STATE_STRIDE;
-    const kind = state[base + 14] ?? 0;
-
-    if (kind < 0.5) {
-      const position = f32(state[base + 0] ?? 0);
-      const velocity = f32(state[base + 1] ?? 0);
-      const target = f32(state[base + 2] ?? position);
-      const stiffness = f32(state[base + 4] ?? 0);
-      const damping = f32(state[base + 5] ?? 0);
-      const mass = Math.max(0.001, f32(state[base + 6] ?? 1));
-      const restSpeed = f32(state[base + 7] ?? 0);
-      const restDelta = f32(state[base + 8] ?? 0);
-
-      const displacement = f32(position - target);
-      const force = f32(-stiffness * displacement - damping * velocity);
-      const acceleration = f32(force / mass);
-      let v = f32(velocity + acceleration * f32(dtSec));
-      v = f32(Math.max(-maxVel, Math.min(maxVel, v)));
-      let p = f32(position + v * f32(dtSec));
-
-      const done = Math.abs(v) < restSpeed && Math.abs(displacement) < restDelta;
-      if (done) {
-        p = target;
-        v = 0;
-      }
-      state[base + 0] = p;
-      state[base + 1] = v;
-      continue;
-    }
-
-    let position = f32(state[base + 0] ?? 0);
-    let velocity = f32(state[base + 1] ?? 0);
-    let mode = f32(state[base + 15] ?? 0);
-
-    const timeConstant = Math.max(0.001, f32(state[base + 4] ?? 0));
-    const minB = state[base + 5];
-    const maxB = state[base + 6];
-    const restSpeed = f32(state[base + 7] ?? 0);
-    const restDelta = f32(state[base + 8] ?? 0);
-    const clampOn = (state[base + 9] ?? 0) >= 0.5;
-    const bounceOn = (state[base + 10] ?? 0) >= 0.5;
-    const hasMin = Number.isFinite(minB);
-    const hasMax = Number.isFinite(maxB);
-
-    if (mode < 0.5) {
-      const decayFactor = f32(Math.exp(-dtMs / timeConstant));
-      velocity = f32(velocity * decayFactor);
-      position = f32(position + velocity * f32(dtSec));
-
-      let hit = false;
-      let boundary = position;
-      if (hasMax && position >= (maxB as number)) {
-        hit = true;
-        boundary = maxB as number;
-      } else if (hasMin && position <= (minB as number)) {
-        hit = true;
-        boundary = minB as number;
-      }
-      if (hit) {
-        position = f32(boundary);
-        if (clampOn || !bounceOn) {
-          velocity = 0;
-        } else {
-          mode = 1;
-        }
-      }
-      state[base + 0] = position;
-      state[base + 1] = velocity;
-      state[base + 15] = mode;
-      continue;
-    }
-
-    let springTarget = position;
-    if (hasMax && position >= (maxB as number) - restDelta) {
-      springTarget = maxB as number;
-    } else if (hasMin && position <= (minB as number) + restDelta) {
-      springTarget = minB as number;
-    }
-
-    const displacement = f32(position - f32(springTarget));
-    const stiffness = f32(state[base + 11] ?? 0);
-    const damping = f32(state[base + 12] ?? 0);
-    const mass = Math.max(0.001, f32(state[base + 13] ?? 1));
-    const force = f32(-stiffness * displacement - damping * velocity);
-    const acceleration = f32(force / mass);
-    velocity = f32(velocity + acceleration * f32(dtSec));
-    position = f32(position + velocity * f32(dtSec));
-
-    const done = Math.abs(velocity) < restSpeed && Math.abs(displacement) < restDelta;
-    if (done) {
-      mode = 0;
-      velocity = 0;
-      position = f32(springTarget);
-    }
-
-    state[base + 0] = position;
-    state[base + 1] = velocity;
-    state[base + 15] = mode;
-  }
-}
+export { __getKeyframeSearchShaderModeForTests } from './keyframe';
+export { debugIO, float32Preview, firstEntityChannelPreview } from './debug';
+export {
+  stepPhysicsShadow,
+  f32,
+  physicsValidationShadow,
+  setPhysicsValidationShadow,
+  clearPhysicsValidationShadow,
+} from './physics-validation';
+export { processOutputBuffer, ProcessOutputBufferInput } from './output-buffer-processing';
+export { getPhysicsValidationShadow } from './physics-validation';
 
 // Sentinel value to track initialization
 let bufferManager: WebGPUBufferManager | null = null;
@@ -454,7 +317,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
             Promise.resolve()
               .then(async () => {
-                await processOutputBuffer({
+                await processOutputBuffer(device, queue, sp, readbackManager, processor, {
                   archetypeId: res.archetypeId,
                   outputBuffer: tag.outputBuffer,
                   entityCount: visibleCount,
@@ -609,107 +472,6 @@ export const WebGPUComputeSystem: SystemDef = {
       (GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST) as any,
       { label: 'physics-params', skipChangeDetection: true },
     );
-
-    const processOutputBuffer = async (input: {
-      archetypeId: string;
-      outputBuffer: GPUBuffer;
-      entityCount: number;
-      entityIdsForReadback: ArrayLike<number>;
-      leaseId?: number;
-      rawStride: number;
-      outputStride: number;
-      rawChannels: Array<{ index: number; property: string }>;
-      outputChannels: Array<{ index: number; property: string }>;
-    }): Promise<void> => {
-      const {
-        archetypeId,
-        outputBuffer,
-        entityCount,
-        entityIdsForReadback,
-        leaseId,
-        rawStride,
-        outputStride,
-        rawChannels,
-        outputChannels,
-      } = input;
-
-      if (entityCount <= 0) {
-        outputBuffer.destroy();
-        if (typeof leaseId === 'number') {
-          processor.releaseEntityIds(leaseId);
-        }
-        return;
-      }
-
-      const usedRawValueCount = entityCount * rawStride;
-      const formattedBuffer = await runOutputFormatPass(
-        device,
-        queue,
-        archetypeId,
-        outputBuffer,
-        usedRawValueCount,
-        rawStride,
-        outputChannels.length ? outputChannels : undefined,
-      );
-
-      const didFormat = formattedBuffer !== outputBuffer;
-      const channelsForReadback = didFormat
-        ? outputChannels.length
-          ? outputChannels
-          : undefined
-        : rawChannels.length
-          ? rawChannels
-          : undefined;
-
-      if (didFormat) {
-        outputBuffer.destroy();
-      }
-
-      const stride = didFormat ? outputStride : rawStride;
-      const bufferSize = (formattedBuffer as any).size as number | undefined;
-      const expectedSize = entityCount * stride * 4;
-      const byteSize = Math.min(bufferSize ?? expectedSize, expectedSize);
-
-      const stagingBuffer = sp.acquire(archetypeId, byteSize);
-      if (!stagingBuffer) {
-        formattedBuffer.destroy();
-        if (typeof leaseId === 'number') {
-          processor.releaseEntityIds(leaseId);
-        }
-        return;
-      }
-      if (typeof leaseId === 'number') {
-        processor.markEntityIdsInFlight(leaseId);
-      }
-      sp.markInFlight(stagingBuffer);
-
-      const copyEncoder = device.createCommandEncoder({
-        label: `copy-output-${archetypeId}`,
-      });
-      copyEncoder.copyBufferToBuffer(formattedBuffer, 0, stagingBuffer, 0, byteSize);
-      queue.submit([copyEncoder.finish()]);
-      if (didFormat) {
-        releaseOutputFormatBuffer(formattedBuffer, queue);
-      } else {
-        formattedBuffer.destroy();
-      }
-
-      if (readbackManager) {
-        const mapPromise = stagingBuffer.mapAsync((GPUMapMode as any).READ);
-        readbackManager.enqueueMapAsync(
-          archetypeId,
-          entityIdsForReadback,
-          stagingBuffer,
-          mapPromise,
-          byteSize,
-          200,
-          stride,
-          channelsForReadback,
-          leaseId,
-        );
-        setPendingReadbackCount(readbackManager.getPendingCount());
-      }
-    };
 
     for (const [archetypeId, batch] of archetypeBatches) {
       let leaseId = (batch as any).entityIdsLeaseId as number | undefined;
@@ -1029,7 +791,7 @@ export const WebGPUComputeSystem: SystemDef = {
           }
           continue;
         }
-        await processOutputBuffer({
+        await processOutputBuffer(device, queue, sp, readbackManager, processor, {
           archetypeId,
           outputBuffer,
           entityCount,
