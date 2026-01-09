@@ -15,4 +15,16 @@ export default defineConfig({
   output: {
     target: 'node',
   },
+  tools: {
+    rspack: {
+      module: {
+        rules: [
+          {
+            resourceQuery: /raw$/,
+            type: 'asset/source',
+          },
+        ],
+      },
+    },
+  },
 });

@@ -1,0 +1,5 @@
+export { TimelineComponent } from './schema';
+export { findActiveKeyframe, isTrackSorted } from './search';
+export { clearKeyframeCache, getKeyframeCacheStats, prewarmKeyframeCache } from './cache';
+
+export type { SpringOptions, InertiaOptions, Keyframe, Track, TimelineData } from '../../types';
