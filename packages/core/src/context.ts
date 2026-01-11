@@ -42,10 +42,7 @@ export class AppContext {
 
   static configure(options: { factories?: AppContextFactories }): void {
     if (options.factories) {
-      AppContext.defaultFactories = {
-        ...AppContext.defaultFactories,
-        ...options.factories,
-      };
+      Object.assign(AppContext.defaultFactories, options.factories);
       AppContext.instance?.setFactories(options.factories);
     }
   }
@@ -71,10 +68,7 @@ export class AppContext {
   }
 
   setFactories(factories: AppContextFactories): void {
-    this.factories = {
-      ...this.factories,
-      ...factories,
-    };
+    Object.assign(this.factories, factories);
   }
 
   /**

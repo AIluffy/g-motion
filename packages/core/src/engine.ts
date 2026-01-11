@@ -108,10 +108,7 @@ class MotionEngineImpl implements MotionEngine {
     }
 
     if (options?.configOverride) {
-      const merged = {
-        ...this.services.config,
-        ...options.configOverride,
-      };
+      const merged = Object.assign({}, this.services.config, options.configOverride);
       this.world.setConfig(merged);
       this.services.config = this.world.config;
     }
@@ -162,10 +159,7 @@ export function getDefaultEngine(config?: MotionAppConfig): MotionEngine {
     return existing;
   }
   if (config) {
-    world.setConfig({
-      ...world.config,
-      ...config,
-    });
+    world.setConfig(Object.assign({}, world.config, config));
   }
   return getEngineForWorld(world);
 }

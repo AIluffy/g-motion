@@ -1,9 +1,11 @@
 import type { ComponentRegistry } from './registry';
 import type { EntityManager } from './entity';
-import { Archetype, ArchetypeInternal } from './archetype';
+import { Archetype, ArchetypeInternal, type ComponentValue } from './archetype';
+import { ARCHETYPE_DEFAULTS } from './constants';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors';
+import type { ComponentDef } from './plugin';
 
-type ComponentData = Record<string, unknown>;
+type ComponentData = Record<string, ComponentValue | undefined>;
 
 export interface MotionStatusCoordinator {
   isActiveMotionStatus(status: number | undefined): boolean;
@@ -20,13 +22,13 @@ class BurstManager {
   ) {}
 
   reserveCapacity(archetype: Archetype, totalSize: number): void {
-    const internal = archetype as ArchetypeInternal;
+    const internal: ArchetypeInternal = archetype;
     const current = archetype.entityCount;
     if (current >= totalSize) return;
 
     let capacity = internal.getInternalCapacity();
     while (capacity < totalSize) {
-      capacity *= 2;
+      capacity *= ARCHETYPE_DEFAULTS.GROWTH_FACTOR;
     }
 
     if (capacity !== internal.getInternalCapacity()) {
@@ -36,22 +38,29 @@ class BurstManager {
 
   createBatch(archetype: Archetype, dataArray: ComponentData[]): number[] {
     const count = dataArray.length;
-    const createdIds: number[] = [];
+    const createdIds = new Array<number>(count);
 
     this.reserveCapacity(archetype, archetype.entityCount + count);
 
-    for (const data of dataArray) {
+    for (let i = 0; i < count; i++) {
+      const data = dataArray[i]!;
       const entityId = this.entityManager.create();
       archetype.addEntity(entityId, data);
       this.entityArchetypes.set(entityId, archetype);
-      createdIds.push(entityId);
+      createdIds[i] = entityId;
     }
 
     return createdIds;
   }
 
   markForDeletion(entityIds: number[]): void {
-    this.pendingDeletions.push(...entityIds);
+    const pending = this.pendingDeletions;
+    const start = pending.length;
+    const addCount = entityIds.length;
+    pending.length = start + addCount;
+    for (let i = 0; i < addCount; i++) {
+      pending[start + i] = entityIds[i]!;
+    }
   }
 
   flushDeletions(): void {
@@ -61,14 +70,16 @@ class BurstManager {
     for (const entityId of this.pendingDeletions) {
       const archetype = this.entityArchetypes.get(entityId);
       if (!archetype) continue;
-      if (!byArchetype.has(archetype)) {
-        byArchetype.set(archetype, []);
+      let ids = byArchetype.get(archetype);
+      if (!ids) {
+        ids = [];
+        byArchetype.set(archetype, ids);
       }
-      byArchetype.get(archetype)!.push(entityId);
+      ids[ids.length] = entityId;
     }
 
     for (const [archetype, entityIds] of byArchetype) {
-      const internal = archetype as ArchetypeInternal;
+      const internal: ArchetypeInternal = archetype;
       const indices = internal.getInternalEntityIndices();
       entityIds.sort((a, b) => {
         const indexA = indices.get(a) ?? -1;
@@ -85,7 +96,7 @@ class BurstManager {
   }
 
   private removeEntityFromArchetype(archetype: Archetype, entityId: number): void {
-    const internal = archetype as ArchetypeInternal;
+    const internal: ArchetypeInternal = archetype;
     const entityIndices = internal.getInternalEntityIndices();
     const indicesMap = internal.getInternalIndicesMap();
     const buffers = internal.getInternalBuffers();
@@ -146,7 +157,7 @@ export class ArchetypeManager {
     const archetypeId = id ?? sortedNames.join('|');
     let arch = this.archetypes.get(archetypeId);
     if (!arch) {
-      const defs = new Map();
+      const defs = new Map<string, ComponentDef>();
       for (const name of componentNames) {
         const def = this.registry.get(name);
         if (!def) {
@@ -176,8 +187,7 @@ export class ArchetypeManager {
   getEntityLocation(entityId: number): { archetype: Archetype; index: number } | null {
     const archetype = this.entityArchetypes.get(entityId);
     if (!archetype) return null;
-    const internal = archetype as ArchetypeInternal;
-    const index = internal.getInternalEntityIndices().get(entityId);
+    const index = archetype.getInternalEntityIndices().get(entityId);
     if (index === undefined) return null;
     return { archetype, index };
   }
@@ -189,9 +199,9 @@ export class ArchetypeManager {
     archetype.addEntity(id, components);
     this.entityArchetypes.set(id, archetype);
 
-    const motionState = components.MotionState as { status?: number } | undefined;
-    if (motionState && typeof motionState.status === 'number') {
-      this.motion.onMotionStatusChange(undefined, motionState.status);
+    const status = this.getMotionStatus(components.MotionState);
+    if (status !== undefined) {
+      this.motion.onMotionStatusChange(undefined, status);
     }
 
     return id;
@@ -203,8 +213,8 @@ export class ArchetypeManager {
 
     let delta = 0;
     for (const data of dataArray) {
-      const motionState = data.MotionState as { status?: number } | undefined;
-      if (motionState && this.motion.isActiveMotionStatus(motionState.status)) {
+      const status = this.getMotionStatus(data.MotionState);
+      if (this.motion.isActiveMotionStatus(status)) {
         delta++;
       }
     }
@@ -227,13 +237,11 @@ export class ArchetypeManager {
       for (const entityId of unique) {
         const archetype = this.entityArchetypes.get(entityId);
         if (!archetype) continue;
-        const internal = archetype as ArchetypeInternal;
-        const index = internal.getInternalEntityIndices().get(entityId);
+        const index = archetype.getInternalEntityIndices().get(entityId);
         if (index === undefined) continue;
         const stateBuffer = archetype.getBuffer('MotionState');
         if (!stateBuffer) continue;
-        const state = stateBuffer[index] as { status?: number };
-        const status = typeof state?.status === 'number' ? state.status : undefined;
+        const status = this.getMotionStatus(stateBuffer[index] as ComponentValue | undefined);
         if (this.motion.isActiveMotionStatus(status)) {
           this.motion.onMotionStatusChange(status, 0);
         }
@@ -253,5 +261,11 @@ export class ArchetypeManager {
       return `${sortedNames.join('|')}::${render.rendererId}`;
     }
     return undefined;
+  }
+
+  private getMotionStatus(motionState: ComponentValue | undefined): number | undefined {
+    if (!motionState || typeof motionState !== 'object') return undefined;
+    const maybeStatus = (motionState as { status?: unknown }).status;
+    return typeof maybeStatus === 'number' ? maybeStatus : undefined;
   }
 }

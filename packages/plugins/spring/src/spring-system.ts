@@ -1,33 +1,33 @@
-import { SystemDef, MotionStatus, SystemContext, World, isPhysicsGPUEntity } from '@g-motion/core';
+import { SystemDef, MotionStatus, SystemContext, isPhysicsGPUEntity } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
+import type { ComponentValue } from '@g-motion/core';
 
 const debug = createDebugger('SpringSystem');
 
-interface MotionStateData {
+type MotionStateData = ComponentValue & {
   status: MotionStatus;
   currentTime: number;
-}
+};
 
-interface TimelineData {
+type TimelineData = ComponentValue & {
   tracks: Map<string, Array<{ endValue: number }>>;
-}
+};
 
-interface SpringData {
+type SpringData = ComponentValue & {
   stiffness: number;
   damping: number;
   mass: number;
   restSpeed: number;
   restDelta: number;
   velocities?: Map<string, number>;
-}
+};
 
-interface RenderData {
+type RenderData = ComponentValue & {
   props?: Record<string, number>;
-}
+  version?: number;
+};
 
-interface TransformData {
-  [key: string]: number;
-}
+type TransformData = ComponentValue & { [key: string]: number };
 
 /**
  * SpringSystem implements spring physics using semi-implicit Euler integration.
@@ -86,9 +86,9 @@ export const SpringSystem: SystemDef = {
         if (entityId >= 0 && isPhysicsGPUEntity(entityId)) {
           continue;
         }
-        const state = stateBuffer[i] as MotionStateData;
-        const timeline = timelineBuffer[i] as TimelineData;
-        const spring = springBuffer[i] as SpringData;
+        const state = stateBuffer[i]! as MotionStateData;
+        const timeline = timelineBuffer[i]! as TimelineData;
+        const spring = springBuffer[i]! as SpringData;
         const inertia = inertiaBuffer ? inertiaBuffer[i] : undefined;
         const transform = transformBuffer ? (transformBuffer[i] as TransformData) : undefined;
         const render = renderBuffer ? (renderBuffer[i] as any) : undefined;
@@ -244,7 +244,7 @@ export const SpringSystem: SystemDef = {
             }
 
             // Remove spring component from this entity so SpringSystem stops processing
-            springBuffer[i] = undefined as unknown as typeof spring;
+            springBuffer[i] = undefined;
             // Keep entity running for inertia to pick up
             if (typeof (world as any).setMotionStatusAt === 'function') {
               (world as any).setMotionStatusAt(archetype, i, MotionStatus.Running);

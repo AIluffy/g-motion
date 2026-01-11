@@ -123,7 +123,7 @@ class InMemoryErrorMonitor {
   }
 
   getEvents(): ErrorMonitorEvent[] {
-    return [...this.events];
+    return this.events.slice();
   }
 
   getAggregates(): ErrorAggregate[] {

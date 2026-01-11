@@ -188,7 +188,9 @@ export class ComputeBenchmark {
 
     const allResults: BenchmarkResult[] = [];
     for (const results of this.results.values()) {
-      allResults.push(...results);
+      for (let i = 0; i < results.length; i++) {
+        allResults.push(results[i]!);
+      }
     }
     return allResults;
   }
@@ -238,12 +240,20 @@ Operation: ${result.name}
     const variance = times.reduce((sum, t) => sum + Math.pow(t - avgTime, 2), 0) / times.length;
     const stdDev = Math.sqrt(variance);
 
+    let minTime = Number.POSITIVE_INFINITY;
+    let maxTime = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < times.length; i++) {
+      const t = times[i]!;
+      if (t < minTime) minTime = t;
+      if (t > maxTime) maxTime = t;
+    }
+
     return {
       name,
       iterations: times.length,
       totalTime,
-      minTime: Math.min(...times),
-      maxTime: Math.max(...times),
+      minTime,
+      maxTime,
       avgTime,
       stdDev,
       timestamp: Date.now(),
@@ -300,12 +310,20 @@ export class PerformanceProfiler {
     const total = measurements.reduce((a, b) => a + b, 0);
     const avg = total / measurements.length;
 
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < measurements.length; i++) {
+      const t = measurements[i]!;
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+
     return {
       measurements: measurements.length,
       total,
       average: avg,
-      min: Math.min(...measurements),
-      max: Math.max(...measurements),
+      min,
+      max,
     };
   }
 

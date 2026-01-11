@@ -1,7 +1,7 @@
 import { ComponentRegistry } from './registry';
 import { EntityManager } from './entity';
 import { SystemScheduler } from './scheduler';
-import { Archetype } from './archetype';
+import { Archetype, type ComponentValue } from './archetype';
 import { MotionAppConfig } from './plugin';
 import { ArchetypeManager, type MotionStatusCoordinator } from './archetypeManager';
 import { ConfigurationService } from './configurationService';
@@ -10,7 +10,7 @@ import { SystemCoordinator } from './systemCoordinator';
 /**
  * Component data type
  */
-type ComponentData = Record<string, unknown>;
+type ComponentData = Record<string, ComponentValue | undefined>;
 
 export type MotionStatusListener = (params: {
   world: World;

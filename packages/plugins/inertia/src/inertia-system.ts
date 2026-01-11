@@ -1,13 +1,14 @@
-import { SystemDef, MotionStatus, SystemContext, World, isPhysicsGPUEntity } from '@g-motion/core';
+import { SystemDef, MotionStatus, SystemContext, isPhysicsGPUEntity } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
+import type { ComponentValue } from '@g-motion/core';
 
 const debug = createDebugger('InertiaSystem');
 
-interface MotionStateData {
+type MotionStateData = ComponentValue & {
   status: MotionStatus;
-}
+};
 
-interface InertiaData {
+type InertiaData = ComponentValue & {
   timeConstant: number;
   min?: number;
   max?: number;
@@ -26,7 +27,7 @@ interface InertiaData {
   velocities?: Map<string, number>;
   bounceVelocities?: Map<string, number>;
   inBounce?: Map<string, boolean>;
-}
+};
 
 /**
  * InertiaSystem implements momentum-based motion with exponential decay.
@@ -67,9 +68,9 @@ export const InertiaSystem: SystemDef = {
         if (entityId >= 0 && isPhysicsGPUEntity(entityId)) {
           continue;
         }
-        const state = stateBuffer[i] as MotionStateData;
+        const state = stateBuffer[i]! as MotionStateData;
         const timeline = timelineBuffer[i] as any;
-        const inertia = inertiaBuffer[i] as InertiaData;
+        const inertia = inertiaBuffer[i]! as InertiaData;
         const render = renderBuffer ? (renderBuffer[i] as any) : undefined;
         let changed = false;
 

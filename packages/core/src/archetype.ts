@@ -4,7 +4,7 @@ import { ARCHETYPE_DEFAULTS } from './constants';
 /**
  * Type for component data values
  */
-type ComponentValue = unknown;
+export type ComponentValue = Record<string, unknown>;
 
 export type ArchetypeTypedBuffer = Float32Array | Float64Array | Int32Array;
 
@@ -44,13 +44,13 @@ export interface ArchetypeInternal {
   getInternalCount(): number;
   getInternalEntityIndices(): Map<number, number>;
   getInternalIndicesMap(): Map<number, number>;
-  getInternalBuffers(): Map<string, Array<ComponentValue>>;
+  getInternalBuffers(): Map<string, Array<ComponentValue | undefined>>;
   setInternalCount(count: number): void;
   resize(newCapacity: number): void;
 }
 
 export class Archetype implements ArchetypeInternal {
-  private buffers = new Map<string, Array<ComponentValue>>();
+  private buffers = new Map<string, Array<ComponentValue | undefined>>();
   private typedBuffers = new Map<string, ArchetypeTypedBuffer>();
   private capacity: number = ARCHETYPE_DEFAULTS.INITIAL_CAPACITY;
   private count = 0;
@@ -65,7 +65,7 @@ export class Archetype implements ArchetypeInternal {
     this.initializeBuffers(this.capacity);
   }
 
-  addEntity(entityId: number, data: Record<string, ComponentValue>): void {
+  addEntity(entityId: number, data: Record<string, ComponentValue | undefined>): void {
     if (this.count >= this.capacity) {
       this.resize(this.capacity * ARCHETYPE_DEFAULTS.GROWTH_FACTOR);
     }
@@ -92,8 +92,7 @@ export class Archetype implements ArchetypeInternal {
               const key = this.makeTypedKey(compName, prop);
               const tbuf = this.typedBuffers.get(key);
               if (tbuf) {
-                const dataObj = compData as Record<string, unknown>;
-                const val = Number(dataObj[prop] ?? 0);
+                const val = Number(compData[prop] ?? 0);
                 tbuf[index] = Number.isFinite(val) ? val : 0;
               }
             }
@@ -108,7 +107,7 @@ export class Archetype implements ArchetypeInternal {
 
     // Resize structured buffers (object arrays)
     for (const [name, buffer] of this.buffers) {
-      const newBuffer = Array.from<ComponentValue>({ length: newCapacity });
+      const newBuffer = Array.from<ComponentValue | undefined>({ length: newCapacity });
       for (let i = 0; i < this.count; i++) {
         newBuffer[i] = buffer[i];
       }
@@ -123,7 +122,7 @@ export class Archetype implements ArchetypeInternal {
     }
   }
 
-  getBuffer(name: string): Array<ComponentValue> | undefined {
+  getBuffer(name: string): Array<ComponentValue | undefined> | undefined {
     return this.buffers.get(name);
   }
 
@@ -208,7 +207,7 @@ export class Archetype implements ArchetypeInternal {
     return this.indicesMap;
   }
 
-  getInternalBuffers(): Map<string, Array<ComponentValue>> {
+  getInternalBuffers(): Map<string, Array<ComponentValue | undefined>> {
     return this.buffers;
   }
 

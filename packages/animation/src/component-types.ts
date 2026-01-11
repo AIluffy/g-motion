@@ -5,7 +5,7 @@
 
 import { MotionStatus } from '@g-motion/core';
 
-export interface MotionStateComponentData {
+export interface MotionStateComponentData extends Record<string, unknown> {
   status: MotionStatus;
   currentTime: number;
   iteration?: number;
@@ -17,14 +17,14 @@ export interface MotionStateComponentData {
   tickPriority?: number;
 }
 
-export interface TimelineComponentData {
+export interface TimelineComponentData extends Record<string, unknown> {
   duration: number;
   repeat?: number;
   loop?: boolean;
   tracks?: Map<string, unknown>;
 }
 
-export interface TransformComponentData {
+export interface TransformComponentData extends Record<string, unknown> {
   x?: number;
   y?: number;
   z?: number;
@@ -44,7 +44,7 @@ export interface TransformComponentData {
   perspective?: number;
 }
 
-export interface RenderComponentData {
+export interface RenderComponentData extends Record<string, unknown> {
   rendererId: string;
   rendererCode?: number;
   target: unknown;
