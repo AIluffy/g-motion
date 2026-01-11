@@ -12,7 +12,14 @@ import {
   WorkgroupSize,
 } from './workgroup';
 
-const WORKGROUP_SIZES = [16, 32, 64, 128] as const;
+import { WebGPUConstants } from '../../../constants/webgpu';
+
+const WORKGROUP_SIZES = [
+  WebGPUConstants.WORKGROUP.SIZE_SMALL,
+  WebGPUConstants.WORKGROUP.SIZE_MEDIUM,
+  WebGPUConstants.WORKGROUP.SIZE_DEFAULT,
+  WebGPUConstants.WORKGROUP.SIZE_XLARGE,
+] as const;
 
 /**
  * Get or retrieve pipeline for a given workgroup size
@@ -25,12 +32,13 @@ export async function getPipelineForWorkgroup(
 ): Promise<GPUComputePipeline | null> {
   const selected = selectWorkgroupSize(workgroupHint);
   const pipelineCache = getBucket(cacheId).pipelineCache;
+  const { WORKGROUP } = WebGPUConstants;
   return (
     pipelineCache.get(selected) ??
-    pipelineCache.get(64) ??
-    pipelineCache.get(32) ??
-    pipelineCache.get(16) ??
-    pipelineCache.get(128) ??
+    pipelineCache.get(WORKGROUP.SIZE_DEFAULT) ??
+    pipelineCache.get(WORKGROUP.SIZE_MEDIUM) ??
+    pipelineCache.get(WORKGROUP.SIZE_SMALL) ??
+    pipelineCache.get(WORKGROUP.SIZE_XLARGE) ??
     null
   );
 }
@@ -47,11 +55,12 @@ export async function precompileWorkgroupPipelines(
 ): Promise<boolean> {
   const bucket = getBucket(cacheId);
   const key = buildCacheKey(shaderCode, bindGroupLayoutEntries, entryPoint);
+  const { WORKGROUP } = WebGPUConstants;
   const hasAll =
-    bucket.pipelineCache.has(16) &&
-    bucket.pipelineCache.has(32) &&
-    bucket.pipelineCache.has(64) &&
-    bucket.pipelineCache.has(128);
+    bucket.pipelineCache.has(WORKGROUP.SIZE_SMALL) &&
+    bucket.pipelineCache.has(WORKGROUP.SIZE_MEDIUM) &&
+    bucket.pipelineCache.has(WORKGROUP.SIZE_DEFAULT) &&
+    bucket.pipelineCache.has(WORKGROUP.SIZE_XLARGE);
   if (bucket.pipelineCacheDevice === device && bucket.pipelineCacheKey === key && hasAll) {
     return true;
   }

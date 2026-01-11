@@ -9,7 +9,6 @@ export function buildRenderComponent(
   world: World,
   onUpdate?: (val: any) => void,
 ): { Render?: any; Transform?: any } {
-  console.log(target, 'xxxxxx', targetType);
   switch (targetType) {
     case TargetType.Primitive:
       return {

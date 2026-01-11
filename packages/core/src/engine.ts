@@ -1,6 +1,5 @@
 import { App, app as globalApp, appWorld, registerBuiltInRenderers } from './app';
-import { getAppContext, getErrorHandler } from './context';
-import { ComputeBatchProcessor } from './systems/batch';
+import { getAppContext } from './context';
 import { getGPUMetricsProvider } from './webgpu/metrics-provider';
 import { getWebGPUBufferManager } from './webgpu/buffer';
 import { clearPipelineCache } from './systems/webgpu';
@@ -41,10 +40,10 @@ class MotionEngineImpl implements MotionEngine {
       registerBuiltInRenderers(this.app as App);
     }
 
-    const batchProcessor = new ComputeBatchProcessor();
-    const metrics = getGPUMetricsProvider();
-    const errorHandler = getErrorHandler();
     const appContext = getAppContext();
+    const batchProcessor = appContext.getBatchProcessor();
+    const metrics = getGPUMetricsProvider();
+    const errorHandler = appContext.getErrorHandler();
 
     this.services = {
       world: this.world,
@@ -141,6 +140,7 @@ class MotionEngineImpl implements MotionEngine {
       this.services.appContext.dispose();
     } catch {}
 
+    this.services.batchProcessor = this.services.appContext.getBatchProcessor();
     this.services.errorHandler = this.services.appContext.getErrorHandler();
   }
 }

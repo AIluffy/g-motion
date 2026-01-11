@@ -1,6 +1,6 @@
-import type { EngineServices, SystemContext, SystemDef } from './plugin';
+import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
 import { WorldProvider } from './worldProvider';
-import { SCHEDULER_LIMITS } from './constants';
+import { SCHEDULER_LIMITS, WebGPUConstants } from './constants';
 import { FrameSampler } from './utils';
 import { getErrorHandler } from './context';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors';
@@ -11,7 +11,7 @@ import {
 } from './webgpu/sync-manager';
 import { getPersistentGPUBufferManager } from './webgpu/persistent-buffer-manager';
 
-const GPU_TAIL_KEEP_ALIVE_MS = 250;
+const GPU_TAIL_KEEP_ALIVE_MS = WebGPUConstants.GPU.TAIL_KEEP_ALIVE_MS;
 
 export class SystemScheduler {
   private systems: SystemDef[] = [];
@@ -133,8 +133,7 @@ export class SystemScheduler {
 
     // FPS limiting: check if enough time has passed
     const frameDuration =
-      (this.services?.config as any)?.frameDuration ??
-      (this.getWorld()?.config as any)?.frameDuration;
+      this.services?.config.frameDuration ?? this.getWorld()?.config.frameDuration;
 
     if (frameDuration && dt < frameDuration) {
       this.frameId = requestAnimationFrame(this.loop);
@@ -148,8 +147,10 @@ export class SystemScheduler {
     const safeDt = Math.min(dt, SCHEDULER_LIMITS.MAX_FRAME_TIME_MS);
     this.engineFrame++;
     this.elapsedMs += safeDt;
-    const config = (this.services?.config ?? (this.getWorld()?.config as any) ?? {}) as any;
+    const config: MotionAppConfig = this.services?.config ?? this.getWorld()?.config ?? {};
     const sampling = this.frameSampler.compute(this.elapsedMs, config);
+    const samplingRate =
+      typeof config.metricsSamplingRate === 'number' ? config.metricsSamplingRate : 1;
 
     const ctx: SystemContext | undefined = this.services
       ? {
@@ -185,12 +186,11 @@ export class SystemScheduler {
         (this.services?.errorHandler ?? getErrorHandler()).handle(error);
       } finally {
         const systemDuration = performance.now() - systemStart;
-        const samplingRate = ((this.services?.config as any)?.metricsSamplingRate ?? 1) as number;
         this.metricsCounter++;
         const shouldSample =
           samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
         if (shouldSample) {
-          (this.services.metrics as any).recordSystemTiming?.(system.name, systemDuration);
+          this.services?.metrics.recordSystemTiming?.(system.name, systemDuration);
         }
       }
     }
@@ -201,37 +201,25 @@ export class SystemScheduler {
     } catch {}
 
     try {
-      const samplingRate = ((this.services?.config as any)?.metricsSamplingRate ?? 1) as number;
       const shouldSampleMemory =
         samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
       if (shouldSampleMemory) {
-        const metricsAny = this.services?.metrics as any;
-        const recordMemorySnapshot = metricsAny?.recordMemorySnapshot as
-          | ((snapshot: {
-              bytesSkipped: number;
-              totalBytesProcessed: number;
-              currentMemoryUsage: number;
-              peakMemoryUsage: number;
-              timestamp: number;
-            }) => void)
-          | undefined;
+        const recordMemorySnapshot = this.services?.metrics.recordMemorySnapshot;
         if (recordMemorySnapshot) {
           let managerStats: {
             bytesSkipped: number;
             totalBytesProcessed: number;
             currentMemoryUsage: number;
             peakMemoryUsage: number;
-            totalMemoryBytes?: number;
           } | null = null;
           try {
             const manager = getPersistentGPUBufferManager();
-            const stats = manager.getStats() as any;
+            const stats = manager.getStats();
             managerStats = {
               bytesSkipped: stats.bytesSkipped ?? 0,
               totalBytesProcessed: stats.totalBytesProcessed ?? 0,
               currentMemoryUsage: stats.currentMemoryUsage ?? stats.totalMemoryBytes ?? 0,
               peakMemoryUsage: stats.peakMemoryUsage ?? stats.totalMemoryBytes ?? 0,
-              totalMemoryBytes: stats.totalMemoryBytes,
             };
           } catch {
             managerStats = null;

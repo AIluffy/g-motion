@@ -5,7 +5,7 @@
  * Culls entities outside the viewport and compacts the output buffer.
  */
 
-import type { ArchetypeBatchDescriptor } from '../../../types';
+import type { ViewportCullingBatchDescriptor } from '../../../types';
 import { ENTITY_BOUNDS_STRIDE, RENDER_STATE_EX_STRIDE } from './culling-types';
 import {
   getScratch,
@@ -22,7 +22,7 @@ export async function runViewportCullingCompactionPass(
   world: any,
   processor: any,
   archetypeId: string,
-  batch: ArchetypeBatchDescriptor,
+  batch: ViewportCullingBatchDescriptor,
   rawOutputBuffer: GPUBuffer,
   rawStride: number,
 ): Promise<{
@@ -36,7 +36,7 @@ export async function runViewportCullingCompactionPass(
     return {
       entityCount: batch.entityCount,
       entityIds: batch.entityIds as any,
-      leaseId: (batch as any).entityIdsLeaseId as number | undefined,
+      leaseId: batch.entityIdsLeaseId,
       outputBuffer: rawOutputBuffer,
     };
   }
@@ -153,7 +153,9 @@ export async function runViewportCullingCompactionPass(
   }
 
   const frustumF32 = getFrustumBuffer();
-  updateFrustumBuffer(frustumF32);
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 0;
+  const viewportH = typeof window !== 'undefined' ? window.innerHeight : 0;
+  updateFrustumBuffer(frustumF32, viewportW, viewportH);
   resetParamsBuffer(rawStride);
 
   const renderStatesGPU = device.createBuffer({

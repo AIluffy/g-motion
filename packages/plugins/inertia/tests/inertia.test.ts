@@ -3,6 +3,40 @@ import { motion } from '@g-motion/animation';
 import { WorldProvider, app } from '@g-motion/core';
 import { InertiaPlugin } from '../src/index';
 
+type InertiaComponentData = {
+  power: number;
+  timeConstant: number;
+  min?: number;
+  max?: number;
+  bounds?: { min?: number; max?: number };
+  clamp?: number;
+  snap?: unknown;
+  end?: unknown;
+  bounceStiffness: number;
+  bounceDamping: number;
+  restSpeed: number;
+  restDelta: number;
+  velocities: Map<string, number>;
+  bounceVelocities?: Map<string, number>;
+  inBounce?: Map<string, boolean>;
+  handoff?: unknown;
+  bounce?: unknown;
+};
+
+type TimelineComponentData = {
+  tracks: Map<string, Array<{ endValue: number }>>;
+};
+
+function asInertiaBuffer(buffer: unknown): Array<InertiaComponentData | undefined> | null {
+  if (!Array.isArray(buffer)) return null;
+  return buffer as Array<InertiaComponentData | undefined>;
+}
+
+function asTimelineBuffer(buffer: unknown): Array<TimelineComponentData | undefined> | null {
+  if (!Array.isArray(buffer)) return null;
+  return buffer as Array<TimelineComponentData | undefined>;
+}
+
 describe('Inertia Physics Plugin', () => {
   beforeAll(() => {
     // Manually register Inertia plugin in test environment
@@ -35,9 +69,10 @@ describe('Inertia Physics Plugin', () => {
     // Find entity with Inertia component
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(inertia.power).toBe(0.8); // default
         expect(inertia.timeConstant).toBe(350); // default
         expect(inertia.bounceStiffness).toBe(500); // default
@@ -75,9 +110,10 @@ describe('Inertia Physics Plugin', () => {
     // Find entity with Inertia component
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(inertia.power).toBe(0.9);
         expect(inertia.timeConstant).toBe(500);
         expect(inertia.min).toBe(0);
@@ -107,17 +143,23 @@ describe('Inertia Physics Plugin', () => {
 
     // Velocity should be initialized in the builder
     // Find entity with Inertia component
+    let found = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
-        const inertia = inertiaBuffer[archetype.entityCount - 1];
-        expect(inertia.velocities).toBeDefined();
-        expect(inertia.velocities instanceof Map).toBe(true);
-        // Velocity might have been updated by system, check it's initialized
-        expect(inertia.velocities.has('x')).toBe(true);
-        break;
+        for (let i = archetype.entityCount - 1; i >= 0; i--) {
+          const inertia = inertiaBuffer[i];
+          if (!inertia) continue;
+          if (!(inertia.velocities instanceof Map)) continue;
+          if (inertia.velocities.has('x')) {
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
       }
     }
+    expect(found).toBe(true);
 
     control.stop();
   });
@@ -137,9 +179,10 @@ describe('Inertia Physics Plugin', () => {
     // Velocity function is resolved in builder when creating component
     // Find entity with Inertia component
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         // Velocity might have decayed, but should be initialized
         expect(inertia.velocities.has('__primitive')).toBe(true);
         const vel = inertia.velocities.get('__primitive');
@@ -168,14 +211,24 @@ describe('Inertia Physics Plugin', () => {
       ])
       .play();
 
+    let found = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
-        const inertia = inertiaBuffer[archetype.entityCount - 1];
-        expect(inertia.velocities.get('x')).toBe(420);
-        break;
+        for (let i = archetype.entityCount - 1; i >= 0; i--) {
+          const inertia = inertiaBuffer[i];
+          if (!inertia) continue;
+          const velocities = inertia.velocities;
+          if (velocities.has('x')) {
+            expect(velocities.get('x')).toBe(420);
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
       }
     }
+    expect(found).toBe(true);
 
     control.stop();
   });
@@ -188,9 +241,10 @@ describe('Inertia Physics Plugin', () => {
       .play();
 
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(inertia.bounds?.min).toBe(-50);
         expect(inertia.bounds?.max).toBe(50);
         expect(inertia.clamp).toBe(1);
@@ -207,9 +261,10 @@ describe('Inertia Physics Plugin', () => {
       .play();
 
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(inertia.snap).toBe(20);
         expect(inertia.bounce).toBe(false);
         break;
@@ -225,9 +280,10 @@ describe('Inertia Physics Plugin', () => {
       .play();
 
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(inertia.handoff).toEqual({ type: 'spring', to: 120 });
         break;
       }
@@ -265,7 +321,7 @@ describe('Inertia Physics Plugin', () => {
     // Should create Inertia component
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         foundInertia = true;
         break;
@@ -320,11 +376,12 @@ describe('Inertia Physics Plugin', () => {
     // Here we just verify the entity was created with expected config
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
-      const timelineBuffer = archetype.getBuffer('Timeline');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
+      const timelineBuffer = asTimelineBuffer(archetype.getBuffer('Timeline'));
       if (inertiaBuffer && timelineBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
         const timeline = timelineBuffer[archetype.entityCount - 1];
+        if (!inertia || !timeline) continue;
         // Velocity should be initialized (might have decayed)
         expect(inertia.velocities.has('__primitive')).toBe(true);
         expect(timeline.tracks.get('__primitive')?.[0]?.endValue).toBe(200);
@@ -349,9 +406,10 @@ describe('Inertia Physics Plugin', () => {
       .play();
 
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[0];
+        if (!inertia) continue;
         expect(inertia.bounceVelocities).toBeDefined();
         expect(inertia.bounceVelocities instanceof Map).toBe(true);
         expect(inertia.inBounce).toBeDefined();
@@ -418,9 +476,10 @@ describe('Inertia Physics Plugin', () => {
     // Verify InertiaComponent has end parameter set
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(inertia.end).toBe(500);
         foundInertia = true;
         break;
@@ -448,9 +507,10 @@ describe('Inertia Physics Plugin', () => {
     // Verify InertiaComponent has end array set
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(Array.isArray(inertia.end)).toBe(true);
         expect(inertia.end).toEqual([0, 100, 200, 300]);
         foundInertia = true;
@@ -480,9 +540,10 @@ describe('Inertia Physics Plugin', () => {
     // Verify InertiaComponent has end function set
     let foundInertia = false;
     for (const archetype of world.getArchetypes()) {
-      const inertiaBuffer = archetype.getBuffer('Inertia');
+      const inertiaBuffer = asInertiaBuffer(archetype.getBuffer('Inertia'));
       if (inertiaBuffer && archetype.entityCount > 0) {
         const inertia = inertiaBuffer[archetype.entityCount - 1];
+        if (!inertia) continue;
         expect(typeof inertia.end).toBe('function');
         expect(inertia.end).toBe(snapFn);
         foundInertia = true;

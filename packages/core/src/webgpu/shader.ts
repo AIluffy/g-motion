@@ -1,5 +1,6 @@
 import { CustomGpuEasing } from './custom-easing';
 import interpolationShaderCode from './shaders/interpolation.wgsl?raw';
+import { WebGPUConstants } from '../constants';
 
 // T031: Built-in WGSL Shader for Interpolation
 // Extended with Bezier curve support (Phase 1.1)
@@ -37,7 +38,7 @@ export const EASING_MODE = {
 } as const;
 
 // Keyframe data layout (10 floats per keyframe)
-export const KEYFRAME_STRIDE = 10;
+export const KEYFRAME_STRIDE = WebGPUConstants.BUFFER.STRIDE_KEYFRAME;
 
 /**
  * Pack keyframe data for GPU upload

@@ -6,6 +6,7 @@
 
 import { BatchBufferCache } from './buffer-cache';
 import { resetArchetypeBufferCache } from './archetype-buffer-cache';
+import type { Archetype } from '../../archetype';
 
 // Module-level caches and state
 const keyframesPackedCache = new Map<
@@ -15,8 +16,8 @@ const keyframesPackedCache = new Map<
 
 const entityIndicesScratchByArchetype = new Map<string, Int32Array>();
 
-const archetypeScratch: any[] = [];
-const pickedArchetypesScratch: any[] = [];
+const archetypeScratch: Archetype[] = [];
+const pickedArchetypesScratch: Archetype[] = [];
 
 let archetypeCursor = 0;
 let frameId = 0;
@@ -35,11 +36,11 @@ export function getEntityIndicesScratchByArchetype(): Map<string, Int32Array> {
   return entityIndicesScratchByArchetype;
 }
 
-export function getArchetypeScratch(): any[] {
+export function getArchetypeScratch(): Archetype[] {
   return archetypeScratch;
 }
 
-export function getPickedArchetypesScratch(): any[] {
+export function getPickedArchetypesScratch(): Archetype[] {
   return pickedArchetypesScratch;
 }
 

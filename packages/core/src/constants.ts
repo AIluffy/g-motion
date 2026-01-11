@@ -4,6 +4,9 @@
  * Centralizes magic numbers to improve code readability and maintainability
  */
 
+import { SchedulingConstants } from './constants/scheduling';
+import { WebGPUConstants } from './constants/webgpu';
+
 /**
  * Archetype default settings
  */
@@ -14,18 +17,16 @@ export const ARCHETYPE_DEFAULTS = {
   GROWTH_FACTOR: 2,
 } as const;
 
+export { SchedulingConstants, WebGPUConstants };
+
 /**
  * WebGPU workgroup size hints for optimal GPU utilization
  */
 export const WEBGPU_WORKGROUPS = {
-  /** Small batches (< 64 entities) */
-  SMALL: 16,
-  /** Medium batches (< 256 entities) */
-  MEDIUM: 32,
-  /** Large batches (< 1024 entities) */
-  LARGE: 64,
-  /** Extra large batches (>= 1024 entities) */
-  XLARGE: 128,
+  SMALL: WebGPUConstants.WORKGROUP.SIZE_SMALL,
+  MEDIUM: WebGPUConstants.WORKGROUP.SIZE_MEDIUM,
+  LARGE: WebGPUConstants.WORKGROUP.SIZE_LARGE,
+  XLARGE: WebGPUConstants.WORKGROUP.SIZE_XLARGE,
 } as const;
 
 /**
@@ -36,7 +37,7 @@ export const SCHEDULER_LIMITS = {
    * Maximum frame delta time to prevent spiraling on lag spikes
    * (e.g., when tab is in background)
    */
-  MAX_FRAME_TIME_MS: 100,
+  MAX_FRAME_TIME_MS: SchedulingConstants.MAX_FRAME_TIME_MS,
 } as const;
 
 /**

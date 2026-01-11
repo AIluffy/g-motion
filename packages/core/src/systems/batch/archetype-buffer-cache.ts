@@ -36,6 +36,8 @@ export interface CachedArchetypeBuffers {
   lastAccessFrame: number;
 }
 
+import type { Archetype } from '../../archetype';
+
 /**
  * Archetype Buffer Cache Manager
  *
@@ -53,7 +55,7 @@ export class ArchetypeBufferCache {
    * @param archetype - Archetype to get buffers for
    * @returns Cached buffers or undefined if cache miss
    */
-  getBuffers(archetype: any): CachedArchetypeBuffers | undefined {
+  getBuffers(archetype: Archetype): CachedArchetypeBuffers | undefined {
     const cached = this.cache.get(archetype.id);
 
     // Cache hit: validate version
@@ -79,7 +81,7 @@ export class ArchetypeBufferCache {
    * @param buffers - Buffers to cache
    */
   setBuffers(
-    archetype: any,
+    archetype: Archetype,
     buffers: Omit<CachedArchetypeBuffers, 'archetypeVersion' | 'lastAccessFrame'>,
   ): void {
     const cached: CachedArchetypeBuffers = {

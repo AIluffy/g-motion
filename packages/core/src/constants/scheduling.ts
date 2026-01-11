@@ -1,0 +1,7 @@
+export const SchedulingConstants = {
+  MAX_FRAME_TIME_MS: 100,
+  DEFAULT_SAMPLING_FPS: 60,
+  DEFAULT_KEYFRAME_INTERVAL_MS: 16,
+  FRAME_BUDGET_MS_DEFAULT: 12,
+  WORK_SLICING_ENABLED: true,
+} as const;

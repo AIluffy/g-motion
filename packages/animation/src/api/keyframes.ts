@@ -1,7 +1,10 @@
 import { TimelineData, Keyframe } from '@g-motion/core';
+import { createDebugger } from '@g-motion/utils';
 import { ResolvedMarkOptions, TargetType } from './mark';
 import type { VisualTarget } from './visualTarget';
 import { defaultRegistry } from '../values/registry';
+
+const warn = createDebugger('Keyframes', 'warn');
 
 const domTransformKeys = new Set([
   'x',
@@ -88,9 +91,7 @@ function addPrimitiveKeyframe(
       track.push(kf);
       return;
     }
-    if (typeof console !== 'undefined') {
-      console.warn('[Motion] Skipping primitive keyframe: invalid end value', resolved.to);
-    }
+    warn('Skipping primitive keyframe: invalid end value', resolved.to);
     return;
   }
 
@@ -116,9 +117,7 @@ function addDOMKeyframes(
 
       const num = typeof endVal === 'string' ? parseFloat(endVal) : Number(endVal);
       if (!Number.isFinite(num)) {
-        if (typeof console !== 'undefined') {
-          console.warn('[Motion] Skipping DOM keyframe: invalid end value', key, endVal);
-        }
+        warn('Skipping DOM keyframe: invalid end value', key, endVal);
         continue;
       }
 
@@ -140,9 +139,7 @@ function addDOMKeyframes(
 
     const parser = defaultRegistry.detect(endVal);
     if (!parser) {
-      if (typeof console !== 'undefined') {
-        console.warn('[Motion] Skipping DOM keyframe: unsupported value', key, endVal);
-      }
+      warn('Skipping DOM keyframe: unsupported value', key, endVal);
       continue;
     }
 
@@ -171,9 +168,7 @@ function addObjectKeyframes(
 
       const num = typeof endVal === 'string' ? parseFloat(endVal) : Number(endVal);
       if (!Number.isFinite(num)) {
-        if (typeof console !== 'undefined') {
-          console.warn('[Motion] Skipping object keyframe: invalid end value', key, endVal);
-        }
+        warn('Skipping object keyframe: invalid end value', key, endVal);
         continue;
       }
 
@@ -195,9 +190,7 @@ function addObjectKeyframes(
 
     const parser = defaultRegistry.detect(endVal);
     if (!parser) {
-      if (typeof console !== 'undefined') {
-        console.warn('[Motion] Skipping object keyframe: unsupported value', key, endVal);
-      }
+      warn('Skipping object keyframe: unsupported value', key, endVal);
       continue;
     }
 

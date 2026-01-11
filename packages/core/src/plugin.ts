@@ -86,6 +86,23 @@ export interface MotionAppConfig {
   gpuOnlyInterpolation?: boolean;
 
   keyframeSearchOptimized?: boolean;
+
+  metricsSamplingRate?: number;
+
+  debugWebGPUIO?: boolean;
+  debug?: {
+    webgpuIO?: boolean;
+    physicsValidation?: boolean;
+  };
+
+  webgpuCulling?: {
+    enabled?: boolean;
+    viewport?: boolean;
+    async?: boolean;
+  };
+
+  physicsMaxVelocity?: number;
+  physicsValidation?: boolean;
 }
 
 export interface EngineServices {

@@ -7,6 +7,8 @@
  * and performance monitoring for compute shader execution.
  */
 
+import { SchedulingConstants } from '../constants/scheduling';
+
 /**
  * GPU-CPU synchronization event
  */
@@ -151,7 +153,9 @@ Performance Report:
    * @param frameBudgetMs - Frame time threshold (default 12ms for 60fps with headroom)
    * @returns true if should fallback to CPU
    */
-  shouldFallbackToCPU(frameBudgetMs: number = 12): boolean {
+  shouldFallbackToCPU(
+    frameBudgetMs: number = SchedulingConstants.FRAME_BUDGET_MS_DEFAULT,
+  ): boolean {
     if (this.metrics.totalTime === 0) return false;
     return this.metrics.totalTime > frameBudgetMs;
   }

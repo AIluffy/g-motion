@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { motion } from '@g-motion/animation';
 import { WorldProvider, app, MotionStatus } from '@g-motion/core';
 import { SpringPlugin } from '../src/index';
@@ -11,6 +11,10 @@ describe('Spring Physics Plugin', () => {
     global.requestAnimationFrame = (cb) =>
       setTimeout(() => cb(performance.now()), 16) as unknown as number;
     global.cancelAnimationFrame = (id) => clearTimeout(id);
+  });
+
+  beforeEach(() => {
+    WorldProvider.useWorld().resetState();
   });
 
   it('creates SpringComponent when spring option is provided', () => {
@@ -28,9 +32,16 @@ describe('Spring Physics Plugin', () => {
   it('uses default spring parameters when not specified', () => {
     const world = WorldProvider.useWorld();
 
-    motion('#test-element-2')
-      .mark([{ to: { x: 100 }, spring: {} }])
-      .play();
+    const el = document.createElement('div');
+    el.id = 'test-element-2';
+    document.body.appendChild(el);
+    try {
+      motion('#test-element-2')
+        .mark([{ to: { x: 100 }, spring: {} }])
+        .play();
+    } finally {
+      document.body.removeChild(el);
+    }
 
     // Find entity with Spring component (get last one created)
     let foundSpring = false;

@@ -5,7 +5,7 @@
  * Returns a promise for the readback operation.
  */
 
-import type { ArchetypeBatchDescriptor } from '../../../types';
+import type { ViewportCullingBatchDescriptor } from '../../../types';
 import { ENTITY_BOUNDS_STRIDE, RENDER_STATE_EX_STRIDE } from './culling-types';
 import {
   getScratch,
@@ -21,7 +21,7 @@ export async function runViewportCullingCompactionPassAsync(
   queue: GPUQueue,
   world: any,
   archetypeId: string,
-  batch: ArchetypeBatchDescriptor,
+  batch: ViewportCullingBatchDescriptor,
   rawOutputBuffer: GPUBuffer,
   rawStride: number,
 ): Promise<{
@@ -147,7 +147,9 @@ export async function runViewportCullingCompactionPassAsync(
   }
 
   const frustumF32 = getFrustumBuffer();
-  updateFrustumBuffer(frustumF32);
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 0;
+  const viewportH = typeof window !== 'undefined' ? window.innerHeight : 0;
+  updateFrustumBuffer(frustumF32, viewportW, viewportH);
   resetParamsBuffer(rawStride);
 
   const renderStatesGPU = device.createBuffer({

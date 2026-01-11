@@ -3,10 +3,18 @@ import type { AppContext } from './context.js';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors.js';
 
 const debug = createDebugger('ErrorHandler');
+const warn = createDebugger('ErrorHandler', 'warn');
+const errorLog = createDebugger('ErrorHandler', 'error');
 
 export type ErrorListener = (error: MotionError) => void;
 
 export type ErrorScope = 'gpu' | 'batch' | 'system' | 'animation' | 'config' | 'unknown';
+
+export type LogContext = Record<string, unknown> | undefined;
+
+export interface SeverityHandler {
+  handle(error: MotionError, context: LogContext): void;
+}
 
 export interface ErrorMonitorEvent {
   code: ErrorCode;
@@ -112,7 +120,6 @@ class InMemoryErrorMonitor {
       prev.count += 1;
       prev.lastTimestamp = event.timestamp;
     }
-    this.syncToGlobal(event);
   }
 
   getEvents(): ErrorMonitorEvent[] {
@@ -126,19 +133,6 @@ class InMemoryErrorMonitor {
   clear(): void {
     this.events = [];
     this.aggregates.clear();
-  }
-
-  private syncToGlobal(event: ErrorMonitorEvent): void {
-    if (typeof globalThis === 'undefined') return;
-    const g = globalThis as any;
-    if (!Array.isArray(g.__motionErrors)) {
-      g.__motionErrors = [];
-    }
-    g.__motionErrors.push(event);
-    const limit = this.maxEvents;
-    if (g.__motionErrors.length > limit) {
-      g.__motionErrors.splice(0, g.__motionErrors.length - limit);
-    }
   }
 }
 
@@ -166,9 +160,11 @@ export function __resetErrorMonitorForTests(): void {
 export class ErrorHandler {
   private listeners = new Set<ErrorListener>();
   private context: AppContext;
+  private severityHandlers = new Map<ErrorSeverity, SeverityHandler>();
 
   constructor(context: AppContext) {
     this.context = context;
+    this.registerDefaultSeverityHandlers();
     try {
       const monitor = getErrorMonitor();
       const listener = createErrorMonitorListener((event) => {
@@ -233,6 +229,10 @@ export class ErrorHandler {
     this.listeners.delete(listener);
   }
 
+  registerSeverityHandler(severity: ErrorSeverity, handler: SeverityHandler): void {
+    this.severityHandlers.set(severity, handler);
+  }
+
   /**
    * Get current number of registered listeners
    */
@@ -249,7 +249,7 @@ export class ErrorHandler {
         listener(error);
       } catch (listenerError) {
         // Prevent listener errors from breaking error handling
-        console.error('[ErrorHandler] Listener error:', listenerError);
+        errorLog('Listener error:', listenerError);
       }
     });
   }
@@ -284,23 +284,39 @@ export class ErrorHandler {
     debug('GPU fallback triggered - switching to CPU path', error.context);
   }
 
+  private registerDefaultSeverityHandlers(): void {
+    this.severityHandlers.set(ErrorSeverity.FATAL, {
+      handle: (error, context) => {
+        errorLog(error.message, context);
+      },
+    });
+    this.severityHandlers.set(ErrorSeverity.ERROR, {
+      handle: (error, context) => {
+        errorLog(error.message, context);
+      },
+    });
+    this.severityHandlers.set(ErrorSeverity.WARNING, {
+      handle: (error, context) => {
+        warn(error.message, context);
+      },
+    });
+    this.severityHandlers.set(ErrorSeverity.INFO, {
+      handle: (error, context) => {
+        debug(error.message, context);
+      },
+    });
+  }
+
   /**
    * Log error with appropriate level based on severity
    */
   private logError(error: MotionError): void {
     const logContext = error.context ? error.context : undefined;
-
-    switch (error.severity) {
-      case ErrorSeverity.FATAL:
-      case ErrorSeverity.ERROR:
-        console.error(error.message, logContext);
-        break;
-      case ErrorSeverity.WARNING:
-        console.warn(error.message, logContext);
-        break;
-      case ErrorSeverity.INFO:
-        debug(error.message, logContext);
-        break;
+    const handler = this.severityHandlers.get(error.severity);
+    if (handler) {
+      handler.handle(error, logContext);
+      return;
     }
+    warn(error.message, logContext);
   }
 }

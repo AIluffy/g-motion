@@ -1,4 +1,7 @@
 import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/core';
+import { createDebugger } from '@g-motion/utils';
+
+const warn = createDebugger('Validation', 'warn');
 
 const SUPPORTED_INTERP = new Set(['linear', 'bezier', 'hold', 'autoBezier', 'spring', 'inertia']);
 
@@ -79,8 +82,8 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
       );
     }
     // Warn if both time and duration provided (time takes precedence)
-    if (options.duration !== undefined && typeof console !== 'undefined') {
-      console.warn(
+    if (options.duration !== undefined) {
+      warn(
         `[Motion] Mark has both 'time' (absolute) and 'duration' (relative). Using 'time', ignoring 'duration'.`,
       );
     }

@@ -1,4 +1,7 @@
 import { WorldProvider } from '@g-motion/core';
+import { createDebugger } from '@g-motion/utils';
+
+const warn = createDebugger('Engine', 'warn');
 
 /**
  * Global engine configuration object for controlling animation behavior
@@ -108,9 +111,8 @@ class EngineConfig {
    * Use forceGpu('never') to disable GPU acceleration.
    */
   setGpuThreshold(threshold: number): void {
-    console.warn(
-      '[Motion Engine] setGpuThreshold is deprecated. GPU is now enabled by default. ' +
-        "Use forceGpu('never') to disable GPU acceleration.",
+    warn(
+      "setGpuThreshold is deprecated. GPU is now enabled by default. Use forceGpu('never') to disable GPU acceleration.",
     );
     // Keep for backward compatibility but no-op
     const world = this.getWorld();

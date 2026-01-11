@@ -8,6 +8,7 @@
 import springShaderCode from './shaders/physics-spring.wgsl?raw';
 import inertiaShaderCode from './shaders/physics-inertia.wgsl?raw';
 import physicsCombinedShaderCode from './shaders/physics-combined.wgsl?raw';
+import { WebGPUConstants } from '../constants';
 
 // WGSL shader for Spring physics
 export const SPRING_SHADER = springShaderCode;
@@ -53,10 +54,10 @@ export interface PhysicsSimParams {
 }
 
 // Data layout constants
-export const SPRING_STATE_STRIDE = 8;
-export const INERTIA_STATE_STRIDE = 8;
-export const PHYSICS_STATE_STRIDE = 16;
-export const SIM_PARAMS_SIZE = 16; // 4 floats
+export const SPRING_STATE_STRIDE = WebGPUConstants.BUFFER.STRIDE_SPRING_STATE;
+export const INERTIA_STATE_STRIDE = WebGPUConstants.BUFFER.STRIDE_INERTIA_STATE;
+export const PHYSICS_STATE_STRIDE = WebGPUConstants.BUFFER.STRIDE_PHYSICS_STATE;
+export const SIM_PARAMS_SIZE = WebGPUConstants.BUFFER.STRIDE_SIM_PARAMS_FLOATS * 4;
 
 /**
  * Pack spring states for GPU upload
@@ -104,8 +105,8 @@ export function packInertiaStates(inertias: InertiaStateData[]): Float32Array {
 export function packSimParams(params: PhysicsSimParams): Float32Array {
   return new Float32Array([
     params.deltaTime,
-    params.maxVelocity ?? 10000,
-    params.settleThreshold ?? 0.001,
+    params.maxVelocity ?? WebGPUConstants.GPU.PHYSICS_MAX_VELOCITY_DEFAULT,
+    params.settleThreshold ?? WebGPUConstants.GPU.PHYSICS_SETTLE_THRESHOLD_DEFAULT,
     0, // padding
   ]);
 }

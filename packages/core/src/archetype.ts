@@ -6,6 +6,35 @@ import { ARCHETYPE_DEFAULTS } from './constants';
  */
 type ComponentValue = unknown;
 
+export type ArchetypeTypedBuffer = Float32Array | Float64Array | Int32Array;
+
+export class TypedBufferFactory {
+  private factories = new Map<ComponentType, (cap: number) => ArchetypeTypedBuffer>();
+
+  register(type: ComponentType, factory: (cap: number) => ArchetypeTypedBuffer): void {
+    this.factories.set(type, factory);
+  }
+
+  has(type: ComponentType): boolean {
+    return this.factories.has(type);
+  }
+
+  create(type: ComponentType, cap: number): ArchetypeTypedBuffer | null {
+    const factory = this.factories.get(type);
+    if (!factory) return null;
+    return factory(cap);
+  }
+}
+
+const typedBufferFactory = new TypedBufferFactory();
+typedBufferFactory.register('float32', (cap) => new Float32Array(cap));
+typedBufferFactory.register('float64', (cap) => new Float64Array(cap));
+typedBufferFactory.register('int32', (cap) => new Int32Array(cap));
+
+export function getTypedBufferFactory(): TypedBufferFactory {
+  return typedBufferFactory;
+}
+
 /**
  * Internal interface for BurstManager to access archetype internals
  * This avoids 'as any' casts while keeping implementation details private
@@ -22,7 +51,7 @@ export interface ArchetypeInternal {
 
 export class Archetype implements ArchetypeInternal {
   private buffers = new Map<string, Array<ComponentValue>>();
-  private typedBuffers = new Map<string, Float32Array | Float64Array | Int32Array>();
+  private typedBuffers = new Map<string, ArchetypeTypedBuffer>();
   private capacity: number = ARCHETYPE_DEFAULTS.INITIAL_CAPACITY;
   private count = 0;
   private entityIndices = new Map<number, number>(); // Entity ID -> Index
@@ -98,10 +127,7 @@ export class Archetype implements ArchetypeInternal {
     return this.buffers.get(name);
   }
 
-  getTypedBuffer(
-    componentName: string,
-    prop: string,
-  ): Float32Array | Float64Array | Int32Array | undefined {
+  getTypedBuffer(componentName: string, prop: string): ArchetypeTypedBuffer | undefined {
     return this.typedBuffers.get(this.makeTypedKey(componentName, prop));
   }
 
@@ -141,38 +167,22 @@ export class Archetype implements ArchetypeInternal {
       for (const [prop, type] of Object.entries(def.schema)) {
         if (!this.isNumericType(type)) continue;
         const key = this.makeTypedKey(compName, prop);
-        // Allocate correct typed array
-        let arr: Float32Array | Float64Array | Int32Array;
-        switch (type) {
-          case 'float32':
-            arr = new Float32Array(cap);
-            break;
-          case 'float64':
-            arr = new Float64Array(cap);
-            break;
-          case 'int32':
-            arr = new Int32Array(cap);
-            break;
-          default:
-            continue;
-        }
+        const arr = typedBufferFactory.create(type, cap);
+        if (!arr) continue;
         this.typedBuffers.set(key, arr);
       }
     }
   }
 
   private isNumericType(type: ComponentType): boolean {
-    return type === 'float32' || type === 'float64' || type === 'int32';
+    return typedBufferFactory.has(type);
   }
 
   private makeTypedKey(componentName: string, prop: string): string {
     return `${componentName}.${prop}`;
   }
 
-  private allocateTyped(
-    ref: Float32Array | Float64Array | Int32Array,
-    cap: number,
-  ): Float32Array | Float64Array | Int32Array {
+  private allocateTyped(ref: ArchetypeTypedBuffer, cap: number): ArchetypeTypedBuffer {
     if (ref instanceof Float32Array) return new Float32Array(cap);
     if (ref instanceof Float64Array) return new Float64Array(cap);
     return new Int32Array(cap);

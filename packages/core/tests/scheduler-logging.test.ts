@@ -126,6 +126,7 @@ describe('SystemScheduler Logging', () => {
 
         // Should have logged the error via ErrorHandler (WARNING severity)
         expect(consoleWarnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[Motion][ErrorHandler]'),
           expect.stringContaining("System 'ErrorSystem' update failed"),
           expect.objectContaining({ systemName: 'ErrorSystem' }),
         );

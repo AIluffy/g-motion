@@ -59,10 +59,7 @@ export function getFrustumBuffer(): Float32Array {
   return CACHED_FRUSTUM_F32;
 }
 
-export function updateFrustumBuffer(frustumF32: Float32Array): void {
-  const w = typeof (globalThis as any).innerWidth === 'number' ? (globalThis as any).innerWidth : 0;
-  const h =
-    typeof (globalThis as any).innerHeight === 'number' ? (globalThis as any).innerHeight : 0;
+export function updateFrustumBuffer(frustumF32: Float32Array, w: number, h: number): void {
   frustumF32.set(
     [1, 0, 0, 0, -1, 0, 0, w, 0, 1, 0, 0, 0, -1, 0, h, 0, 0, 1, 1e9, 0, 0, -1, 1e9],
     0,

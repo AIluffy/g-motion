@@ -1,5 +1,6 @@
 import { getErrorHandler } from '../context';
 import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
+import { WebGPUConstants } from '../constants/webgpu';
 
 export interface PendingReadback {
   archetypeId: string;
@@ -33,7 +34,7 @@ export interface PendingReadback {
 
 export class AsyncReadbackManager {
   private pending: PendingReadback[] = [];
-  private readonly defaultTimeoutMs = 100; // 100ms default timeout
+  private readonly defaultTimeoutMs: number = WebGPUConstants.GPU.DEFAULT_READBACK_TIMEOUT_MS;
 
   /**
    * Queue a readback that's already mapped

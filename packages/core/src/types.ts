@@ -160,7 +160,7 @@ export interface TransformData {
 export interface RenderData {
   rendererId: string;
   rendererCode?: number;
-  target: any;
+  target: unknown;
   props?: Record<string, number>;
   version?: number;
   renderedVersion?: number;
@@ -175,6 +175,20 @@ export interface MotionStateData {
   currentTime: number;
   playbackRate: number;
   iteration?: number;
+  delay?: number;
+  pausedAt?: number;
+  tickInterval?: number;
+  tickPhase?: number;
+  tickPriority?: number;
+}
+
+export interface TimelineComponentData {
+  tracks?: TimelineData;
+  duration?: number;
+  loop?: number | boolean;
+  repeat?: number;
+  version?: number;
+  rovingApplied?: number;
 }
 
 /**
@@ -190,21 +204,43 @@ export interface VelocityData {
  * Per-archetype batch descriptor for GPU processing
  * Supports per-archetype segmented buffers with adaptive workgroup sizing
  */
-export interface ArchetypeBatchDescriptor {
+export type PreprocessedKeyframes = {
+  rawKeyframesPerEntity: Float32Array[];
+  channelMapPerEntity: Uint32Array[];
+};
+
+export interface BatchDescriptor {
   archetypeId: string;
   entityIds: ArrayLike<number>;
   entityCount: number;
+}
+
+export interface LeasedBatchDescriptor extends BatchDescriptor {
   entityIdsLeaseId?: number;
-  statesData: Float32Array; // Flat: [st₀, ct₀, pr₀, s₀, st₁, ct₁, pr₁, s₁, ...]
-  keyframesData: Float32Array; // Flat: [t₀, dur₀, sv₀, ev₀, eid₀, ...]
-  keyframesVersion?: number; // P0-2: Version signature for fast change detection
-  workgroupHint: number; // 16, 32, 64, or 128 (adaptive based on entity count)
-  preprocessedKeyframes?: {
-    rawKeyframesPerEntity: Float32Array[];
-    channelMapPerEntity: Uint32Array[];
+}
+
+export interface WorkgroupBatchDescriptor extends LeasedBatchDescriptor {
+  workgroupHint: number;
+}
+
+export interface GPUBatchDescriptor extends WorkgroupBatchDescriptor {
+  statesData: Float32Array;
+  keyframesData: Float32Array;
+  keyframesVersion?: number;
+  preprocessedKeyframes?: PreprocessedKeyframes;
+  gpuBuffers?: {
+    statesBuffer: any;
+    keyframesBuffer: any;
+    outputBuffer: any;
   };
-  kind?: 'interpolation' | 'physics';
-  physics?: {
+  bindGroup?: any;
+  createdAt: number;
+  kind?: 'interpolation';
+}
+
+export interface PhysicsBatchDescriptor extends WorkgroupBatchDescriptor {
+  kind: 'physics';
+  physics: {
     baseArchetypeId: string;
     stride: number;
     channels: Array<{ index: number; property: string }>;
@@ -212,14 +248,33 @@ export interface ArchetypeBatchDescriptor {
     stateData?: Float32Array;
     stateVersion?: number;
   };
-  // Optional GPU resources (managed by WebGPUComputeSystem)
-  gpuBuffers?: {
-    statesBuffer: any; // GPUBuffer
-    keyframesBuffer: any; // GPUBuffer
-    outputBuffer: any; // GPUBuffer
-  };
-  bindGroup?: any; // GPUBindGroup
   createdAt: number;
+  statesData?: Float32Array;
+  keyframesData?: Float32Array;
+  keyframesVersion?: number;
+  preprocessedKeyframes?: PreprocessedKeyframes;
+  gpuBuffers?: {
+    statesBuffer: any;
+    keyframesBuffer: any;
+    outputBuffer: any;
+  };
+  bindGroup?: any;
+}
+
+export type ArchetypeBatchDescriptor = GPUBatchDescriptor | PhysicsBatchDescriptor;
+
+export type KeyframePreprocessBatchDescriptor = {
+  archetypeId: string;
+  preprocessedKeyframes: PreprocessedKeyframes;
+  keyframesVersion?: number;
+};
+
+export type GPUBatchWithPreprocessedKeyframes = GPUBatchDescriptor & {
+  preprocessedKeyframes: PreprocessedKeyframes;
+};
+
+export interface ViewportCullingBatchDescriptor extends LeasedBatchDescriptor {
+  statesData: Float32Array;
 }
 
 /**

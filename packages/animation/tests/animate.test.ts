@@ -1,12 +1,17 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { animate } from '../src';
 
 describe('animate syntax sugar', () => {
   beforeAll(() => {
+    vi.useFakeTimers();
     global.requestAnimationFrame = (cb) => {
       return setTimeout(() => cb(performance.now()), 16) as unknown as number;
     };
     global.cancelAnimationFrame = (id) => clearTimeout(id);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
   });
 
   it('animates a simple object with one-shot call', async () => {
@@ -16,7 +21,7 @@ describe('animate syntax sugar', () => {
 
     expect(control).toBeDefined();
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await vi.advanceTimersByTimeAsync(150);
 
     expect(target.opacity).toBeGreaterThan(0.9);
     expect(target.opacity).toBeLessThanOrEqual(1);
@@ -29,7 +34,7 @@ describe('animate syntax sugar', () => {
 
     expect(control).toBeDefined();
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await vi.advanceTimersByTimeAsync(200);
 
     expect(target.x).toBeGreaterThan(40);
     expect(target.x).toBeLessThan(60);
@@ -40,10 +45,10 @@ describe('animate syntax sugar', () => {
 
     animate(0 as any, { value: 10 }, { duration: 30, delay: 40, repeat: 1, onUpdate });
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await vi.advanceTimersByTimeAsync(30);
     expect(onUpdate).not.toHaveBeenCalled();
 
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await vi.advanceTimersByTimeAsync(120);
     expect(onUpdate).toHaveBeenCalled();
   });
 
@@ -52,7 +57,7 @@ describe('animate syntax sugar', () => {
 
     animate(0, 10, { duration: 50, onUpdate });
 
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await vi.advanceTimersByTimeAsync(120);
 
     expect(onUpdate).toHaveBeenCalled();
     const lastCall = onUpdate.mock.calls[onUpdate.mock.calls.length - 1][0];
@@ -68,17 +73,17 @@ describe('animate syntax sugar', () => {
 
     expect(control).toBeDefined();
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await vi.advanceTimersByTimeAsync(30);
     expect(target.x).toBeGreaterThan(0);
     expect(target.x).toBeLessThanOrEqual(100);
 
-    await new Promise((resolve) => setTimeout(resolve, 90));
+    await vi.advanceTimersByTimeAsync(90);
     expect(target.x).toBeGreaterThanOrEqual(0);
     expect(target.x).toBeLessThanOrEqual(100);
     expect(target.x).toBeGreaterThan(30);
     expect(target.x).toBeLessThan(80);
 
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await vi.advanceTimersByTimeAsync(120);
     expect(target.x).toBeGreaterThanOrEqual(0);
     expect(target.x).toBeLessThanOrEqual(10);
   });

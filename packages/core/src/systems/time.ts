@@ -11,11 +11,9 @@ export const TimeSystem: SystemDef = {
       return;
     }
 
-    // Apply global speed multiplier if set
-    const globalSpeed =
-      (ctx?.services.config as any)?.globalSpeed ?? (world.config as any).globalSpeed ?? 1;
-    const config = (ctx?.services.config ?? world.config) as any;
-    const samplingMode = (config.samplingMode ?? 'time') as 'time' | 'frame';
+    const config = ctx?.services.config ?? world.config;
+    const globalSpeed = config.globalSpeed ?? 1;
+    const samplingMode = config.samplingMode ?? 'time';
     const baseDt = samplingMode === 'frame' ? (ctx?.sampling?.deltaTimeMs ?? 0) : dt;
     const adjustedDt = baseDt * globalSpeed;
 

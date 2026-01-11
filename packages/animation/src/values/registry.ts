@@ -15,6 +15,9 @@ import {
   ParserRegistrationOptions,
   DetectionResult,
 } from './types';
+import { createDebugger } from '@g-motion/utils';
+
+const warn = createDebugger('ValueParserRegistry', 'warn');
 
 /**
  * Internal parser entry with priority
@@ -147,12 +150,12 @@ export class ValueParserRegistry {
     // Fallback: try string parser if available
     const stringParser = this.get(ValueType.String);
     if (stringParser) {
-      console.warn(`[ValueParserRegistry] Unknown value type, falling back to string: ${value}`);
+      warn('Unknown value type, falling back to string:', value);
       return stringParser.parse(value);
     }
 
     // No fallback available - return basic parsed value
-    console.warn(`[ValueParserRegistry] No parser found for value: ${value}`);
+    warn('No parser found for value:', value);
     return {
       type: ValueType.String,
       value: String(value),

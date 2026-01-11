@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { createDebugger } from '@g-motion/utils';
+
+const warn = createDebugger('Benchmark', 'warn');
+const errorLog = createDebugger('Benchmark', 'error');
+
 /**
  * Performance Benchmarking and Profiling Utilities
  *
@@ -65,7 +70,7 @@ export class ComputeBenchmark {
       try {
         await fn();
       } catch (e) {
-        console.warn(`[Benchmark] Warmup failed for '${name}':`, e);
+        warn(`Warmup failed for '${name}':`, e);
       }
     }
 
@@ -77,7 +82,7 @@ export class ComputeBenchmark {
       try {
         await fn();
       } catch (e) {
-        console.error(`[Benchmark] Iteration ${i} failed for '${name}':`, e);
+        errorLog(`Iteration ${i} failed for '${name}':`, e);
         continue;
       }
       const duration = performance.now() - start;
@@ -269,9 +274,7 @@ export class PerformanceProfiler {
     const endTime = this.marks.get(endMark);
 
     if (startTime === undefined || endTime === undefined) {
-      console.warn(
-        `[Profiler] Mark not found for measure '${name}' (start: ${startMark}, end: ${endMark})`,
-      );
+      warn(`Mark not found for measure '${name}' (start: ${startMark}, end: ${endMark})`);
       return -1;
     }
 

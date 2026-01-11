@@ -15,7 +15,7 @@ import {
   isStandardTransformChannels,
 } from '../../../webgpu/channel-mapping';
 import type { ChannelMapping } from '../../../webgpu/channel-mapping';
-import { isDev } from '@g-motion/utils';
+import { createDebugger, isDev } from '@g-motion/utils';
 import { getRendererCode } from '../../../renderer-code';
 import { MotionError, ErrorCode, ErrorSeverity } from '../../../errors';
 import {
@@ -25,6 +25,8 @@ import {
   packedRGBAToCSS,
   unpackHalf2,
 } from './transform-utils';
+
+const warn = createDebugger('GPUResultApplySystem', 'warn');
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
@@ -312,7 +314,7 @@ export const GPUResultApplySystem: SystemDef = {
               try {
                 value = channelMap.transform(value);
               } catch (e) {
-                console.warn('[GPUResultApplySystem] Channel transform error', e);
+                warn('Channel transform error', e);
               }
             }
             if (typeof channelMap.unpackAndAssign === 'function') {
@@ -540,7 +542,7 @@ export const GPUResultApplySystem: SystemDef = {
               try {
                 value = channelMap.transform(value);
               } catch (e) {
-                console.warn('[GPUResultApplySystem] Channel transform error', e);
+                warn('Channel transform error', e);
               }
             }
             if (typeof channelMap.unpackAndAssign === 'function') {

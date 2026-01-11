@@ -5,7 +5,7 @@
  * Organizes keyframes into a format optimized for the search and interpolation passes.
  */
 
-import type { ArchetypeBatchDescriptor } from '../../../types';
+import type { KeyframePreprocessBatchDescriptor } from '../../../types';
 import {
   CHANNEL_MAP_STRIDE,
   PACKED_KEYFRAME_STRIDE,
@@ -18,7 +18,7 @@ import type { KeyframePreprocessResult } from './types';
 export async function runKeyframePreprocessPass(
   device: GPUDevice,
   queue: GPUQueue,
-  batch: ArchetypeBatchDescriptor,
+  batch: KeyframePreprocessBatchDescriptor,
 ): Promise<KeyframePreprocessResult | null> {
   const preprocessed = batch.preprocessedKeyframes;
   if (!preprocessed) {

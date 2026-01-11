@@ -1,5 +1,8 @@
-import { isDev } from '@g-motion/utils';
+import { createDebugger, isDev } from '@g-motion/utils';
 import type { OutputFormatPoolStats } from '../systems/webgpu/output-format';
+
+const debug = createDebugger('GPUMetrics');
+const warn = createDebugger('GPUMetrics', 'warn');
 
 export interface GPUBatchStatus {
   enabled: boolean;
@@ -92,14 +95,9 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   private systemTimings = new Map<string, SystemTimingStat>();
   private readonly MAX_METRICS = 100;
   private readonly MAX_SYSTEM_TIMINGS = 64;
-  private syncToGlobalEnabled = false;
   private memoryHistory: GPUMemoryStats[] = [];
   private readonly MAX_MEMORY_HISTORY = 300;
   private lastMemoryLogTime = 0;
-
-  enableGlobalSync(enabled: boolean): void {
-    this.syncToGlobalEnabled = enabled;
-  }
 
   getStatus(): GPUBatchStatus {
     return this.status;
@@ -122,9 +120,6 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
     if (this.metrics.length > this.MAX_METRICS) {
       this.metrics.shift();
     }
-
-    // Sync to global for UI
-    this.syncToGlobal(metric);
   }
 
   recordSystemTiming(name: string, durationMs: number): void {
@@ -186,20 +181,12 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
         memoryAlertActive: true,
       };
       if (isDev()) {
-        console.warn('Motion GPU memory usage exceeded threshold', {
+        warn('GPU memory usage exceeded threshold', {
           usage: snapshot.currentMemoryUsage,
           peak: snapshot.peakMemoryUsage,
           threshold,
         });
       }
-      const g = globalThis as any;
-      if (!Array.isArray(g.__motionGPUMemoryAlerts)) {
-        g.__motionGPUMemoryAlerts = [];
-      }
-      g.__motionGPUMemoryAlerts.push({
-        ...snapshot,
-        threshold,
-      });
     } else if (this.status.memoryAlertActive) {
       this.status = {
         ...this.status,
@@ -213,9 +200,7 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
     }
     if (now - this.lastMemoryLogTime >= 5000) {
       this.lastMemoryLogTime = now;
-      if (typeof console !== 'undefined' && console.log) {
-        console.log('Motion GPU memory stats', snapshot);
-      }
+      debug('GPU memory stats', snapshot);
     }
   }
 
@@ -250,21 +235,6 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
         dispatchCount: count,
         entityCount: metric.entityCount,
       });
-    }
-  }
-
-  private syncToGlobal(metric: GPUBatchMetric): void {
-    if (!this.syncToGlobalEnabled) return;
-    if (typeof globalThis === 'undefined') return;
-
-    const g = globalThis as any;
-    if (!Array.isArray(g.__motionGPUMetrics)) {
-      g.__motionGPUMetrics = [];
-    }
-    g.__motionGPUMetrics.push(metric);
-
-    if (g.__motionGPUMetrics.length > this.MAX_METRICS) {
-      g.__motionGPUMetrics.splice(0, g.__motionGPUMetrics.length - this.MAX_METRICS);
     }
   }
 
@@ -320,37 +290,11 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
 }
 
 let provider: GPUMetricsProvider | null = null;
-let legacyWarningIssued = false;
-let globalSyncEnabled = false;
-
-function seedFromLegacyIfPresent(target: GPUMetricsProvider): void {
-  const g = globalThis as any;
-  if (!g.__motionThresholdContext && !g.__motionGPUMetrics && g.__webgpuInitialized === undefined) {
-    return;
-  }
-
-  target.seedFromLegacy({
-    status: g.__motionThresholdContext,
-    metrics: Array.isArray(g.__motionGPUMetrics) ? g.__motionGPUMetrics : undefined,
-    gpuInitialized: g.__webgpuInitialized,
-  });
-
-  // Warn once in development about legacy globals
-  if (isDev() && !legacyWarningIssued) {
-    console.warn(
-      'Motion detected legacy globals (__motionThresholdContext, __motionGPUMetrics, __webgpuInitialized). ' +
-        'These will be deprecated in future versions. Please migrate to the new API.',
-    );
-    legacyWarningIssued = true;
-  }
-}
 
 export function getGPUMetricsProvider(): GPUMetricsProvider {
   if (!provider) {
     const impl = new InMemoryGPUMetricsProvider();
-    impl.enableGlobalSync(globalSyncEnabled);
     provider = impl;
-    seedFromLegacyIfPresent(provider);
   }
   return provider;
 }
@@ -359,14 +303,6 @@ export function setGPUMetricsProvider(customProvider: GPUMetricsProvider): void 
   provider = customProvider;
 }
 
-export function setGPUGlobalMetricsSyncEnabled(enabled: boolean): void {
-  globalSyncEnabled = enabled;
-  if (provider && provider instanceof InMemoryGPUMetricsProvider) {
-    provider.enableGlobalSync(enabled);
-  }
-}
-
 export function __resetGPUMetricsProviderForTests(): void {
   provider = null;
-  legacyWarningIssued = false;
 }

@@ -1,3 +1,5 @@
+import { SchedulingConstants } from '../constants/scheduling';
+
 export type FrameSamplerConfig = {
   samplingFps?: number;
   targetFps?: number;
@@ -16,8 +18,13 @@ export class FrameSampler {
   private lastFrame = 0;
 
   compute(elapsedMs: number, config: FrameSamplerConfig): FrameSamplingState {
-    const samplingFps = Number(config.samplingFps ?? config.targetFps ?? 60);
-    const fps = Number.isFinite(samplingFps) && samplingFps > 0 ? samplingFps : 60;
+    const samplingFps = Number(
+      config.samplingFps ?? config.targetFps ?? SchedulingConstants.DEFAULT_SAMPLING_FPS,
+    );
+    const fps =
+      Number.isFinite(samplingFps) && samplingFps > 0
+        ? samplingFps
+        : SchedulingConstants.DEFAULT_SAMPLING_FPS;
     const framePosition = (elapsedMs * fps) / 1000;
     const frame = Math.floor(framePosition + 1e-9);
 

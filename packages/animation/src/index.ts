@@ -25,14 +25,9 @@ import type { DomAnimationScope } from './api/control';
 import { registerControlWithScope, AnimationControl } from './api/control';
 import { isVisualTargetCached } from './api/visualTarget';
 
-let initialized = false;
 const debug = createDebugger('Animation');
 
-function initEngine() {
-  if (initialized) return;
-  initialized = true;
-
-  const world = WorldProvider.useWorld();
+function initEngine(world: World) {
   getEngineForWorld(world);
 
   if (typeof (world as any).addMotionStatusListener === 'function') {
@@ -48,6 +43,7 @@ function initEngine() {
           nextStatus: number;
         }) => {
           AnimationControl.handleMotionStatusChange(
+            world,
             entityId,
             prevStatus as MotionStatus | undefined,
             nextStatus as MotionStatus,
@@ -58,8 +54,11 @@ function initEngine() {
     }
   }
 
-  debug('Initializing engine, registering systems');
-  registerAnimationSystems(world);
+  if (!(world as any).__animationSystemsRegistered) {
+    debug('Initializing engine, registering systems');
+    registerAnimationSystems(world);
+    (world as any).__animationSystemsRegistered = true;
+  }
 }
 
 /**
@@ -160,7 +159,8 @@ export function inspectTargets(
 }
 
 export const motion = (target: any, options?: MotionOptions) => {
-  initEngine();
+  const world = WorldProvider.useWorld();
+  initEngine(world);
   const root = typeof document !== 'undefined' ? document : null;
   const builderTarget = normalizeTargets(target, root, options);
   return builderMotion(builderTarget);
@@ -171,7 +171,8 @@ type ScopedMotionFn = ((target: any) => ReturnType<typeof builderMotion>) & {
 };
 
 export function createScopedMotion(root: Element): ScopedMotionFn {
-  initEngine();
+  const world = WorldProvider.useWorld();
+  initEngine(world);
   const scope: DomAnimationScope = {
     root,
     animations: [],

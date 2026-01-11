@@ -221,7 +221,11 @@ describe('ErrorHandler', () => {
       });
 
       expect(() => handler.handle(error)).toThrow();
-      expect(consoleError).toHaveBeenCalledWith('[INVALID_CONFIG] Fatal', { key: 'value' });
+      expect(consoleError).toHaveBeenCalledWith(
+        '[Motion][ErrorHandler]',
+        '[INVALID_CONFIG] Fatal',
+        { key: 'value' },
+      );
 
       consoleError.mockRestore();
     });
@@ -288,7 +292,32 @@ describe('ErrorHandler', () => {
       const error = new MotionError('Test', ErrorCode.SYSTEM_UPDATE_FAILED, ErrorSeverity.WARNING);
       handler.handle(error);
 
-      expect(consoleWarn).toHaveBeenCalledWith('[SYSTEM_UPDATE_FAILED] Test', undefined);
+      expect(consoleWarn).toHaveBeenCalledWith(
+        '[Motion][ErrorHandler]',
+        '[SYSTEM_UPDATE_FAILED] Test',
+        undefined,
+      );
+
+      consoleWarn.mockRestore();
+    });
+  });
+
+  describe('Severity Handlers', () => {
+    it('should allow overriding severity handler behavior', () => {
+      const custom = vi.fn();
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      handler.registerSeverityHandler(ErrorSeverity.WARNING, {
+        handle: (error, context) => {
+          custom(error, context);
+        },
+      });
+
+      const error = new MotionError('Test', ErrorCode.SYSTEM_UPDATE_FAILED, ErrorSeverity.WARNING);
+      handler.handle(error);
+
+      expect(custom).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).not.toHaveBeenCalled();
 
       consoleWarn.mockRestore();
     });

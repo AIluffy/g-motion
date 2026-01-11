@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
-import { ArchetypeBatchDescriptor } from '../../types';
+import type { GPUBatchDescriptor } from '../../types';
 import { getPipelineForWorkgroup, selectWorkgroupSize } from './pipeline';
 import type { TimingHelper } from '../../webgpu/timing-helper';
 import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-manager';
@@ -24,7 +24,7 @@ import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-ma
 export async function dispatchGPUBatch(
   device: GPUDevice,
   queue: GPUQueue,
-  batch: ArchetypeBatchDescriptor,
+  batch: GPUBatchDescriptor,
   timingHelper: TimingHelper | null,
   archetypeId: string,
   channelCount: number,

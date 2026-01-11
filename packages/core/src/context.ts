@@ -2,26 +2,60 @@ import { ComputeBatchProcessor } from './systems/batch';
 import { BatchContext } from './types';
 import { ErrorHandler } from './error-handler.js';
 
+export type BatchProcessorFactory = (options?: { maxBatchSize?: number }) => ComputeBatchProcessor;
+export type ErrorHandlerFactory = (context: AppContext) => ErrorHandler;
+
+export interface AppContextFactories {
+  createBatchProcessor?: BatchProcessorFactory;
+  createErrorHandler?: ErrorHandlerFactory;
+}
+
 /**
  * Application-level context for managing singleton services and shared state.
  * This replaces the previous globalThis-based approach with proper dependency injection.
  */
 export class AppContext {
-  private static instance: AppContext;
+  private static instance: AppContext | null = null;
+  private static defaultFactories: Required<AppContextFactories> =
+    AppContext.buildDefaultFactories();
 
   private batchProcessor: ComputeBatchProcessor | null = null;
   private batchContext: BatchContext = {};
   private webgpuInitialized = false;
   private errorHandler: ErrorHandler | null = null;
 
-  private constructor() {}
+  private factories: Required<AppContextFactories>;
+
+  private constructor(factories: Required<AppContextFactories>) {
+    this.factories = factories;
+  }
+
+  private static buildDefaultFactories(): Required<AppContextFactories> {
+    return {
+      createBatchProcessor: (options) =>
+        new ComputeBatchProcessor({
+          maxBatchSize: options?.maxBatchSize ?? 1024,
+        }),
+      createErrorHandler: (context) => new ErrorHandler(context),
+    };
+  }
+
+  static configure(options: { factories?: AppContextFactories }): void {
+    if (options.factories) {
+      AppContext.defaultFactories = {
+        ...AppContext.defaultFactories,
+        ...options.factories,
+      };
+      AppContext.instance?.setFactories(options.factories);
+    }
+  }
 
   /**
    * Get the singleton AppContext instance
    */
   static getInstance(): AppContext {
     if (!AppContext.instance) {
-      AppContext.instance = new AppContext();
+      AppContext.instance = new AppContext(AppContext.defaultFactories);
     }
     return AppContext.instance;
   }
@@ -31,11 +65,16 @@ export class AppContext {
    */
   getBatchProcessor(options?: { maxBatchSize?: number }): ComputeBatchProcessor {
     if (!this.batchProcessor) {
-      this.batchProcessor = new ComputeBatchProcessor({
-        maxBatchSize: options?.maxBatchSize ?? 1024,
-      });
+      this.batchProcessor = this.factories.createBatchProcessor(options);
     }
     return this.batchProcessor;
+  }
+
+  setFactories(factories: AppContextFactories): void {
+    this.factories = {
+      ...this.factories,
+      ...factories,
+    };
   }
 
   /**
@@ -85,7 +124,7 @@ export class AppContext {
    */
   getErrorHandler(): ErrorHandler {
     if (!this.errorHandler) {
-      this.errorHandler = new ErrorHandler(this);
+      this.errorHandler = this.factories.createErrorHandler(this);
     }
     return this.errorHandler;
   }
@@ -101,7 +140,8 @@ export class AppContext {
    * Reset the singleton (useful for testing)
    */
   static reset(): void {
-    AppContext.instance = null as any;
+    AppContext.instance?.dispose();
+    AppContext.instance = null;
   }
 
   dispose(): void {

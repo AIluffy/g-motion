@@ -3,7 +3,6 @@ import {
   getGPUMetricsProvider,
   setGPUMetricsProvider,
   __resetGPUMetricsProviderForTests,
-  setGPUGlobalMetricsSyncEnabled,
 } from '../src/webgpu/metrics-provider';
 
 const legacyStatus = {
@@ -19,9 +18,6 @@ describe('GPUMetricsProvider', () => {
 
   beforeEach(() => {
     __resetGPUMetricsProviderForTests();
-    delete (globalThis as any).__motionThresholdContext;
-    delete (globalThis as any).__motionGPUMetrics;
-    delete (globalThis as any).__webgpuInitialized;
     process.env.NODE_ENV = 'development';
     vi.restoreAllMocks();
   });
@@ -87,7 +83,6 @@ describe('GPUMetricsProvider', () => {
 
   it('records metrics and returns newest first', () => {
     const provider = getGPUMetricsProvider();
-    setGPUGlobalMetricsSyncEnabled(false);
     provider.recordMetric({ batchId: 'a', entityCount: 1, timestamp: 1, gpu: false });
     provider.recordMetric({ batchId: 'b', entityCount: 2, timestamp: 2, gpu: true });
 
@@ -100,7 +95,6 @@ describe('GPUMetricsProvider', () => {
   it('records GPU memory snapshots, history, and threshold alerts', () => {
     const provider = getGPUMetricsProvider() as any;
     const now = Date.now();
-    (globalThis as any).__motionGPUMemoryAlerts = [];
     provider.updateStatus({
       memoryUsageThresholdBytes: 512,
     });
@@ -125,20 +119,16 @@ describe('GPUMetricsProvider', () => {
     expect(status.peakMemoryUsageBytes).toBe(2048);
     expect(status.memoryAlertActive).toBe(true);
 
-    const alerts = (globalThis as any).__motionGPUMemoryAlerts as any[];
-    expect(Array.isArray(alerts)).toBe(true);
-    expect(alerts.length).toBeGreaterThan(0);
     expect(warn).toHaveBeenCalled();
   });
 
-  it('seeds from legacy globals and warns once in dev', () => {
-    (globalThis as any).__motionThresholdContext = legacyStatus;
-    (globalThis as any).__motionGPUMetrics = legacyMetrics;
-    (globalThis as any).__webgpuInitialized = true;
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    setGPUGlobalMetricsSyncEnabled(true);
+  it('supports explicit legacy seeding', () => {
     const provider = getGPUMetricsProvider();
+    provider.seedFromLegacy({
+      status: legacyStatus,
+      metrics: legacyMetrics,
+      gpuInitialized: true,
+    });
 
     expect(provider.getStatus()).toEqual({
       enabled: true,
@@ -150,11 +140,6 @@ describe('GPUMetricsProvider', () => {
     expect(provider.getMetrics()).toEqual([
       { batchId: 'legacy-1', entityCount: 10, timestamp: 1, gpu: true },
     ]);
-    expect(warn).toHaveBeenCalledTimes(1);
-
-    // Second access should not warn again
-    provider.getStatus();
-    expect(warn).toHaveBeenCalledTimes(1);
   });
 
   afterAll(() => {

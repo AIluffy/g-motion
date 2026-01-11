@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { createDebugger } from '@g-motion/utils';
+
+const errorLog = createDebugger('WebGPU', 'error');
+
 /**
  * Compute Shader Interface and Abstractions
  *
@@ -134,7 +138,7 @@ export class ComputeShaderManager {
 
       return shader;
     } catch (error) {
-      console.error(`[WebGPU] Failed to compile shader '${name}':`, error);
+      errorLog(`Failed to compile shader '${name}':`, error);
       return null;
     }
   }

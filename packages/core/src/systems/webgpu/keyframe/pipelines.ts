@@ -13,6 +13,7 @@ import {
   KEYFRAME_SEARCH_SHADER,
   KEYFRAME_SEARCH_SHADER_OPT,
 } from '../../../webgpu/keyframe-preprocess-shader';
+import { createDebugger } from '@g-motion/utils';
 
 // Pipeline cache (exported for use by pass files)
 export let keyframePreprocessPipeline: GPUComputePipeline | null = null;
@@ -23,6 +24,7 @@ export let keyframeInterpPipeline: GPUComputePipeline | null = null;
 export let keyframeInterpBindGroupLayout: GPUBindGroupLayout | null = null;
 
 let keyframeSearchOptimizedInUse: boolean | null = null;
+const debug = createDebugger('WebGPU');
 
 // Test utilities
 export function __getKeyframeSearchShaderModeForTests(): boolean | null {
@@ -121,7 +123,7 @@ export async function getKeyframeSearchPipeline(
   keyframeSearchOptimizedInUse = useOptimizedShader;
   try {
     const mode = useOptimizedShader ? 'optimized' : 'baseline';
-    console.info('[Motion][WebGPUComputeSystem] keyframe search shader mode', mode);
+    debug('keyframe search shader mode', mode);
   } catch {}
   return pipeline;
 }

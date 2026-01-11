@@ -1,18 +1,6 @@
-import {
-  World,
-  MotionStateComponent,
-  TimelineComponent,
-  TimelineData,
-  RenderComponent,
-  MotionStatus,
-  getGPUChannelMappingRegistry,
-  createBatchChannelTable,
-  OUTPUT_FORMAT,
-} from '@g-motion/core';
+import { World, TimelineData, MotionStatus } from '@g-motion/core';
 import { WorldProvider } from '@g-motion/core';
-import { registerAnimationSystems } from '../index';
 import { AnimationControl } from './control';
-import { validateMarkOptions } from './validation';
 import { TrackBuilder } from './track';
 import { applyAdjust } from './adjust';
 import { runBatchAnimation, BatchTemplate } from './batch-runner';
@@ -29,6 +17,9 @@ import {
 import { addKeyframesForTarget } from './keyframes';
 import { analyzeSpringTracks, analyzeInertiaTracks, buildInertiaComponent } from './physics';
 import { buildRenderComponent } from './render';
+import { AnimationValidator } from './animationValidator';
+import { ComponentRegistrar } from './componentRegistrar';
+import { GPUChannelMapper } from './gpuChannelMapper';
 import type { VisualTarget } from './visualTarget';
 import { getOrCreateVisualTarget } from './visualTarget';
 
@@ -53,6 +44,9 @@ export function motion(target: any, opts?: { world?: World }) {
  * Supports both single and multi-entity animations.
  */
 export class MotionBuilder {
+  private validator = new AnimationValidator();
+  private componentRegistrar = new ComponentRegistrar();
+  private gpuChannelMapper = new GPUChannelMapper();
   private tracks: TimelineData = new Map();
   private currentTime = 0;
   private targets: any[];
@@ -113,10 +107,7 @@ export class MotionBuilder {
     // Store precompiled templates for batch animation (don't process tracks yet)
     if (this.isBatch) {
       for (const opt of optsArray) {
-        validateMarkOptions({
-          ...(opt as any),
-          time: (opt as any).time ?? opt.at,
-        });
+        this.validator.validateMark(opt);
       }
       const staticResolved: ResolvedMarkOptions[] = [];
       const dynamic: MarkOptions[] = [];
@@ -161,12 +152,8 @@ export class MotionBuilder {
 
     const injectedWorld = (this as any)._world as World | undefined;
     const world = injectedWorld ?? WorldProvider.useWorld();
-    // Ensure animation systems are registered for this world (idempotent guard)
-    if (!(world as any).__animationSystemsRegistered) {
-      registerAnimationSystems(world);
-      (world as any).__animationSystemsRegistered = true;
-    }
-    this.registerCoreComponents(world);
+    this.componentRegistrar.ensureAnimationSystemsRegistered(world);
+    this.componentRegistrar.registerCoreComponents(world);
 
     const visualTarget = this.getVisualTarget();
     const targetType = this.cachedTargetType ?? getTargetType(this.target);
@@ -234,94 +221,12 @@ export class MotionBuilder {
         render && typeof render.rendererId === 'string'
           ? `${componentNames.join('|')}::${render.rendererId}`
           : componentNames.join('|');
-      const registry = getGPUChannelMappingRegistry();
-
-      if (targetType === TargetType.Primitive) {
-        if (this.tracks.has('__primitive') && visualTarget.canUseGPU('__primitive')) {
-          registry.registerBatchChannels({
-            batchId: archetypeId,
-            rawStride: 1,
-            rawChannels: [{ index: 0, property: '__primitive' }],
-            stride: 1,
-            channels: [{ index: 0, property: '__primitive', formatType: OUTPUT_FORMAT.FLOAT }],
-          });
-        }
-      }
-
-      if (targetType === TargetType.DOM || targetType === TargetType.Object) {
-        const properties: string[] = [];
-        for (const key of this.tracks.keys()) {
-          if (key === '__primitive') continue;
-          properties.push(key);
-        }
-        if (properties.length) {
-          const gpuProps = properties.filter((prop) => visualTarget.canUseGPU(prop));
-          if (gpuProps.length) {
-            const standardTransformProps = ['x', 'y', 'rotate', 'scaleX', 'scaleY', 'opacity'];
-            const canUsePackedTransform =
-              gpuProps.length === standardTransformProps.length &&
-              standardTransformProps.every((p) => gpuProps.includes(p));
-
-            if (canUsePackedTransform) {
-              const rawChannels = standardTransformProps.map((prop, idx) => ({
-                index: idx,
-                property: prop,
-              }));
-              const channels = [
-                {
-                  index: 0,
-                  property: '__packed0',
-                  sourceIndex: 0,
-                  formatType: OUTPUT_FORMAT.PACKED_HALF2,
-                  packedProps: ['x', 'y'] as [string, string],
-                },
-                {
-                  index: 1,
-                  property: '__packed1',
-                  sourceIndex: 2,
-                  formatType: OUTPUT_FORMAT.PACKED_HALF2,
-                  packedProps: ['rotate', 'scaleX'] as [string, string],
-                },
-                {
-                  index: 2,
-                  property: '__packed2',
-                  sourceIndex: 4,
-                  formatType: OUTPUT_FORMAT.PACKED_HALF2,
-                  packedProps: ['scaleY', 'opacity'] as [string, string],
-                },
-              ];
-              registry.registerBatchChannels({
-                batchId: archetypeId,
-                rawStride: rawChannels.length,
-                rawChannels,
-                stride: channels.length,
-                channels,
-              });
-            } else {
-              const table = createBatchChannelTable(archetypeId, gpuProps.length, gpuProps);
-              for (const ch of table.channels) {
-                switch (ch.property) {
-                  case 'rotate':
-                  case 'rotateX':
-                  case 'rotateY':
-                  case 'rotateZ':
-                    ch.formatType = OUTPUT_FORMAT.ANGLE_DEG;
-                    break;
-                  case 'opacity':
-                    ch.formatType = OUTPUT_FORMAT.COLOR_NORM;
-                    ch.minValue = 0;
-                    ch.maxValue = 1;
-                    break;
-                  default:
-                    ch.formatType = OUTPUT_FORMAT.FLOAT;
-                    break;
-                }
-              }
-              registry.registerBatchChannels(table);
-            }
-          }
-        }
-      }
+      this.gpuChannelMapper.registerChannels({
+        archetypeId,
+        targetType,
+        tracks: this.tracks,
+        visualTarget,
+      });
     }
 
     const entityId = world.createEntity(components);
@@ -388,10 +293,7 @@ export class MotionBuilder {
   // Private: Mark Processing Helpers
   // ============================================================================
   private processSingleMark(rawOptions: MarkOptions): void {
-    validateMarkOptions({
-      ...(rawOptions as any),
-      time: (rawOptions as any).time ?? rawOptions.at,
-    });
+    this.validator.validateMark(rawOptions);
     const visualTarget = this.getVisualTarget();
     const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
 
@@ -404,27 +306,12 @@ export class MotionBuilder {
 
   // Apply a pre-resolved mark without re-resolving per entity
   addResolvedMark(resolved: ResolvedMarkOptions): void {
-    validateMarkOptions(resolved);
+    this.validator.validateResolvedMark(resolved);
     const easing = resolved.ease;
     const visualTarget = this.getVisualTarget();
     const targetType = this.cachedTargetType ?? getTargetType(this.target);
     addKeyframesForTarget(this.tracks, visualTarget, targetType, resolved, easing);
     this.currentTime = resolved.time;
     this.timelineVersion++;
-  }
-  // ============================================================================
-  // Private: Animation Setup Helpers
-  // ============================================================================
-
-  private registerCoreComponents(world: World): void {
-    if (!world.registry.get('MotionState')) {
-      world.registry.register('MotionState', MotionStateComponent);
-    }
-    if (!world.registry.get('Timeline')) {
-      world.registry.register('Timeline', TimelineComponent);
-    }
-    if (!world.registry.get('Render')) {
-      world.registry.register('Render', RenderComponent);
-    }
   }
 }

@@ -97,14 +97,7 @@ export function runBatchAnimation(params: {
       .play();
 
     controls.push(control);
-    const entityId = (control as any).entityId;
-    if (entityId !== undefined) {
-      if (Array.isArray(entityId)) {
-        entityIds.push(...entityId);
-      } else {
-        entityIds.push(entityId);
-      }
-    }
+    entityIds.push(...control.getEntityIds());
   });
 
   const batchControl = new AnimationControl(entityIds, controls, true, params.injectedWorld);

@@ -4,21 +4,31 @@
  * Workgroup size selection and shader code variant generation.
  */
 
+import { WebGPUConstants } from '../../../constants/webgpu';
+
 type WorkgroupSize = 16 | 32 | 64 | 128;
 
 /**
  * Select optimal workgroup size based on entity count
  */
 export function selectWorkgroupSize(workgroupHint: number): WorkgroupSize {
-  if (!Number.isFinite(workgroupHint) || workgroupHint <= 0) return 64;
-  if (workgroupHint === 16 || workgroupHint === 32 || workgroupHint === 64 || workgroupHint === 128)
-    return workgroupHint;
+  const { WORKGROUP } = WebGPUConstants;
+
+  if (!Number.isFinite(workgroupHint) || workgroupHint <= 0) return WORKGROUP.SIZE_DEFAULT;
+  if (
+    workgroupHint === WORKGROUP.SIZE_SMALL ||
+    workgroupHint === WORKGROUP.SIZE_MEDIUM ||
+    workgroupHint === WORKGROUP.SIZE_DEFAULT ||
+    workgroupHint === WORKGROUP.SIZE_XLARGE
+  ) {
+    return workgroupHint as WorkgroupSize;
+  }
 
   const entityCount = Math.floor(workgroupHint);
-  if (entityCount >= 1000) return 128;
-  if (entityCount < 64) return 16;
-  if (entityCount < 256) return 32;
-  return 64;
+  if (entityCount >= WORKGROUP.ENTITY_COUNT_XLARGE_THRESHOLD) return WORKGROUP.SIZE_XLARGE;
+  if (entityCount < WORKGROUP.ENTITY_COUNT_SMALL_THRESHOLD) return WORKGROUP.SIZE_SMALL;
+  if (entityCount < WORKGROUP.ENTITY_COUNT_MEDIUM_THRESHOLD) return WORKGROUP.SIZE_MEDIUM;
+  return WORKGROUP.SIZE_DEFAULT;
 }
 
 /**

@@ -2,11 +2,20 @@ import type { SystemContext, SystemDef } from '../../plugin';
 import { MotionStatus } from '../../components/state';
 import { getEasingId } from '../easing-registry';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
-import type { TimelineData, Track, Keyframe } from '../../types';
+import { SchedulingConstants } from '../../constants/scheduling';
+import type {
+  Keyframe,
+  MotionStateData,
+  RenderData,
+  TimelineComponentData,
+  TimelineData,
+  Track,
+} from '../../types';
 import { getRendererCode } from '../../renderer-code';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
 import { consumeForcedGPUStateSyncEntityIds, isPhysicsGPUEntity } from '../../webgpu/sync-manager';
 import { PHYSICS_STATE_STRIDE } from '../../webgpu/physics-shader';
+import type { ArchetypeTypedBuffer } from '../../archetype';
 import {
   preprocessChannelsToRawAndMap,
   type RawKeyframeGenerationOptions,
@@ -38,6 +47,33 @@ import {
 } from './utils';
 
 import { getPhysicsStateVersionByArchetype, getPhysicsLayoutSigByArchetype } from './physics-state';
+
+type SpringComponentData = {
+  stiffness?: number;
+  damping?: number;
+  mass?: number;
+  restSpeed?: number;
+  restDelta?: number;
+  velocities?: Map<string, number>;
+};
+
+type InertiaComponentData = {
+  power?: number;
+  velocities?: Map<string, number>;
+  bounceVelocities?: Map<string, number>;
+  inBounce?: Map<string, boolean>;
+  bounds?: { min?: number; max?: number };
+  min?: number;
+  max?: number;
+  timeConstant?: number;
+  restSpeed?: number;
+  restDelta?: number;
+  clamp?: boolean | number;
+  bounce?: unknown | false;
+  bounceStiffness?: number;
+  bounceDamping?: number;
+  bounceMass?: number;
+};
 
 /**
  * Batch Sampling System
@@ -89,16 +125,15 @@ export const BatchSamplingSystem: SystemDef = {
         ? ctx!.sampling!.engineFrame
         : incrementFrameId();
     const tickFrame =
-      (config as any).samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number'
+      config.samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number'
         ? ctx!.sampling!.frame
         : engineFrame;
     const channelRegistry = getGPUChannelMappingRegistry();
-    const preprocessConfig = (config as any).keyframePreprocess as
-      | { enabled?: boolean; timeInterval?: number; maxSubdivisionsPerSegment?: number }
-      | undefined;
+    const preprocessConfig = config.keyframePreprocess;
     const preprocessEnabled = !!preprocessConfig?.enabled;
     const preprocessOptions: RawKeyframeGenerationOptions = {
-      timeInterval: preprocessConfig?.timeInterval ?? 16,
+      timeInterval:
+        preprocessConfig?.timeInterval ?? SchedulingConstants.DEFAULT_KEYFRAME_INTERVAL_MS,
       maxSubdivisionsPerSegment: preprocessConfig?.maxSubdivisionsPerSegment ?? 4,
     };
     const evaluateRawValue: RawKeyframeValueEvaluator = (kf, t) => {
@@ -128,14 +163,9 @@ export const BatchSamplingSystem: SystemDef = {
     // Per-archetype batch collection
     let totalEntities = 0;
 
-    const slice = (config as any).workSlicing as
-      | {
-          enabled?: boolean;
-          batchSamplingArchetypesPerFrame?: number;
-        }
-      | undefined;
+    const slice = config.workSlicing;
     const perFrame = slice?.enabled ? slice.batchSamplingArchetypesPerFrame : undefined;
-    let toProcess: Iterable<any>;
+    let toProcess: Iterable<import('../../archetype').Archetype>;
     if (typeof perFrame === 'number' && Number.isFinite(perFrame)) {
       const archetypeScratch = getArchetypeScratch();
       const pickedArchetypesScratch = getPickedArchetypesScratch();
@@ -250,43 +280,41 @@ export const BatchSamplingSystem: SystemDef = {
       let entityCount = 0;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        let rendererCode = typedRendererCode ? typedRendererCode[i] : 0;
         let rendererId: string | undefined;
-        if (!typedRendererCode) {
+        let rendererCode = 0;
+        if (typedRendererCode) {
+          rendererCode = typedRendererCode[i];
+        } else {
           const render = renderBuffer[i] as { rendererId: string; rendererCode?: number };
-          rendererCode = render.rendererCode ?? 0;
           rendererId = render.rendererId;
+          rendererCode = render.rendererCode ?? 0;
         }
         if (rendererCode === callbackCode || rendererId === 'callback') {
           continue;
         }
 
-        if (
-          (springBuffer && (springBuffer as any)[i]) ||
-          (inertiaBuffer && (inertiaBuffer as any)[i])
-        ) {
+        const hasPhysics =
+          !!(springBuffer && springBuffer[i] != null) ||
+          !!(inertiaBuffer && inertiaBuffer[i] != null);
+        if (hasPhysics) {
           continue;
         }
 
-        // Only include running animations
+        const stateObj = stateBuffer[i] as MotionStateData;
         const status = typedStatus
           ? (typedStatus[i] as unknown as MotionStatus)
-          : ((stateBuffer[i] as any).status as MotionStatus);
+          : (stateObj.status as unknown as MotionStatus);
         if (status !== MotionStatus.Running) {
           continue;
         }
 
-        if (status === MotionStatus.Running) {
-          const interval = typedTickInterval
-            ? typedTickInterval[i]
-            : Number((stateBuffer[i] as any).tickInterval ?? 0);
-          if (interval > 1) {
-            const phase = typedTickPhase
-              ? typedTickPhase[i]
-              : Number((stateBuffer[i] as any).tickPhase ?? 0);
-            if ((tickFrame + phase) % interval !== 0) {
-              continue;
-            }
+        const interval = typedTickInterval
+          ? typedTickInterval[i]
+          : Number(stateObj.tickInterval ?? 0);
+        if (interval > 1) {
+          const phase = typedTickPhase ? typedTickPhase[i] : Number(stateObj.tickPhase ?? 0);
+          if ((tickFrame + phase) % interval !== 0) {
+            continue;
           }
         }
 
@@ -312,10 +340,10 @@ export const BatchSamplingSystem: SystemDef = {
         let pausedCount = 0;
         for (let eIndex = 0; eIndex < entityCount; eIndex++) {
           const i = entityIndicesBuf[eIndex];
-          const stateObj = stateBuffer[i] as any;
+          const stateObj = stateBuffer[i] as MotionStateData;
           const status = typedStatus
             ? (typedStatus[i] as unknown as MotionStatus)
-            : (stateObj.status as MotionStatus);
+            : (stateObj.status as unknown as MotionStatus);
           if (status === MotionStatus.Running) {
             runningCount++;
           } else if (status === MotionStatus.Paused) {
@@ -326,13 +354,9 @@ export const BatchSamplingSystem: SystemDef = {
           let currentTime = typedCurrentTime
             ? typedCurrentTime[i]
             : Number(stateObj.currentTime ?? 0);
-          const timeline = timelineBuffer[i] as {
-            duration?: number;
-            repeat?: number;
-            loop?: boolean;
-          };
+          const timeline = timelineBuffer[i] as TimelineComponentData;
           const duration = Number(timeline?.duration ?? 0);
-          const hasSpring = !!(springBuffer && (springBuffer as any)[i]);
+          const hasSpring = !!(springBuffer && springBuffer[i] != null);
           if (!hasSpring && duration > 0 && currentTime >= duration) {
             const maxRepeat = timeline?.repeat ?? (timeline?.loop ? -1 : 0);
             const iteration = typedIteration ? typedIteration[i] : Number(stateObj.iteration ?? 0);
@@ -416,7 +440,7 @@ export const BatchSamplingSystem: SystemDef = {
           const i = entityIndicesBuf[eIndex];
           const v = typedTimelineVersion
             ? (typedTimelineVersion[i] as unknown as number)
-            : Number((timelineBuffer[i] as any).version ?? 0);
+            : Number((timelineBuffer[i] as TimelineComponentData).version ?? 0);
           versionSig = (((versionSig * 31) >>> 0) ^ (v >>> 0)) >>> 0;
         }
         const entitySig = hashEntityIndices(entityIndicesBuf, entityCount);
@@ -575,16 +599,23 @@ export const BatchSamplingSystem: SystemDef = {
           }
         }
 
-        const preprocessed =
+        let preprocessed:
+          | {
+              rawKeyframesPerEntity: Float32Array[];
+              channelMapPerEntity: Uint32Array[];
+            }
+          | undefined;
+        if (
           preprocessEnabled &&
           channelCount > 0 &&
           preprocessedRawKeyframesPerEntity &&
           preprocessedChannelMapPerEntity
-            ? {
-                rawKeyframesPerEntity: preprocessedRawKeyframesPerEntity,
-                channelMapPerEntity: preprocessedChannelMapPerEntity,
-              }
-            : undefined;
+        ) {
+          preprocessed = {
+            rawKeyframesPerEntity: preprocessedRawKeyframesPerEntity,
+            channelMapPerEntity: preprocessedChannelMapPerEntity,
+          };
+        }
 
         // Add per-archetype batch with adaptive workgroup hint
         // P0-2: Pass keyframes version signature for fast change detection
@@ -611,19 +642,19 @@ export const BatchSamplingSystem: SystemDef = {
       }
 
       let physicsChannels: Array<{ index: number; property: string }> = rawChannels;
-      if (!physicsChannels || physicsChannels.length === 0) {
+      if (physicsChannels.length === 0) {
         const keys = new Set<string>();
         for (let i = 0; i < archetype.entityCount; i++) {
           const hasPhysics =
-            !!(springBuffer && (springBuffer as any)[i]) ||
-            !!(inertiaBuffer && (inertiaBuffer as any)[i]);
+            !!(springBuffer && springBuffer[i] != null) ||
+            !!(inertiaBuffer && inertiaBuffer[i] != null);
           if (!hasPhysics) continue;
           const status = typedStatus
             ? (typedStatus[i] as unknown as MotionStatus)
-            : ((stateBuffer[i] as any).status as MotionStatus);
+            : ((stateBuffer[i] as MotionStateData).status as unknown as MotionStatus);
           if (status !== MotionStatus.Running) continue;
-          const timeline = timelineBuffer[i] as any;
-          const tracks = timeline?.tracks as Map<string, any> | undefined;
+          const timeline = timelineBuffer[i] as TimelineComponentData;
+          const tracks = timeline?.tracks as TimelineData | undefined;
           if (!tracks || typeof tracks.keys !== 'function') continue;
           for (const k of tracks.keys()) {
             keys.add(String(k));
@@ -661,22 +692,22 @@ export const BatchSamplingSystem: SystemDef = {
         }
 
         const hasPhysics =
-          !!(springBuffer && (springBuffer as any)[i]) ||
-          !!(inertiaBuffer && (inertiaBuffer as any)[i]);
+          !!(springBuffer && springBuffer[i] != null) ||
+          !!(inertiaBuffer && inertiaBuffer[i] != null);
         if (!hasPhysics) continue;
 
         const status = typedStatus
           ? (typedStatus[i] as unknown as MotionStatus)
-          : ((stateBuffer[i] as any).status as MotionStatus);
+          : ((stateBuffer[i] as MotionStateData).status as unknown as MotionStatus);
         if (status !== MotionStatus.Running) continue;
 
         const interval = typedTickInterval
           ? typedTickInterval[i]
-          : Number((stateBuffer[i] as any).tickInterval ?? 0);
+          : Number((stateBuffer[i] as MotionStateData).tickInterval ?? 0);
         if (interval > 1) {
           const phase = typedTickPhase
             ? typedTickPhase[i]
-            : Number((stateBuffer[i] as any).tickPhase ?? 0);
+            : Number((stateBuffer[i] as MotionStateData).tickPhase ?? 0);
           if ((tickFrame + phase) % interval !== 0) {
             continue;
           }
@@ -702,10 +733,8 @@ export const BatchSamplingSystem: SystemDef = {
       for (let eIndex = 0; eIndex < physicsEntityCount; eIndex++) {
         const id = archetype.getEntityId(physicsIndicesBuf[eIndex]);
         entityIdsView[eIndex] = id;
-        if (!needsUpload) {
-          if ((id >= 0 && !isPhysicsGPUEntity(id)) || forcedSync.has(id)) {
-            needsUpload = true;
-          }
+        if (!needsUpload && (forcedSync.has(id) || (id >= 0 && !isPhysicsGPUEntity(id)))) {
+          needsUpload = true;
         }
       }
 
@@ -729,23 +758,26 @@ export const BatchSamplingSystem: SystemDef = {
         physicsStateVersionMap.set(physicsArchetypeId, stateVersion);
 
         stateData = new Float32Array(slotCount * PHYSICS_STATE_STRIDE);
-        const typedTransformByProp: Record<
-          string,
-          Float32Array | Float64Array | Int32Array | undefined
-        > = {};
+        const typedTransformByProp: Record<string, ArchetypeTypedBuffer | undefined> = {};
         for (let cIndex = 0; cIndex < physicsStride; cIndex++) {
           const prop = physicsChannels[cIndex].property;
-          typedTransformByProp[prop] = archetype.getTypedBuffer?.('Transform', prop) as any;
+          typedTransformByProp[prop] = archetype.getTypedBuffer('Transform', prop);
         }
 
         for (let eIndex = 0; eIndex < physicsEntityCount; eIndex++) {
           const i = physicsIndicesBuf[eIndex];
-          const timeline = timelineBuffer[i] as any;
-          const tracks = (timeline?.tracks as Map<string, Track> | undefined) ?? undefined;
-          const spring = springBuffer ? (springBuffer as any)[i] : undefined;
-          const inertia = inertiaBuffer ? (inertiaBuffer as any)[i] : undefined;
-          const render = renderBuffer[i] as any;
-          const transform = transformBuffer ? (transformBuffer[i] as any) : undefined;
+          const timeline = timelineBuffer[i] as TimelineComponentData;
+          const tracks = timeline?.tracks;
+          const spring = springBuffer
+            ? (springBuffer[i] as SpringComponentData | undefined)
+            : undefined;
+          const inertia = inertiaBuffer
+            ? (inertiaBuffer[i] as InertiaComponentData | undefined)
+            : undefined;
+          const render = renderBuffer[i] as RenderData;
+          const transform = transformBuffer
+            ? (transformBuffer[i] as Record<string, unknown>)
+            : undefined;
 
           for (let cIndex = 0; cIndex < physicsStride; cIndex++) {
             const prop = physicsChannels[cIndex].property;
@@ -765,8 +797,8 @@ export const BatchSamplingSystem: SystemDef = {
 
             const track = tracks ? (tracks.get(prop) as Track | undefined) : undefined;
             const first = Array.isArray(track) && track.length ? track[0] : undefined;
-            const target = first ? Number((first as any).endValue ?? position) : position;
-            const fromValue = first ? Number((first as any).startValue ?? position) : position;
+            const target = first ? Number(first.endValue ?? position) : position;
+            const fromValue = first ? Number(first.startValue ?? position) : position;
 
             if (spring) {
               const velocities = spring.velocities instanceof Map ? spring.velocities : undefined;

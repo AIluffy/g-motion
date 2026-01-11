@@ -4,7 +4,14 @@
  * Caches and retrieves compute pipelines for different workgroup sizes.
  */
 
-const WORKGROUP_SIZES = [16, 32, 64, 128] as const;
+import { WebGPUConstants } from '../../constants/webgpu';
+
+const WORKGROUP_SIZES = [
+  WebGPUConstants.WORKGROUP.SIZE_SMALL,
+  WebGPUConstants.WORKGROUP.SIZE_MEDIUM,
+  WebGPUConstants.WORKGROUP.SIZE_DEFAULT,
+  WebGPUConstants.WORKGROUP.SIZE_XLARGE,
+] as const;
 type WorkgroupSize = (typeof WORKGROUP_SIZES)[number];
 
 // Pipeline cache for different workgroup sizes
@@ -48,12 +55,13 @@ export async function getPipelineForWorkgroup(
 ): Promise<GPUComputePipeline | null> {
   const selected = selectWorkgroupSize(workgroupHint);
   const pipelineCache = getBucket(cacheId).pipelineCache;
+  const { WORKGROUP } = WebGPUConstants;
   return (
     pipelineCache.get(selected) ??
-    pipelineCache.get(64) ??
-    pipelineCache.get(32) ??
-    pipelineCache.get(16) ??
-    pipelineCache.get(128) ??
+    pipelineCache.get(WORKGROUP.SIZE_DEFAULT) ??
+    pipelineCache.get(WORKGROUP.SIZE_MEDIUM) ??
+    pipelineCache.get(WORKGROUP.SIZE_SMALL) ??
+    pipelineCache.get(WORKGROUP.SIZE_XLARGE) ??
     null
   );
 }
@@ -70,15 +78,23 @@ export function clearPipelineCache(): void {
 }
 
 export function selectWorkgroupSize(workgroupHint: number): WorkgroupSize {
-  if (!Number.isFinite(workgroupHint) || workgroupHint <= 0) return 64;
-  if (workgroupHint === 16 || workgroupHint === 32 || workgroupHint === 64 || workgroupHint === 128)
-    return workgroupHint;
+  const { WORKGROUP } = WebGPUConstants;
+
+  if (!Number.isFinite(workgroupHint) || workgroupHint <= 0) return WORKGROUP.SIZE_DEFAULT;
+  if (
+    workgroupHint === WORKGROUP.SIZE_SMALL ||
+    workgroupHint === WORKGROUP.SIZE_MEDIUM ||
+    workgroupHint === WORKGROUP.SIZE_DEFAULT ||
+    workgroupHint === WORKGROUP.SIZE_XLARGE
+  ) {
+    return workgroupHint as WorkgroupSize;
+  }
 
   const entityCount = Math.floor(workgroupHint);
-  if (entityCount >= 1000) return 128;
-  if (entityCount < 64) return 16;
-  if (entityCount < 256) return 32;
-  return 64;
+  if (entityCount >= WORKGROUP.ENTITY_COUNT_XLARGE_THRESHOLD) return WORKGROUP.SIZE_XLARGE;
+  if (entityCount < WORKGROUP.ENTITY_COUNT_SMALL_THRESHOLD) return WORKGROUP.SIZE_SMALL;
+  if (entityCount < WORKGROUP.ENTITY_COUNT_MEDIUM_THRESHOLD) return WORKGROUP.SIZE_MEDIUM;
+  return WORKGROUP.SIZE_DEFAULT;
 }
 
 function hashString(input: string): number {
@@ -123,11 +139,12 @@ export async function precompileWorkgroupPipelines(
 ): Promise<boolean> {
   const bucket = getBucket(cacheId);
   const key = buildCacheKey(shaderCode, bindGroupLayoutEntries, entryPoint);
+  const { WORKGROUP } = WebGPUConstants;
   const hasAll =
-    bucket.pipelineCache.has(16) &&
-    bucket.pipelineCache.has(32) &&
-    bucket.pipelineCache.has(64) &&
-    bucket.pipelineCache.has(128);
+    bucket.pipelineCache.has(WORKGROUP.SIZE_SMALL) &&
+    bucket.pipelineCache.has(WORKGROUP.SIZE_MEDIUM) &&
+    bucket.pipelineCache.has(WORKGROUP.SIZE_DEFAULT) &&
+    bucket.pipelineCache.has(WORKGROUP.SIZE_XLARGE);
   if (bucket.pipelineCacheDevice === device && bucket.pipelineCacheKey === key && hasAll) {
     return true;
   }

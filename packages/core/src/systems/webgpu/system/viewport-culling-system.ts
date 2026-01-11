@@ -1,0 +1,172 @@
+import type { GPUBatchDescriptor } from '../../../types';
+import type { World } from '../../../world';
+import type { PendingReadback } from '../../../webgpu/async-readback';
+import type { ComputeBatchProcessor } from '../../batch';
+import {
+  runViewportCullingCompactionPass,
+  runViewportCullingCompactionPassAsync,
+} from '../viewport';
+import { setPendingReadbackCount } from '../../../webgpu/sync-manager';
+import type { WebGPUComputeRuntime } from './runtime';
+
+export type CullingReadbackTag = {
+  kind: 'culling';
+  frameId: number;
+  outputBuffer: GPUBuffer;
+  rawStride: number;
+  outputStride: number;
+  rawChannels: Array<{ index: number; property: string }>;
+  outputChannels: Array<{ index: number; property: string }>;
+  entityCountMax: number;
+  visibleCount?: number;
+};
+
+export type ViewportCullingResult =
+  | { kind: 'enqueued' }
+  | {
+      kind: 'continue';
+      outputBuffer: GPUBuffer;
+      entityCount: number;
+      entityIdsForReadback: ArrayLike<number>;
+      leaseId: number | undefined;
+    };
+
+export async function maybeRunViewportCulling(params: {
+  runtime: WebGPUComputeRuntime;
+  device: GPUDevice;
+  queue: GPUQueue;
+  world: World;
+  processor: ComputeBatchProcessor;
+  archetypeId: string;
+  batch: GPUBatchDescriptor;
+  outputBuffer: GPUBuffer;
+  entityCount: number;
+  entityIdsForReadback: ArrayLike<number>;
+  leaseId: number | undefined;
+  rawStride: number;
+  outputStride: number;
+  rawChannels: Array<{ index: number; property: string }>;
+  outputChannels: Array<{ index: number; property: string }>;
+  asyncEnabled: boolean;
+}): Promise<ViewportCullingResult> {
+  const {
+    runtime,
+    device,
+    queue,
+    world,
+    processor,
+    archetypeId,
+    batch,
+    outputBuffer,
+    entityCount,
+    entityIdsForReadback,
+    leaseId,
+    rawStride,
+    outputStride,
+    rawChannels,
+    outputChannels,
+    asyncEnabled,
+  } = params;
+
+  const readbackManager = runtime.readbackManager;
+
+  if (entityCount <= 0) {
+    return {
+      kind: 'continue',
+      outputBuffer,
+      entityCount,
+      entityIdsForReadback,
+      leaseId,
+    };
+  }
+
+  if (asyncEnabled && readbackManager) {
+    const pending = await runViewportCullingCompactionPassAsync(
+      device,
+      queue,
+      world,
+      archetypeId,
+      batch,
+      outputBuffer,
+      rawStride,
+    );
+    if (pending) {
+      runtime.latestAsyncCullingFrameByArchetype.set(archetypeId, runtime.webgpuFrameId);
+
+      if (typeof leaseId === 'number') {
+        processor.releaseEntityIds(leaseId);
+      }
+      try {
+        outputBuffer.destroy();
+      } catch {}
+
+      const cullingTag: CullingReadbackTag = {
+        kind: 'culling',
+        frameId: runtime.webgpuFrameId,
+        outputBuffer: pending.outputBuffer,
+        rawStride,
+        outputStride,
+        rawChannels,
+        outputChannels,
+        entityCountMax: pending.entityCountMax,
+      };
+
+      const decode: PendingReadback['decode'] = (mappedRange: ArrayBuffer) => {
+        const u32 = new Uint32Array(mappedRange);
+        const visibleCount = Math.min(pending.entityCountMax, u32[0] >>> 0);
+
+        let compactLeaseId: number | undefined;
+        let compactEntityIds: Int32Array = new Int32Array(0);
+        if (visibleCount > 0) {
+          const lease = processor.acquireEntityIds(visibleCount);
+          compactLeaseId = lease.leaseId;
+          compactEntityIds = lease.buffer.subarray(0, visibleCount);
+          compactEntityIds.set(u32.subarray(1, 1 + visibleCount));
+        }
+
+        return {
+          entityIds: compactEntityIds,
+          leaseId: compactLeaseId,
+          tag: { ...cullingTag, visibleCount },
+          byteSize: 4 + visibleCount * 4,
+        };
+      };
+
+      readbackManager.enqueueMapAsyncDecoded(
+        archetypeId,
+        pending.readback,
+        pending.mapPromise,
+        4 + pending.entityCountMax * 4,
+        decode,
+        200,
+        cullingTag,
+      );
+      setPendingReadbackCount(readbackManager.getPendingCount());
+      return { kind: 'enqueued' };
+    }
+  }
+
+  const cullRes = await runViewportCullingCompactionPass(
+    device,
+    queue,
+    world,
+    processor,
+    archetypeId,
+    batch,
+    outputBuffer,
+    rawStride,
+  );
+  let nextOutputBuffer = outputBuffer;
+  if (cullRes.outputBuffer !== outputBuffer) {
+    outputBuffer.destroy();
+    nextOutputBuffer = cullRes.outputBuffer;
+  }
+
+  return {
+    kind: 'continue',
+    outputBuffer: nextOutputBuffer,
+    entityCount: cullRes.entityCount,
+    entityIdsForReadback: cullRes.entityIds,
+    leaseId: cullRes.leaseId,
+  };
+}
