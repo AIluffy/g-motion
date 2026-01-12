@@ -13,7 +13,7 @@ import { ParsedValue } from './types';
  * LRU Cache entry with access tracking
  */
 interface CacheEntry {
-  value: ParsedValue;
+  cachedValue: ParsedValue;
   lastAccess: number;
 }
 
@@ -77,7 +77,7 @@ export class ValueCache {
       // Update access time for LRU
       entry.lastAccess = ++this.accessCounter;
       this.hits++;
-      return entry.value;
+      return entry.cachedValue;
     }
 
     this.misses++;
@@ -97,7 +97,7 @@ export class ValueCache {
     }
 
     this.cache.set(key, {
-      value,
+      cachedValue: value,
       lastAccess: ++this.accessCounter,
     });
   }
@@ -181,9 +181,9 @@ export class ValueCache {
       return cached;
     }
 
-    const value = compute();
-    this.set(key, value);
-    return value;
+    const cachedValue = compute();
+    this.set(key, cachedValue);
+    return cachedValue;
   }
 
   /**

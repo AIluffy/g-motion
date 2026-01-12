@@ -82,4 +82,6 @@ export const debug = createDebugger('Core');
 export * from './targetResolver';
 export * from './time/frameSampler';
 export * from './math/rollingAverage';
+export * from './math/interpolation';
+export * from './dom';
 export * from './packedStream';

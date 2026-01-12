@@ -14,12 +14,12 @@
  * @returns [h, s, l] where h is 0-360, s and l are 0-100
  */
 export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  r /= 255;
-  g /= 255;
-  b /= 255;
+  let red = r / 255;
+  let green = g / 255;
+  let blue = b / 255;
 
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
   const l = (max + min) / 2;
 
   if (max === min) {
@@ -29,20 +29,20 @@ export function rgbToHsl(r: number, g: number, b: number): [number, number, numb
   const d = max - min;
   const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
 
-  let h: number;
+  let hue: number;
   switch (max) {
-    case r:
-      h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    case red:
+      hue = ((green - blue) / d + (green < blue ? 6 : 0)) / 6;
       break;
-    case g:
-      h = ((b - r) / d + 2) / 6;
+    case green:
+      hue = ((blue - red) / d + 2) / 6;
       break;
     default:
-      h = ((r - g) / d + 4) / 6;
+      hue = ((red - green) / d + 4) / 6;
       break;
   }
 
-  return [h * 360, s * 100, l * 100];
+  return [hue * 360, s * 100, l * 100];
 }
 
 /**
@@ -53,12 +53,12 @@ export function rgbToHsl(r: number, g: number, b: number): [number, number, numb
  * @returns [r, g, b] where each is 0-255
  */
 export function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  h /= 360;
-  s /= 100;
-  l /= 100;
+  let hue = h / 360;
+  let saturation = s / 100;
+  let lightness = l / 100;
 
-  if (s === 0) {
-    const gray = Math.round(l * 255);
+  if (saturation === 0) {
+    const gray = Math.round(lightness * 255);
     return [gray, gray, gray];
   }
 
@@ -71,13 +71,16 @@ export function hslToRgb(h: number, s: number, l: number): [number, number, numb
     return p;
   };
 
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
+  const q =
+    lightness < 0.5
+      ? lightness * (1 + saturation)
+      : lightness + saturation - lightness * saturation;
+  const p = 2 * lightness - q;
 
   return [
-    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
-    Math.round(hue2rgb(p, q, h) * 255),
-    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, hue + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, hue) * 255),
+    Math.round(hue2rgb(p, q, hue - 1 / 3) * 255),
   ];
 }
 

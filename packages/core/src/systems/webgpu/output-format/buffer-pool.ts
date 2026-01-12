@@ -6,6 +6,9 @@
 
 import type { OutputFormatPoolStats, PooledBufferMeta } from './types';
 import { nextPow2 } from './types';
+import { createDebugger } from '@g-motion/utils';
+
+const warn = createDebugger('OutputFormatBufferPool', 'warn');
 
 const trackedBuffers: GPUBuffer[] = [];
 
@@ -185,7 +188,9 @@ export class OutputFormatBufferPool {
     }
 
     done
-      .catch(() => {})
+      .catch((error) => {
+        warn('queue.onSubmittedWorkDone failed', error);
+      })
       .then(async () => {
         const unlock2 = await this.mutex.lock();
         try {

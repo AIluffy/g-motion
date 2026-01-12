@@ -1,10 +1,11 @@
-import { World } from './world';
 import type { ComponentDef, SystemDef, RendererDef } from './plugin';
 import { registerEasingWithWGSL } from './systems/easing-registry';
 import { createDebugger } from '@g-motion/utils';
 import { MotionApp, MotionAppConfig } from './plugin';
 import { WorldProvider } from './worldProvider';
 import { getRendererCode } from './renderer-code';
+import type { World } from './world';
+import { ErrorCode, ErrorSeverity, MotionError } from './errors';
 
 const debug = createDebugger('Core');
 
@@ -37,9 +38,11 @@ export class App implements MotionApp {
 
     // Check for duplicate registration
     if (this.world.registry.has(name)) {
-      throw new Error(
-        `[Motion] Component '${name}' is already registered. ` +
-          `Consider using a unique namespace or unregister first.`,
+      throw new MotionError(
+        `[Motion] Component '${name}' is already registered. Consider using a unique namespace or unregister first.`,
+        ErrorCode.DUPLICATE_REGISTRATION,
+        ErrorSeverity.FATAL,
+        { componentName: name },
       );
     }
 
@@ -111,8 +114,8 @@ export function registerBuiltInRenderers(app: App): void {
 
       if (target.onUpdate) {
         if (Object.keys(props).length === 1) {
-          const value = Object.values(props)[0];
-          target.onUpdate(value);
+          const componentValue = Object.values(props)[0];
+          target.onUpdate(componentValue);
         } else {
           target.onUpdate(props);
         }
@@ -125,8 +128,8 @@ export function registerBuiltInRenderers(app: App): void {
 
       if (target.onUpdate) {
         if (Object.keys(props).length === 1) {
-          const value = Object.values(props)[0];
-          target.onUpdate(value);
+          const componentValue = Object.values(props)[0];
+          target.onUpdate(componentValue);
         } else {
           target.onUpdate(props);
         }

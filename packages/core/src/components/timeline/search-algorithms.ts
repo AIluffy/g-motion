@@ -16,7 +16,7 @@ export function linearSearchKeyframe(track: Track, t: number): number {
 export function binarySearchKeyframe(track: Track, t: number): number {
   let left = 0;
   let right = track.length - 1;
-  let result = -1;
+  let searchResult = -1;
 
   while (left <= right) {
     const mid = Math.floor((left + right) / 2);
@@ -29,10 +29,10 @@ export function binarySearchKeyframe(track: Track, t: number): number {
     if (t < kf.startTime) {
       right = mid - 1;
     } else {
-      result = mid;
+      searchResult = mid;
       left = mid + 1;
     }
   }
 
-  return result;
+  return searchResult;
 }

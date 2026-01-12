@@ -20,13 +20,7 @@ import type {
   ArcCommand,
 } from './types';
 import { normalizePath, normalizePaths } from './normalize';
-
-/**
- * Interpolate a single number
- */
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
+import { lerp } from '@g-motion/utils';
 
 /**
  * Interpolate between two path commands of the same type

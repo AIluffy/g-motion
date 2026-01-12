@@ -4,6 +4,7 @@ import {
   createChannelMapping,
   createBatchChannelTable,
 } from '../src/webgpu/channel-mapping';
+import { clamp01 } from '@g-motion/utils';
 
 /**
  * Phase 4 Validation: Multi-Channel GPU Output Mapping
@@ -280,7 +281,7 @@ describe('Phase 4: Transform Function', () => {
         channels: [
           createChannelMapping(0, 'x'),
           createChannelMapping(1, 'y'),
-          { index: 2, property: 'opacity', transform: (v: number) => Math.max(0, Math.min(1, v)) },
+          { index: 2, property: 'opacity', transform: (v: number) => clamp01(v) },
         ],
       });
 

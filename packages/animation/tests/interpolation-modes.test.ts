@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion } from '../src/index';
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { wait } from './test-utils';
 
 describe('Interpolation Modes', () => {
   beforeAll(() => {

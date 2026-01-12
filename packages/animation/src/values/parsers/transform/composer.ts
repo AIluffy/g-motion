@@ -11,6 +11,7 @@
 import type { TransformProperties, TransformOrigin } from './types';
 import { parseTransformString } from './utils';
 import { axisAngleToQuaternion, quaternionToAxisAngle, slerp } from './quaternion';
+import { lerp } from '@g-motion/utils';
 
 /**
  * Transform composer for independent transform properties
@@ -229,13 +230,6 @@ export class TransformComposer {
   ): TransformProperties {
     const result: TransformProperties = {};
 
-    // Helper for linear interpolation
-    const lerp = (a: number | undefined, b: number | undefined, defaultVal: number): number => {
-      const va = a ?? defaultVal;
-      const vb = b ?? defaultVal;
-      return va + (vb - va) * progress;
-    };
-
     // Helper to determine if a property should be included in result
     const shouldInclude = (fromVal: number | undefined, toVal: number | undefined): boolean => {
       return fromVal !== undefined || toVal !== undefined;
@@ -243,27 +237,52 @@ export class TransformComposer {
 
     // Translation
     if (shouldInclude(from.x, to.x)) {
-      result.x = lerp(from.x, to.x, 0);
+      result.x = lerp(from.x ?? 0, to.x ?? 0, progress);
+    }
+
+    if (shouldInclude(from.y, to.y)) {
+      result.y = lerp(from.y ?? 0, to.y ?? 0, progress);
+    }
+
+    if (shouldInclude(from.z, to.z)) {
+      result.z = lerp(from.z ?? 0, to.z ?? 0, progress);
+    }
+
+    // Rotation (3D)
+    if (shouldInclude(from.rotateX, to.rotateX)) {
+      result.rotateX = lerp(from.rotateX ?? 0, to.rotateX ?? 0, progress);
+    }
+
+    if (shouldInclude(from.rotateY, to.rotateY)) {
+      result.rotateY = lerp(from.rotateY ?? 0, to.rotateY ?? 0, progress);
+    }
+
+    if (shouldInclude(from.rotateZ, to.rotateZ)) {
+      result.rotateZ = lerp(from.rotateZ ?? 0, to.rotateZ ?? 0, progress);
+    }
+
+    if (shouldInclude(from.rotate, to.rotate)) {
+      result.rotate = lerp(from.rotate ?? 0, to.rotate ?? 0, progress);
     }
     if (shouldInclude(from.y, to.y)) {
-      result.y = lerp(from.y, to.y, 0);
+      result.y = lerp(from.y ?? 0, to.y ?? 0, progress);
     }
     if (shouldInclude(from.z, to.z)) {
-      result.z = lerp(from.z, to.z, 0);
+      result.z = lerp(from.z ?? 0, to.z ?? 0, progress);
     }
 
     // Rotation (individual axes)
     if (shouldInclude(from.rotateX, to.rotateX)) {
-      result.rotateX = lerp(from.rotateX, to.rotateX, 0);
+      result.rotateX = lerp(from.rotateX ?? 0, to.rotateX ?? 0, progress);
     }
     if (shouldInclude(from.rotateY, to.rotateY)) {
-      result.rotateY = lerp(from.rotateY, to.rotateY, 0);
+      result.rotateY = lerp(from.rotateY ?? 0, to.rotateY ?? 0, progress);
     }
     if (shouldInclude(from.rotateZ, to.rotateZ)) {
-      result.rotateZ = lerp(from.rotateZ, to.rotateZ, 0);
+      result.rotateZ = lerp(from.rotateZ ?? 0, to.rotateZ ?? 0, progress);
     }
     if (shouldInclude(from.rotate, to.rotate)) {
-      result.rotate = lerp(from.rotate, to.rotate, 0);
+      result.rotate = lerp(from.rotate ?? 0, to.rotate ?? 0, progress);
     }
 
     // 3D Rotation using slerp
@@ -279,29 +298,55 @@ export class TransformComposer {
 
     // Scale
     if (shouldInclude(from.scaleX, to.scaleX)) {
-      result.scaleX = lerp(from.scaleX, to.scaleX, 1);
+      result.scaleX = lerp(from.scaleX ?? 1, to.scaleX ?? 1, progress);
     }
+
     if (shouldInclude(from.scaleY, to.scaleY)) {
-      result.scaleY = lerp(from.scaleY, to.scaleY, 1);
+      result.scaleY = lerp(from.scaleY ?? 1, to.scaleY ?? 1, progress);
     }
+
     if (shouldInclude(from.scaleZ, to.scaleZ)) {
-      result.scaleZ = lerp(from.scaleZ, to.scaleZ, 1);
+      result.scaleZ = lerp(from.scaleZ ?? 1, to.scaleZ ?? 1, progress);
     }
+
     if (shouldInclude(from.scale, to.scale)) {
-      result.scale = lerp(from.scale, to.scale, 1);
+      result.scale = lerp(from.scale ?? 1, to.scale ?? 1, progress);
     }
 
     // Skew
     if (shouldInclude(from.skewX, to.skewX)) {
-      result.skewX = lerp(from.skewX, to.skewX, 0);
+      result.skewX = lerp(from.skewX ?? 0, to.skewX ?? 0, progress);
     }
+
     if (shouldInclude(from.skewY, to.skewY)) {
-      result.skewY = lerp(from.skewY, to.skewY, 0);
+      result.skewY = lerp(from.skewY ?? 0, to.skewY ?? 0, progress);
     }
 
     // Perspective
     if (shouldInclude(from.perspective, to.perspective)) {
-      result.perspective = lerp(from.perspective, to.perspective, 0);
+      result.perspective = lerp(from.perspective ?? 0, to.perspective ?? 0, progress);
+    }
+    if (shouldInclude(from.scaleY, to.scaleY)) {
+      result.scaleY = lerp(from.scaleY ?? 1, to.scaleY ?? 1, progress);
+    }
+    if (shouldInclude(from.scaleZ, to.scaleZ)) {
+      result.scaleZ = lerp(from.scaleZ ?? 1, to.scaleZ ?? 1, progress);
+    }
+    if (shouldInclude(from.scale, to.scale)) {
+      result.scale = lerp(from.scale ?? 1, to.scale ?? 1, progress);
+    }
+
+    // Skew
+    if (shouldInclude(from.skewX, to.skewX)) {
+      result.skewX = lerp(from.skewX ?? 0, to.skewX ?? 0, progress);
+    }
+    if (shouldInclude(from.skewY, to.skewY)) {
+      result.skewY = lerp(from.skewY ?? 0, to.skewY ?? 0, progress);
+    }
+
+    // Perspective
+    if (shouldInclude(from.perspective, to.perspective)) {
+      result.perspective = lerp(from.perspective ?? 0, to.perspective ?? 0, progress);
     }
 
     // Transform origin (interpolate numeric values, keep strings)

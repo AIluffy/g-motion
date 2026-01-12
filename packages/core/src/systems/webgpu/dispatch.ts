@@ -5,6 +5,9 @@ import type { GPUBatchDescriptor } from '../../types';
 import { getPipelineForWorkgroup, selectWorkgroupSize } from './pipeline';
 import type { TimingHelper } from '../../webgpu/timing-helper';
 import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-manager';
+import { createDebugger } from '@g-motion/utils';
+
+const warn = createDebugger('WebGPUDispatch', 'warn');
 
 /**
  * Dispatch a compute shader for a single archetype batch
@@ -238,7 +241,9 @@ export async function dispatchPhysicsBatch(input: {
           workgroupsDispatched: workgroupsX,
         });
       })
-      .catch(() => {});
+      .catch((error) => {
+        warn('timingHelper.getResult failed', { archetypeId, slotCount, error });
+      });
   }
 
   return { archetypeId, slotCount, outputBuffer, finishedBuffer };

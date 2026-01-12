@@ -1,6 +1,6 @@
-import type { ComponentValue } from './archetype';
+import type { ComponentDef, ComponentValue } from './types';
 
-export type ComponentType = 'float32' | 'float64' | 'int32' | 'string' | 'object';
+export type { ComponentDef, ComponentType, ComponentValue } from './types';
 
 export type GPUComputeMode = 'auto' | 'always' | 'never';
 
@@ -8,10 +8,6 @@ export type TransformTypedBuffers = Record<
   string,
   Float32Array | Float64Array | Int32Array | undefined
 >;
-
-export interface ComponentDef {
-  schema: Record<string, ComponentType>;
-}
 
 export interface SystemDef {
   name: string;

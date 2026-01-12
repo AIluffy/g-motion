@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { motion, engine } from '../src';
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { wait } from './test-utils';
 
 describe('GPU regression: CPU vs GPU modes', () => {
   beforeAll(() => {

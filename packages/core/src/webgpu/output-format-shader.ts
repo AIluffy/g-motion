@@ -8,6 +8,7 @@
 import outputFormatShaderCode from './shaders/output-format.wgsl?raw';
 import batchOutputShaderCode from './shaders/batch-output.wgsl?raw';
 import soaOutputShaderCode from './shaders/soa-output.wgsl?raw';
+import { clamp01 } from '@g-motion/utils';
 
 // WGSL shader for output format conversion
 export const OUTPUT_FORMAT_SHADER = outputFormatShaderCode;
@@ -32,12 +33,6 @@ export const OUTPUT_FORMAT = {
   MATRIX_3D: 7,
   PACKED_HALF2: 8,
 } as const;
-
-function clamp01(v: number): number {
-  if (v < 0) return 0;
-  if (v > 1) return 1;
-  return v;
-}
 
 export function linearToSRGB(v: number): number {
   if (v <= 0.0031308) {

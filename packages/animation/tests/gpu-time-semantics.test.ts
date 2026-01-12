@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion, engine } from '../src';
 import type { Keyframe } from '@g-motion/core';
 import { getProgress } from '../src/api/timeline';
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { wait } from './test-utils';
 
 describe('GPU time semantics vs CPU', () => {
   beforeAll(() => {

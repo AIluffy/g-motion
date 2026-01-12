@@ -8,13 +8,7 @@
 
 import type { GradientValue, GradientStop } from './types';
 import { interpolateRgb } from '../color';
-
-/**
- * Interpolate between two numbers
- */
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
+import { lerp } from '@g-motion/utils';
 
 /**
  * Normalize stops to have explicit positions

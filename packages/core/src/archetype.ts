@@ -1,10 +1,7 @@
-import { ComponentDef, ComponentType } from './plugin';
+import type { ComponentDef, ComponentType, ComponentValue } from './types';
 import { ARCHETYPE_DEFAULTS } from './constants';
 
-/**
- * Type for component data values
- */
-export type ComponentValue = Record<string, unknown>;
+export type { ComponentValue } from './types';
 
 export type ArchetypeTypedBuffer = Float32Array | Float64Array | Int32Array;
 

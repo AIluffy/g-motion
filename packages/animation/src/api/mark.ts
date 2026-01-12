@@ -9,7 +9,14 @@ import {
   MotionError,
   getErrorHandler,
 } from '@g-motion/core';
-import { createDebugger, isDev, resolveDomElements } from '@g-motion/utils';
+import {
+  createDebugger,
+  isDev,
+  resolveDomElements,
+  isDomElement,
+  isNodeList,
+  isArrayLike,
+} from '@g-motion/utils';
 
 export type MarkOptions = {
   to?: any | ((index: number, entityId: number, target?: any) => any);
@@ -167,25 +174,6 @@ function resolveWithRegisteredResolvers(
   return null;
 }
 
-function isDomElement(value: unknown): value is Element {
-  if (typeof Element === 'undefined') return false;
-  return value instanceof Element;
-}
-
-function isNodeList(value: unknown): value is NodeListOf<Element> | HTMLCollection {
-  if (typeof NodeList !== 'undefined' && value instanceof NodeList) return true;
-  if (typeof HTMLCollection !== 'undefined' && value instanceof HTMLCollection) return true;
-  return false;
-}
-
-function isArrayLike(value: unknown): value is { length: number } & { [index: number]: unknown } {
-  if (!value || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return false;
-  if (typeof (value as any).length !== 'number') return false;
-  if ((value as any) instanceof String) return false;
-  return true;
-}
-
 function getRootDiagnostics(root: TargetScopeRoot): {
   rootKind: string;
   hasQuerySelectorAll: boolean;
@@ -202,44 +190,58 @@ function getRootDiagnostics(root: TargetScopeRoot): {
   return { rootKind, hasQuerySelectorAll };
 }
 
-export function resolveTargets(
+type SelectorResolutionPolicy = {
+  useCache: boolean;
+  reportDomEnvMissing: boolean;
+  reportResolutionError: boolean;
+};
+
+const DEFAULT_SELECTOR_POLICY: SelectorResolutionPolicy = {
+  useCache: true,
+  reportDomEnvMissing: true,
+  reportResolutionError: true,
+};
+
+function logRootOptionDiagnostics(
+  options: TargetResolutionOptions | undefined,
   input: unknown,
-  options?: TargetResolutionOptions,
-): ResolvedTarget[] {
-  const root = options?.root ?? (typeof document !== 'undefined' ? document : null);
-  const selectorCache = options?.selectorCache ?? {};
-  const seen = new Set<unknown>();
-  const result: ResolvedTarget[] = [];
-  const strict = options?.strictTargets ?? isDev();
+): void {
+  if (!options || !('root' in options)) return;
 
-  const resolverCtx: TargetResolveContext = {
-    root: root ?? null,
-    selectorCache,
-    strictTargets: strict,
-  };
-
-  const resolvedByNamespace = resolveWithRegisteredResolvers(input, resolverCtx);
-  if (resolvedByNamespace && resolvedByNamespace.length > 0) {
-    return resolvedByNamespace;
+  if (options.root === null) {
+    debugResolveTargets('Received null scope root for target resolution', { input });
+    return;
   }
+  if (!options.root) return;
 
-  const handler = getErrorHandler();
-
-  if (options && 'root' in options) {
-    if (options.root === null) {
-      debugResolveTargets('Received null scope root for target resolution', { input });
-    } else if (options.root) {
-      const r = options.root;
-      if (typeof Element !== 'undefined' && typeof Document !== 'undefined') {
-        if (!(r instanceof Element) && !(r instanceof Document)) {
-          debugResolveTargets('Received non-DOM scope root for target resolution', {
-            input,
-            root: r,
-          });
-        }
-      }
+  const r = options.root;
+  if (typeof Element !== 'undefined' && typeof Document !== 'undefined') {
+    if (!(r instanceof Element) && !(r instanceof Document)) {
+      debugResolveTargets('Received non-DOM scope root for target resolution', {
+        input,
+        root: r,
+      });
     }
   }
+}
+
+function createTargetErrorHandlers(params: {
+  input: unknown;
+  root: TargetScopeRoot;
+  strict: boolean;
+  options?: TargetResolutionOptions;
+  handler: ReturnType<typeof getErrorHandler>;
+}): {
+  handleTargetError: (
+    message: string,
+    code: ErrorCode,
+    severity: ErrorSeverity,
+    context: Record<string, unknown>,
+  ) => void;
+  handleSelectorDomEnvMissing: (selector: string, reason: string) => void;
+  handleSelectorResolutionError: (selector: string, reason: string) => void;
+} {
+  const { input, root, strict, options, handler } = params;
 
   const handleTargetError = (
     message: string,
@@ -301,161 +303,240 @@ export function resolveTargets(
     }
   };
 
-  type SelectorResolutionPolicy = {
-    useCache: boolean;
-    reportDomEnvMissing: boolean;
-    reportResolutionError: boolean;
+  return {
+    handleTargetError,
+    handleSelectorDomEnvMissing,
+    handleSelectorResolutionError,
   };
+}
 
-  const defaultSelectorPolicy: SelectorResolutionPolicy = {
-    useCache: true,
-    reportDomEnvMissing: true,
-    reportResolutionError: true,
-  };
+function resolveSelectorWithPolicy(params: {
+  selector: string;
+  rootNode: TargetScopeRoot;
+  cache: SelectorCache;
+  policy?: SelectorResolutionPolicy;
+  handleSelectorDomEnvMissing: (selector: string, reason: string) => void;
+  handleSelectorResolutionError: (selector: string, reason: string) => void;
+}): { elements: Element[] | null; handled: boolean } {
+  const {
+    selector,
+    rootNode,
+    cache,
+    policy = DEFAULT_SELECTOR_POLICY,
+    handleSelectorDomEnvMissing,
+    handleSelectorResolutionError,
+  } = params;
 
-  const resolveSelectorWithPolicy = (
-    selector: string,
-    rootNode: TargetScopeRoot,
-    cache: SelectorCache,
-    policy: SelectorResolutionPolicy = defaultSelectorPolicy,
-  ): { elements: Element[] | null; handled: boolean } => {
-    if (!rootNode || typeof (rootNode as any).querySelectorAll !== 'function') {
-      if (policy.reportDomEnvMissing) {
-        const reason = 'No DOM root with querySelectorAll available for selector resolution';
-        handleSelectorDomEnvMissing(selector, reason);
-      }
-      return { elements: null, handled: true };
+  if (!rootNode || typeof (rootNode as any).querySelectorAll !== 'function') {
+    if (policy.reportDomEnvMissing) {
+      const reason = 'No DOM root with querySelectorAll available for selector resolution';
+      handleSelectorDomEnvMissing(selector, reason);
     }
+    return { elements: null, handled: true };
+  }
 
-    if (!policy.useCache) {
+  if (!policy.useCache) {
+    const resolved = resolveDomElements(selector, rootNode as Element | Document);
+    return { elements: resolved, handled: false };
+  }
+
+  try {
+    let elements = cache[selector];
+    if (!elements) {
       const resolved = resolveDomElements(selector, rootNode as Element | Document);
-      return { elements: resolved, handled: false };
+      elements = resolved ?? [];
+      cache[selector] = elements;
     }
-
-    const elements = resolveSelectorElementsWithCache(
-      selector,
-      rootNode as Element | Document,
-      cache,
-    );
     return { elements, handled: false };
-  };
-
-  const resolveSelectorElementsWithCache = (
-    selector: string,
-    rootNode: Element | Document,
-    cache: SelectorCache,
-  ): Element[] | null => {
-    try {
-      let elements = cache[selector];
-      if (!elements) {
-        const resolved = resolveDomElements(selector, rootNode as Element | Document);
-        elements = resolved ?? [];
-        cache[selector] = elements;
-      }
-      return elements;
-    } catch (e) {
+  } catch (e) {
+    if (policy.reportResolutionError) {
       const reason =
         e instanceof Error && e.message ? e.message : 'Unknown error during selector resolution';
       handleSelectorResolutionError(selector, reason);
-      return null;
     }
-  };
+    return { elements: null, handled: false };
+  }
+}
 
-  const pushTarget = (value: unknown) => {
-    if (value == null) {
-      const { rootKind } = getRootDiagnostics(root ?? null);
-      handleTargetError(
-        'Resolved target is null or undefined',
-        ErrorCode.TARGET_NULL,
-        ErrorSeverity.WARNING,
-        {
-          input,
-          root: root ?? null,
-          rootKind,
-          strictTargets: strict,
-        },
-      );
-      return;
-    }
-    if (seen.has(value)) return;
-    seen.add(value);
-    const type = getTargetType(value);
-    if (
-      type === TargetType.Object &&
-      (typeof value !== 'object' || value === null) &&
-      typeof value !== 'function'
-    ) {
-      debugResolveTargets('Unsupported non-object target value resolved as Object type', {
+function pushResolvedTarget(params: {
+  value: unknown;
+  input: unknown;
+  root: TargetScopeRoot;
+  strict: boolean;
+  seen: Set<unknown>;
+  result: ResolvedTarget[];
+  handleTargetError: (
+    message: string,
+    code: ErrorCode,
+    severity: ErrorSeverity,
+    context: Record<string, unknown>,
+  ) => void;
+}): void {
+  const { value, input, root, strict, seen, result, handleTargetError } = params;
+  if (value == null) {
+    const { rootKind } = getRootDiagnostics(root ?? null);
+    handleTargetError(
+      'Resolved target is null or undefined',
+      ErrorCode.TARGET_NULL,
+      ErrorSeverity.WARNING,
+      {
         input,
-        value,
-        valueType: typeof value,
-      });
-    }
-    result.push({
-      target: value,
-      type,
+        root: root ?? null,
+        rootKind,
+        strictTargets: strict,
+      },
+    );
+    return;
+  }
+  if (seen.has(value)) return;
+  seen.add(value);
+  const type = getTargetType(value);
+  if (
+    type === TargetType.Object &&
+    (typeof value !== 'object' || value === null) &&
+    typeof value !== 'function'
+  ) {
+    debugResolveTargets('Unsupported non-object target value resolved as Object type', {
+      input,
+      value,
+      valueType: typeof value,
     });
+  }
+  result.push({ target: value, type });
+}
+
+function addTargetsFromValue(params: {
+  value: unknown;
+  input: unknown;
+  root: TargetScopeRoot;
+  selectorCache: SelectorCache;
+  strict: boolean;
+  seen: Set<unknown>;
+  result: ResolvedTarget[];
+  handleTargetError: (
+    message: string,
+    code: ErrorCode,
+    severity: ErrorSeverity,
+    context: Record<string, unknown>,
+  ) => void;
+  handleSelectorDomEnvMissing: (selector: string, reason: string) => void;
+  handleSelectorResolutionError: (selector: string, reason: string) => void;
+}): void {
+  const {
+    value,
+    input,
+    root,
+    selectorCache,
+    strict,
+    seen,
+    result,
+    handleTargetError,
+    handleSelectorDomEnvMissing,
+    handleSelectorResolutionError,
+  } = params;
+
+  if (value == null) return;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      addTargetsFromValue({ ...params, value: item });
+    }
+    return;
+  }
+
+  if (isNodeList(value)) {
+    for (let i = 0; i < value.length; i++) {
+      addTargetsFromValue({ ...params, value: value.item(i) });
+    }
+    return;
+  }
+
+  if (isArrayLike(value)) {
+    const length = (value as any).length as number;
+    for (let i = 0; i < length; i++) {
+      if (i in (value as any)) {
+        addTargetsFromValue({ ...params, value: (value as any)[i] });
+      }
+    }
+    return;
+  }
+
+  if (typeof value === 'string') {
+    const { elements, handled } = resolveSelectorWithPolicy({
+      selector: value,
+      rootNode: root ?? null,
+      cache: selectorCache,
+      policy: DEFAULT_SELECTOR_POLICY,
+      handleSelectorDomEnvMissing,
+      handleSelectorResolutionError,
+    });
+
+    if (handled) return;
+
+    if (elements && elements.length > 1) {
+      for (const el of elements) {
+        pushResolvedTarget({ value: el, input, root, strict, seen, result, handleTargetError });
+      }
+      return;
+    }
+
+    pushResolvedTarget({ value, input, root, strict, seen, result, handleTargetError });
+    return;
+  }
+
+  if (isDomElement(value)) {
+    pushResolvedTarget({ value, input, root, strict, seen, result, handleTargetError });
+    return;
+  }
+
+  pushResolvedTarget({ value, input, root, strict, seen, result, handleTargetError });
+}
+
+export function resolveTargets(
+  input: unknown,
+  options?: TargetResolutionOptions,
+): ResolvedTarget[] {
+  const root = options?.root ?? (typeof document !== 'undefined' ? document : null);
+  const selectorCache = options?.selectorCache ?? {};
+  const seen = new Set<unknown>();
+  const result: ResolvedTarget[] = [];
+  const strict = options?.strictTargets ?? isDev();
+
+  const resolverCtx: TargetResolveContext = {
+    root: root ?? null,
+    selectorCache,
+    strictTargets: strict,
   };
+  const resolvedByNamespace = resolveWithRegisteredResolvers(input, resolverCtx);
+  if (resolvedByNamespace && resolvedByNamespace.length > 0) {
+    return resolvedByNamespace;
+  }
 
-  const addFrom = (value: unknown) => {
-    if (value == null) return;
+  const handler = getErrorHandler();
+  logRootOptionDiagnostics(options, input);
 
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        addFrom(item);
-      }
-      return;
-    }
+  const { handleTargetError, handleSelectorDomEnvMissing, handleSelectorResolutionError } =
+    createTargetErrorHandlers({
+      input,
+      root: root ?? null,
+      strict,
+      options,
+      handler,
+    });
 
-    if (isNodeList(value)) {
-      for (let i = 0; i < value.length; i++) {
-        addFrom(value.item(i));
-      }
-      return;
-    }
+  addTargetsFromValue({
+    value: input,
+    input,
+    root: root ?? null,
+    selectorCache,
+    strict,
+    seen,
+    result,
+    handleTargetError,
+    handleSelectorDomEnvMissing,
+    handleSelectorResolutionError,
+  });
 
-    if (isArrayLike(value)) {
-      const length = (value as any).length as number;
-      for (let i = 0; i < length; i++) {
-        if (i in (value as any)) {
-          addFrom((value as any)[i]);
-        }
-      }
-      return;
-    }
-
-    if (typeof value === 'string') {
-      const { elements, handled } = resolveSelectorWithPolicy(
-        value,
-        root ?? null,
-        selectorCache,
-        defaultSelectorPolicy,
-      );
-
-      if (handled) {
-        return;
-      }
-
-      if (elements && elements.length > 1) {
-        for (const el of elements) {
-          pushTarget(el);
-        }
-        return;
-      }
-
-      pushTarget(value);
-      return;
-    }
-
-    if (isDomElement(value)) {
-      pushTarget(value);
-      return;
-    }
-
-    pushTarget(value);
-  };
-
-  addFrom(input);
   if (input != null && result.length === 0) {
     const severity = strict ? ErrorSeverity.FATAL : ErrorSeverity.WARNING;
     debugResolveTargets('No valid targets resolved from input', { input, root });

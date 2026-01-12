@@ -108,39 +108,18 @@ export const WebGPUComputeSystem: SystemDef = {
   order: 6, // Run after BatchSamplingSystem (order 5)
 
   async update(_dt: number, ctx?: SystemContext) {
-    const world = ctx?.services.world ?? null;
-    const metricsProvider = ctx?.services.metrics;
-    const processor = ctx?.services.batchProcessor;
-    const config = ctx?.services.config;
+    const deps = resolveComputeDeps(ctx);
+    if (!deps) return;
 
-    if (!metricsProvider || !processor || !config) {
+    const { world, metricsProvider, processor, config } = deps;
+
+    if (shouldForceCPUFallback(metricsProvider, config)) {
       return;
     }
 
     const debugIOEnabled = isWebGPUIODebugEnabled(config);
-
-    const gpuMode = config.gpuCompute ?? 'auto';
-    if (gpuMode === 'never') {
-      metricsProvider.updateStatus({ cpuFallbackActive: true, enabled: false });
-      setPendingReadbackCount(0);
-      return;
-    }
-
-    await ensureWebGPUInitialized({ runtime, metricsProvider, config });
-
-    if (!runtime.bufferManager || !runtime.deviceAvailable) {
-      clearPhysicsGPUEntities();
-      setPendingReadbackCount(0);
-      return;
-    }
-
-    const device = runtime.bufferManager.getDevice();
-    if (!device) {
-      metricsProvider.updateStatus({ cpuFallbackActive: true });
-      clearPhysicsGPUEntities();
-      setPendingReadbackCount(0);
-      return;
-    }
+    const device = await ensureRuntimeDevice(metricsProvider, config);
+    if (!device) return;
 
     try {
       maybeSampleOutputFormatPoolStats({ runtime, metricsProvider, config, device });
@@ -159,70 +138,30 @@ export const WebGPUComputeSystem: SystemDef = {
 
     metricsProvider.updateStatus({ enabled: true, cpuFallbackActive: false });
 
+    const sp = runtime.stagingPool;
     const archetypeBatches = processor.getArchetypeBatches() as Map<
       string,
       ArchetypeBatchDescriptor
     >;
-    const sp = runtime.stagingPool;
-    if (!sp || archetypeBatches.size === 0) {
-      return;
-    }
-
-    const preprocessEnabled = !!config.keyframePreprocess?.enabled;
-    const useOptimizedKeyframeSearch = resolveKeyframeSearchOptimizedFlag(config);
-    const viewportCullingEnabled = !!world && isWebGPUViewportCullingEnabled(config);
-    const viewportCullingAsyncEnabled =
-      viewportCullingEnabled && isWebGPUViewportCullingAsyncEnabled(config);
+    if (!sp || archetypeBatches.size === 0) return;
 
     runtime.webgpuFrameId++;
 
-    const globalSpeed = config.globalSpeed ?? 1;
-    const samplingMode = config.samplingMode ?? 'time';
-    const baseDtMs =
-      samplingMode === 'frame' && typeof ctx?.sampling?.deltaTimeMs === 'number'
-        ? ctx!.sampling!.deltaTimeMs
-        : _dt;
-    const dtMs = baseDtMs * globalSpeed;
-    const dtSec = dtMs / 1000;
-    const maxVelocity = config.physicsMaxVelocity ?? 10000;
+    const { dtMs, dtSec, maxVelocity } = resolvePhysicsTiming(_dt, ctx, config);
+    const flags = resolveProcessingFlags(world, config);
 
-    for (const [archetypeId, batch] of archetypeBatches) {
-      const leaseId = batch.entityIdsLeaseId;
-      try {
-        if (batch.kind === 'physics') {
-          await dispatchPhysicsBatchForArchetype({
-            runtime,
-            device,
-            processor,
-            config,
-            batch: batch as PhysicsBatchDescriptor,
-            dtMs,
-            dtSec,
-            maxVelocity,
-          });
-          continue;
-        }
-
-        await processInterpolationArchetype({
-          runtime,
-          device,
-          world,
-          processor,
-          archetypeId,
-          batch: batch as GPUBatchDescriptor,
-          debugIOEnabled,
-          preprocessEnabled,
-          useOptimizedKeyframeSearch,
-          viewportCullingEnabled,
-          viewportCullingAsyncEnabled,
-        });
-      } catch {
-        if (typeof leaseId === 'number') {
-          processor.releaseEntityIds(leaseId);
-        }
-        warn('dispatch failed', { archetypeId, entityCount: batch.entityCount });
-      }
-    }
+    await processArchetypeBatches({
+      archetypeBatches,
+      world,
+      processor,
+      config,
+      device,
+      debugIOEnabled,
+      dtMs,
+      dtSec,
+      maxVelocity,
+      ...flags,
+    });
 
     sp.nextFrame();
 
@@ -231,3 +170,162 @@ export const WebGPUComputeSystem: SystemDef = {
     } catch {}
   },
 };
+
+function resolveComputeDeps(ctx: SystemContext | undefined): {
+  world: SystemContext['services']['world'] | null;
+  metricsProvider: NonNullable<SystemContext['services']['metrics']>;
+  processor: NonNullable<SystemContext['services']['batchProcessor']>;
+  config: NonNullable<SystemContext['services']['config']>;
+} | null {
+  const world = ctx?.services.world ?? null;
+  const metricsProvider = ctx?.services.metrics;
+  const processor = ctx?.services.batchProcessor;
+  const config = ctx?.services.config;
+  if (!metricsProvider || !processor || !config) return null;
+  return { world, metricsProvider, processor, config };
+}
+
+function shouldForceCPUFallback(
+  metricsProvider: NonNullable<SystemContext['services']['metrics']>,
+  config: NonNullable<SystemContext['services']['config']>,
+): boolean {
+  const gpuMode = config.gpuCompute ?? 'auto';
+  if (gpuMode !== 'never') return false;
+  metricsProvider.updateStatus({ cpuFallbackActive: true, enabled: false });
+  setPendingReadbackCount(0);
+  return true;
+}
+
+async function ensureRuntimeDevice(
+  metricsProvider: NonNullable<SystemContext['services']['metrics']>,
+  config: NonNullable<SystemContext['services']['config']>,
+): Promise<GPUDevice | null> {
+  await ensureWebGPUInitialized({ runtime, metricsProvider, config });
+
+  if (!runtime.bufferManager || !runtime.deviceAvailable) {
+    clearPhysicsGPUEntities();
+    setPendingReadbackCount(0);
+    return null;
+  }
+
+  const device = runtime.bufferManager.getDevice();
+  if (!device) {
+    metricsProvider.updateStatus({ cpuFallbackActive: true });
+    clearPhysicsGPUEntities();
+    setPendingReadbackCount(0);
+    return null;
+  }
+
+  return device;
+}
+
+function resolvePhysicsTiming(
+  dtMsInput: number,
+  ctx: SystemContext | undefined,
+  config: NonNullable<SystemContext['services']['config']>,
+): { dtMs: number; dtSec: number; maxVelocity: number } {
+  const globalSpeed = config.globalSpeed ?? 1;
+  const samplingMode = config.samplingMode ?? 'time';
+  const baseDtMs =
+    samplingMode === 'frame' && typeof ctx?.sampling?.deltaTimeMs === 'number'
+      ? ctx!.sampling!.deltaTimeMs
+      : dtMsInput;
+  const dtMs = baseDtMs * globalSpeed;
+  return {
+    dtMs,
+    dtSec: dtMs / 1000,
+    maxVelocity: config.physicsMaxVelocity ?? 10000,
+  };
+}
+
+function resolveProcessingFlags(
+  world: SystemContext['services']['world'] | null,
+  config: NonNullable<SystemContext['services']['config']>,
+): {
+  preprocessEnabled: boolean;
+  useOptimizedKeyframeSearch: boolean;
+  viewportCullingEnabled: boolean;
+  viewportCullingAsyncEnabled: boolean;
+} {
+  const preprocessEnabled = !!config.keyframePreprocess?.enabled;
+  const useOptimizedKeyframeSearch = resolveKeyframeSearchOptimizedFlag(config);
+  const viewportCullingEnabled = !!world && isWebGPUViewportCullingEnabled(config);
+  const viewportCullingAsyncEnabled =
+    viewportCullingEnabled && isWebGPUViewportCullingAsyncEnabled(config);
+  return {
+    preprocessEnabled,
+    useOptimizedKeyframeSearch,
+    viewportCullingEnabled,
+    viewportCullingAsyncEnabled,
+  };
+}
+
+async function processArchetypeBatches(params: {
+  archetypeBatches: Map<string, ArchetypeBatchDescriptor>;
+  world: SystemContext['services']['world'] | null;
+  processor: NonNullable<SystemContext['services']['batchProcessor']>;
+  config: NonNullable<SystemContext['services']['config']>;
+  device: GPUDevice;
+  debugIOEnabled: boolean;
+  preprocessEnabled: boolean;
+  useOptimizedKeyframeSearch: boolean;
+  viewportCullingEnabled: boolean;
+  viewportCullingAsyncEnabled: boolean;
+  dtMs: number;
+  dtSec: number;
+  maxVelocity: number;
+}): Promise<void> {
+  const {
+    archetypeBatches,
+    world,
+    processor,
+    config,
+    device,
+    debugIOEnabled,
+    preprocessEnabled,
+    useOptimizedKeyframeSearch,
+    viewportCullingEnabled,
+    viewportCullingAsyncEnabled,
+    dtMs,
+    dtSec,
+    maxVelocity,
+  } = params;
+
+  for (const [archetypeId, batch] of archetypeBatches) {
+    const leaseId = batch.entityIdsLeaseId;
+    try {
+      if (batch.kind === 'physics') {
+        await dispatchPhysicsBatchForArchetype({
+          runtime,
+          device,
+          processor,
+          config,
+          batch: batch as PhysicsBatchDescriptor,
+          dtMs,
+          dtSec,
+          maxVelocity,
+        });
+        continue;
+      }
+
+      await processInterpolationArchetype({
+        runtime,
+        device,
+        world,
+        processor,
+        archetypeId,
+        batch: batch as GPUBatchDescriptor,
+        debugIOEnabled,
+        preprocessEnabled,
+        useOptimizedKeyframeSearch,
+        viewportCullingEnabled,
+        viewportCullingAsyncEnabled,
+      });
+    } catch {
+      if (typeof leaseId === 'number') {
+        processor.releaseEntityIds(leaseId);
+      }
+      warn('dispatch failed', { archetypeId, entityCount: batch.entityCount });
+    }
+  }
+}

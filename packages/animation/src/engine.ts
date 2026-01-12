@@ -1,4 +1,4 @@
-import { WorldProvider } from '@g-motion/core';
+import { ErrorCode, ErrorSeverity, MotionError, WorldProvider } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 
 const warn = createDebugger('Engine', 'warn');
@@ -19,7 +19,12 @@ class EngineConfig {
    */
   setSpeed(speed: number): void {
     if (!Number.isFinite(speed) || speed <= 0) {
-      throw new Error(`[Motion Engine] Speed must be a positive number, got: ${speed}`);
+      throw new MotionError(
+        `[Motion Engine] Speed must be a positive number, got: ${speed}`,
+        ErrorCode.INVALID_PARAMETER,
+        ErrorSeverity.FATAL,
+        { speed },
+      );
     }
     this.getWorld().config.globalSpeed = speed;
   }

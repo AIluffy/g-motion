@@ -1,5 +1,7 @@
 export type FrameRoundingMode = 'floor' | 'ceil' | 'round';
 
+import { clamp01 } from '../math/interpolation';
+
 export class FrameSampler {
   readonly fps: number;
   readonly frameDurationMs: number;
@@ -52,7 +54,7 @@ export class FrameSampler {
 
   interpolateFrame(fromFramePosition: number, toFramePosition: number, t: number): number {
     if (!Number.isFinite(t)) return fromFramePosition;
-    const clamped = Math.max(0, Math.min(1, t));
+    const clamped = clamp01(t);
     return fromFramePosition + (toFramePosition - fromFramePosition) * clamped;
   }
 }

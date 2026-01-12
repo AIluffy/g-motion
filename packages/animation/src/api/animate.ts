@@ -1,4 +1,4 @@
-import type { Easing } from '@g-motion/core';
+import { ErrorCode, ErrorSeverity, MotionError, type Easing } from '@g-motion/core';
 import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
@@ -16,6 +16,108 @@ export interface AnimateOptions {
 }
 
 const DEFAULT_DURATION = 300;
+
+function isKeyframeObject(to: unknown): to is Record<string, unknown> {
+  return !!to && typeof to === 'object';
+}
+
+function hasAnyKeyframeArrays(to: Record<string, unknown>): boolean {
+  for (const v of Object.values(to)) {
+    if (Array.isArray(v)) return true;
+  }
+  return false;
+}
+
+function normalizePrimitiveObjectTo(to: Record<string, unknown>): unknown {
+  const keys = Object.keys(to);
+  if (keys.length === 1 && (keys[0] === 'value' || keys[0] === '__primitive')) {
+    return to[keys[0]];
+  }
+  return to;
+}
+
+function resolveKeyframeCount(keys: string[], to: Record<string, unknown>): number {
+  let keyframeCount = 0;
+  for (const key of keys) {
+    const v = to[key];
+    if (!Array.isArray(v)) continue;
+    if (keyframeCount === 0) {
+      keyframeCount = v.length;
+    } else if (v.length !== keyframeCount) {
+      throw new MotionError(
+        'All keyframe arrays must have the same length',
+        ErrorCode.INVALID_PARAMETER,
+        ErrorSeverity.FATAL,
+        { property: key, expectedLength: keyframeCount, actualLength: v.length },
+      );
+    }
+  }
+  return keyframeCount;
+}
+
+function resolveSegmentDuration(
+  index: number,
+  keyframeCount: number,
+  totalDuration: number,
+  options: AnimateOptions | undefined,
+): number {
+  let segmentDuration = totalDuration / (keyframeCount - 1);
+  if (options?.times && options.times.length === keyframeCount) {
+    const prev = options.times[index - 1];
+    const next = options.times[index];
+    const delta = (next - prev) * totalDuration;
+    if (Number.isFinite(delta) && delta >= 0) {
+      segmentDuration = delta;
+    }
+  }
+  return segmentDuration;
+}
+
+function buildSegmentTo(
+  keys: string[],
+  to: Record<string, unknown>,
+  index: number,
+): Record<string, unknown> {
+  const segmentTo: Record<string, unknown> = {};
+  for (const key of keys) {
+    const v = to[key];
+    segmentTo[key] = Array.isArray(v) ? v[index] : v;
+  }
+  return segmentTo;
+}
+
+function buildKeyframeMarks(
+  keys: string[],
+  to: Record<string, unknown>,
+  keyframeCount: number,
+  totalDuration: number,
+  options: AnimateOptions | undefined,
+): MarkOptions[] {
+  const marks: MarkOptions[] = [];
+  const segmentDurations: number[] = [];
+
+  for (let i = 1; i < keyframeCount; i++) {
+    const segmentDuration = resolveSegmentDuration(i, keyframeCount, totalDuration, options);
+    segmentDurations.push(segmentDuration);
+    marks.push({
+      to: buildSegmentTo(keys, to, i),
+      duration: segmentDuration,
+      ease: options?.ease,
+    });
+  }
+
+  if (options?.repeatType === 'reverse') {
+    for (let i = keyframeCount - 2; i >= 0; i--) {
+      marks.push({
+        to: buildSegmentTo(keys, to, i),
+        duration: segmentDurations[i],
+        ease: options?.ease,
+      });
+    }
+  }
+
+  return marks;
+}
 
 function applyAnimateMark(
   builder: { mark(mark: MarkOptions | MarkOptions[]): unknown },
@@ -35,7 +137,7 @@ function applyAnimateMark(
     return;
   }
 
-  if (!to || typeof to !== 'object') {
+  if (!isKeyframeObject(to)) {
     const mark: MarkOptions = {
       to,
       duration: totalDuration,
@@ -45,108 +147,20 @@ function applyAnimateMark(
     return;
   }
 
-  const values = Object.values(to);
-  const hasKeyframes = values.some((v) => Array.isArray(v));
-
-  if (!hasKeyframes) {
-    let markTo: any = to;
-
-    if (targetType === TargetType.Primitive) {
-      const keys = Object.keys(to);
-      if (keys.length === 1 && (keys[0] === 'value' || keys[0] === '__primitive')) {
-        markTo = to[keys[0]];
-      }
-    }
-
-    const mark: MarkOptions = {
-      to: markTo,
-      duration: totalDuration,
-      ease: options?.ease,
-    };
-    builder.mark(mark);
+  if (!hasAnyKeyframeArrays(to)) {
+    const markTo = targetType === TargetType.Primitive ? normalizePrimitiveObjectTo(to) : to;
+    builder.mark({ to: markTo, duration: totalDuration, ease: options?.ease });
     return;
   }
 
   const keys = Object.keys(to);
-  let keyframeCount = 0;
-
-  for (const key of keys) {
-    const v = to[key];
-    if (Array.isArray(v)) {
-      if (keyframeCount === 0) {
-        keyframeCount = v.length;
-      } else if (v.length !== keyframeCount) {
-        throw new Error('All keyframe arrays must have the same length');
-      }
-    }
-  }
-
+  const keyframeCount = resolveKeyframeCount(keys, to);
   if (keyframeCount <= 1) {
-    const mark: MarkOptions = {
-      to,
-      duration: totalDuration,
-      ease: options?.ease,
-    };
-    builder.mark(mark);
+    builder.mark({ to, duration: totalDuration, ease: options?.ease });
     return;
   }
 
-  const marks: MarkOptions[] = [];
-  const segmentDurations: number[] = [];
-
-  for (let i = 1; i < keyframeCount; i++) {
-    const segmentTo: Record<string, unknown> = {};
-    let segmentDuration = totalDuration / (keyframeCount - 1);
-
-    if (options?.times && options.times.length === keyframeCount) {
-      const prev = options.times[i - 1];
-      const next = options.times[i];
-      const delta = (next - prev) * totalDuration;
-      if (Number.isFinite(delta) && delta >= 0) {
-        segmentDuration = delta;
-      }
-    }
-
-    segmentDurations.push(segmentDuration);
-
-    for (const key of keys) {
-      const v = to[key];
-      if (Array.isArray(v)) {
-        segmentTo[key] = v[i];
-      } else {
-        segmentTo[key] = v;
-      }
-    }
-
-    marks.push({
-      to: segmentTo,
-      duration: segmentDuration,
-      ease: options?.ease,
-    });
-  }
-
-  if (options?.repeatType === 'reverse') {
-    for (let i = keyframeCount - 2; i >= 0; i--) {
-      const segmentTo: Record<string, unknown> = {};
-
-      for (const key of keys) {
-        const v = to[key];
-        if (Array.isArray(v)) {
-          segmentTo[key] = v[i];
-        } else {
-          segmentTo[key] = v;
-        }
-      }
-
-      marks.push({
-        to: segmentTo,
-        duration: segmentDurations[i],
-        ease: options?.ease,
-      });
-    }
-  }
-
-  builder.mark(marks);
+  builder.mark(buildKeyframeMarks(keys, to, keyframeCount, totalDuration, options));
 }
 
 export function animate(

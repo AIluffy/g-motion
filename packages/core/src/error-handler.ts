@@ -171,7 +171,9 @@ export class ErrorHandler {
         monitor.record(event);
       });
       this.addListener(listener);
-    } catch {}
+    } catch (e) {
+      warn('error monitor listener setup failed', e);
+    }
   }
 
   /**

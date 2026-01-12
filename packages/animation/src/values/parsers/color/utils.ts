@@ -9,6 +9,7 @@
 import type { ColorValue } from './types';
 import { hexToRgba, hslToRgb } from './convert';
 import { NAMED_COLORS } from './named';
+import { clamp, clamp01 } from '@g-motion/utils';
 
 // Regex patterns for color detection
 export const HEX_PATTERN = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -45,10 +46,10 @@ export function parseRgb(value: string): ColorValue {
   }
 
   return {
-    r: Math.max(0, Math.min(255, r)),
-    g: Math.max(0, Math.min(255, g)),
-    b: Math.max(0, Math.min(255, b)),
-    a: Math.max(0, Math.min(1, a)),
+    r: clamp(r, 0, 255),
+    g: clamp(g, 0, 255),
+    b: clamp(b, 0, 255),
+    a: clamp01(a),
   };
 }
 
@@ -92,7 +93,7 @@ export function parseHsl(value: string): ColorValue {
     r,
     g,
     b,
-    a: Math.max(0, Math.min(1, a)),
+    a: clamp01(a),
   };
 }
 

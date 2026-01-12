@@ -1,8 +1,9 @@
 import { ComponentRegistry } from './registry';
 import { EntityManager } from './entity';
 import { SystemScheduler } from './scheduler';
-import { Archetype, type ComponentValue } from './archetype';
-import { MotionAppConfig } from './plugin';
+import type { Archetype } from './archetype';
+import type { ComponentValue } from './types';
+import type { MotionAppConfig } from './plugin';
 import { ArchetypeManager, type MotionStatusCoordinator } from './archetypeManager';
 import { ConfigurationService } from './configurationService';
 import { SystemCoordinator } from './systemCoordinator';
