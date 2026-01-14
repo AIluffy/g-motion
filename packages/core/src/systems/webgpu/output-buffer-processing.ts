@@ -9,6 +9,7 @@ import { StagingBufferPool } from '../../webgpu/staging-pool';
 import { AsyncReadbackManager } from '../../webgpu/async-readback';
 import { ComputeBatchProcessor } from '../batch/processor';
 import { setPendingReadbackCount } from '../../webgpu/sync-manager';
+import { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
 
 export interface ProcessOutputBufferInput {
   archetypeId: string;
@@ -20,6 +21,8 @@ export interface ProcessOutputBufferInput {
   outputStride: number;
   rawChannels: Array<{ index: number; property: string }>;
   outputChannels: Array<{ index: number; property: string }>;
+  keepOutputBuffer?: boolean;
+  readbackTag?: unknown;
 }
 
 export async function processOutputBuffer(
@@ -29,6 +32,7 @@ export async function processOutputBuffer(
   readbackManager: AsyncReadbackManager | null,
   processor: ComputeBatchProcessor,
   input: ProcessOutputBufferInput,
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<void> {
   const {
     archetypeId,
@@ -40,10 +44,17 @@ export async function processOutputBuffer(
     outputStride,
     rawChannels,
     outputChannels,
+    keepOutputBuffer,
+    readbackTag,
   } = input;
+  const keep = keepOutputBuffer === true && readbackManager !== null;
 
   if (entityCount <= 0) {
-    outputBuffer.destroy();
+    if (keep) {
+      tryReleasePooledOutputBufferFromTag(readbackTag);
+    } else {
+      outputBuffer.destroy();
+    }
     if (typeof leaseId === 'number') {
       processor.releaseEntityIds(leaseId);
     }
@@ -59,6 +70,7 @@ export async function processOutputBuffer(
     usedRawValueCount,
     rawStride,
     outputChannels.length ? outputChannels : undefined,
+    submit,
   );
 
   const didFormat = formattedBuffer !== outputBuffer;
@@ -71,7 +83,9 @@ export async function processOutputBuffer(
       : undefined;
 
   if (didFormat) {
-    outputBuffer.destroy();
+    if (!keep) {
+      outputBuffer.destroy();
+    }
   }
 
   const stride = didFormat ? outputStride : rawStride;
@@ -81,7 +95,14 @@ export async function processOutputBuffer(
 
   const stagingBuffer = sp.acquire(archetypeId, byteSize);
   if (!stagingBuffer) {
-    formattedBuffer.destroy();
+    if (didFormat) {
+      formattedBuffer.destroy();
+    } else if (!keep) {
+      formattedBuffer.destroy();
+    }
+    if (keep) {
+      tryReleasePooledOutputBufferFromTag(readbackTag);
+    }
     if (typeof leaseId === 'number') {
       processor.releaseEntityIds(leaseId);
     }
@@ -96,15 +117,17 @@ export async function processOutputBuffer(
     label: `copy-output-${archetypeId}`,
   });
   copyEncoder.copyBufferToBuffer(formattedBuffer, 0, stagingBuffer, 0, byteSize);
-  queue.submit([copyEncoder.finish()]);
-  if (didFormat) {
-    releaseOutputFormatBuffer(formattedBuffer, queue);
-  } else {
-    formattedBuffer.destroy();
-  }
+  const commandBuffer = copyEncoder.finish();
+
+  let mapPromise: Promise<void> | null = null;
+  let resolveMapPromise: (() => void) | null = null;
+  let rejectMapPromise: ((e: unknown) => void) | null = null;
 
   if (readbackManager) {
-    const mapPromise = stagingBuffer.mapAsync((GPUMapMode as any).READ);
+    mapPromise = new Promise<void>((resolve, reject) => {
+      resolveMapPromise = resolve;
+      rejectMapPromise = reject;
+    });
     readbackManager.enqueueMapAsync(
       archetypeId,
       entityIdsForReadback,
@@ -115,7 +138,31 @@ export async function processOutputBuffer(
       stride,
       channelsForReadback,
       leaseId,
+      readbackTag,
     );
     setPendingReadbackCount(readbackManager.getPendingCount());
   }
+
+  const afterSubmit = () => {
+    if (didFormat) {
+      releaseOutputFormatBuffer(formattedBuffer, queue);
+    } else {
+      if (!keep) {
+        formattedBuffer.destroy();
+      }
+    }
+    if (readbackManager) {
+      const p = stagingBuffer.mapAsync((GPUMapMode as any).READ);
+      p.then(() => resolveMapPromise?.()).catch((e) => rejectMapPromise?.(e));
+    }
+  };
+
+  if (submit) {
+    submit(commandBuffer, afterSubmit);
+  } else {
+    queue.submit([commandBuffer]);
+    afterSubmit();
+  }
+
+  return;
 }

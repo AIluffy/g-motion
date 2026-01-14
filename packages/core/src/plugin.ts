@@ -90,6 +90,13 @@ export interface MotionAppConfig {
 
   keyframeSearchOptimized?: boolean;
 
+  keyframeEntryExpandOnGPU?: boolean;
+
+  keyframeSearchIndexed?: boolean;
+  keyframeSearchIndexedMinKeyframes?: number;
+
+  timelineFlat?: boolean;
+
   metricsSamplingRate?: number;
 
   debugWebGPUIO?: boolean;
@@ -103,6 +110,18 @@ export interface MotionAppConfig {
     viewport?: boolean;
     async?: boolean;
   };
+
+  webgpuStatesConditionalUpload?: boolean;
+
+  webgpuForceStatesUpload?: boolean;
+
+  webgpuBatchedSubmit?: boolean;
+
+  webgpuReadbackMode?: 'full' | 'visible';
+
+  webgpuOutputBufferReuse?: boolean;
+
+  batchSamplingStaticReuse?: boolean;
 
   physicsMaxVelocity?: number;
   physicsValidation?: boolean;

@@ -30,8 +30,16 @@ import {
 import { clearPhysicsGPUEntities, setPendingReadbackCount } from '../../webgpu/sync-manager';
 import {
   isWebGPUIODebugEnabled,
+  isKeyframeEntryExpandOnGPUEnabled,
+  isKeyframeSearchIndexedEnabled,
+  isWebGPUBatchedSubmitEnabled,
+  isWebGPUForceStatesUploadEnabled,
+  isWebGPUStatesConditionalUploadEnabled,
   isWebGPUViewportCullingEnabled,
   isWebGPUViewportCullingAsyncEnabled,
+  resolveKeyframeSearchIndexedMinKeyframes,
+  resolveWebGPUReadbackMode,
+  resolveWebGPUOutputBufferReuseEnabled,
   resolveKeyframeSearchOptimizedFlag,
 } from './system-config';
 import { __resetOutputFormatPassForTests } from './output-format';
@@ -146,6 +154,7 @@ export const WebGPUComputeSystem: SystemDef = {
     if (!sp || archetypeBatches.size === 0) return;
 
     runtime.webgpuFrameId++;
+    runtime.timingHelper?.beginFrame?.();
 
     const { dtMs, dtSec, maxVelocity } = resolvePhysicsTiming(_dt, ctx, config);
     const flags = resolveProcessingFlags(world, config);
@@ -244,19 +253,36 @@ function resolveProcessingFlags(
 ): {
   preprocessEnabled: boolean;
   useOptimizedKeyframeSearch: boolean;
+  keyframeSearchIndexedEnabled: boolean;
+  keyframeSearchIndexedMinKeyframes: number;
+  keyframeEntryExpandOnGPUEnabled: boolean;
   viewportCullingEnabled: boolean;
   viewportCullingAsyncEnabled: boolean;
+  statesConditionalUploadEnabled: boolean;
+  forceStatesUploadEnabled: boolean;
+  outputBufferReuseEnabled: boolean;
 } {
   const preprocessEnabled = !!config.keyframePreprocess?.enabled;
   const useOptimizedKeyframeSearch = resolveKeyframeSearchOptimizedFlag(config);
-  const viewportCullingEnabled = !!world && isWebGPUViewportCullingEnabled(config);
+  const keyframeSearchIndexedEnabled = isKeyframeSearchIndexedEnabled(config);
+  const keyframeSearchIndexedMinKeyframes = resolveKeyframeSearchIndexedMinKeyframes(config);
+  const keyframeEntryExpandOnGPUEnabled = isKeyframeEntryExpandOnGPUEnabled(config);
+  const readbackMode = resolveWebGPUReadbackMode(config);
+  const viewportCullingEnabled =
+    !!world && (isWebGPUViewportCullingEnabled(config) || readbackMode === 'visible');
   const viewportCullingAsyncEnabled =
     viewportCullingEnabled && isWebGPUViewportCullingAsyncEnabled(config);
   return {
     preprocessEnabled,
     useOptimizedKeyframeSearch,
+    keyframeSearchIndexedEnabled,
+    keyframeSearchIndexedMinKeyframes,
+    keyframeEntryExpandOnGPUEnabled,
     viewportCullingEnabled,
     viewportCullingAsyncEnabled,
+    statesConditionalUploadEnabled: isWebGPUStatesConditionalUploadEnabled(config),
+    forceStatesUploadEnabled: isWebGPUForceStatesUploadEnabled(config),
+    outputBufferReuseEnabled: resolveWebGPUOutputBufferReuseEnabled(config),
   };
 }
 
@@ -269,8 +295,14 @@ async function processArchetypeBatches(params: {
   debugIOEnabled: boolean;
   preprocessEnabled: boolean;
   useOptimizedKeyframeSearch: boolean;
+  keyframeSearchIndexedEnabled: boolean;
+  keyframeSearchIndexedMinKeyframes: number;
+  keyframeEntryExpandOnGPUEnabled: boolean;
   viewportCullingEnabled: boolean;
   viewportCullingAsyncEnabled: boolean;
+  statesConditionalUploadEnabled: boolean;
+  forceStatesUploadEnabled: boolean;
+  outputBufferReuseEnabled: boolean;
   dtMs: number;
   dtSec: number;
   maxVelocity: number;
@@ -284,48 +316,93 @@ async function processArchetypeBatches(params: {
     debugIOEnabled,
     preprocessEnabled,
     useOptimizedKeyframeSearch,
+    keyframeSearchIndexedEnabled,
+    keyframeSearchIndexedMinKeyframes,
+    keyframeEntryExpandOnGPUEnabled,
     viewportCullingEnabled,
     viewportCullingAsyncEnabled,
+    statesConditionalUploadEnabled,
+    forceStatesUploadEnabled,
+    outputBufferReuseEnabled,
     dtMs,
     dtSec,
     maxVelocity,
   } = params;
 
-  for (const [archetypeId, batch] of archetypeBatches) {
-    const leaseId = batch.entityIdsLeaseId;
-    try {
-      if (batch.kind === 'physics') {
-        await dispatchPhysicsBatchForArchetype({
+  const batchedSubmitEnabled = isWebGPUBatchedSubmitEnabled(config);
+  const queue = device.queue;
+  const pendingCommandBuffers: GPUCommandBuffer[] = [];
+  const afterSubmitCallbacks: Array<() => void> = [];
+
+  const submit = (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => {
+    if (!batchedSubmitEnabled) {
+      queue.submit([commandBuffer]);
+      afterSubmit?.();
+      return;
+    }
+    pendingCommandBuffers.push(commandBuffer);
+    if (afterSubmit) afterSubmitCallbacks.push(afterSubmit);
+  };
+
+  const flush = () => {
+    if (!batchedSubmitEnabled || pendingCommandBuffers.length === 0) {
+      return;
+    }
+    const toSubmit = pendingCommandBuffers.slice();
+    pendingCommandBuffers.length = 0;
+    queue.submit(toSubmit);
+    const callbacks = afterSubmitCallbacks.slice();
+    afterSubmitCallbacks.length = 0;
+    for (const cb of callbacks) cb();
+  };
+
+  try {
+    for (const [archetypeId, batch] of archetypeBatches) {
+      const leaseId = batch.entityIdsLeaseId;
+      try {
+        if (batch.kind === 'physics') {
+          await dispatchPhysicsBatchForArchetype({
+            runtime,
+            device,
+            processor,
+            config,
+            batch: batch as PhysicsBatchDescriptor,
+            dtMs,
+            dtSec,
+            maxVelocity,
+            submit,
+          });
+          continue;
+        }
+
+        await processInterpolationArchetype({
           runtime,
           device,
+          world,
           processor,
-          config,
-          batch: batch as PhysicsBatchDescriptor,
-          dtMs,
-          dtSec,
-          maxVelocity,
+          archetypeId,
+          batch: batch as GPUBatchDescriptor,
+          debugIOEnabled,
+          preprocessEnabled,
+          useOptimizedKeyframeSearch,
+          keyframeSearchIndexedEnabled,
+          keyframeSearchIndexedMinKeyframes,
+          keyframeEntryExpandOnGPUEnabled,
+          viewportCullingEnabled,
+          viewportCullingAsyncEnabled,
+          statesConditionalUploadEnabled,
+          forceStatesUploadEnabled,
+          outputBufferReuseEnabled,
+          submit,
         });
-        continue;
+      } catch {
+        if (typeof leaseId === 'number') {
+          processor.releaseEntityIds(leaseId);
+        }
+        warn('dispatch failed', { archetypeId, entityCount: batch.entityCount });
       }
-
-      await processInterpolationArchetype({
-        runtime,
-        device,
-        world,
-        processor,
-        archetypeId,
-        batch: batch as GPUBatchDescriptor,
-        debugIOEnabled,
-        preprocessEnabled,
-        useOptimizedKeyframeSearch,
-        viewportCullingEnabled,
-        viewportCullingAsyncEnabled,
-      });
-    } catch {
-      if (typeof leaseId === 'number') {
-        processor.releaseEntityIds(leaseId);
-      }
-      warn('dispatch failed', { archetypeId, entityCount: batch.entityCount });
     }
+  } finally {
+    flush();
   }
 }

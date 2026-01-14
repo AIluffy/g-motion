@@ -3,9 +3,11 @@ import { MotionStatus } from '../../components/state';
 import { getEasingId } from '../easing-registry';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import { SchedulingConstants } from '../../constants/scheduling';
+import { TimelineTracksMap } from '../../types';
 import type {
   Keyframe,
   MotionStateData,
+  PreprocessedKeyframes,
   RenderData,
   TimelineComponentData,
   TimelineData,
@@ -37,6 +39,8 @@ import {
   bufferCache,
   __resetBatchSamplingCachesForTests,
   hashEntityIndices,
+  hashMotionStateVersionStep,
+  consumeBatchSamplingSeekInvalidation,
   getKeyframesPackedCache,
   getEntityIndicesScratchByArchetype,
   getArchetypeCursor,
@@ -74,6 +78,19 @@ type InertiaComponentData = {
   bounceDamping?: number;
   bounceMass?: number;
 };
+
+function getFlatTracks(timeline: {
+  tracks?: TimelineData;
+}): { keys: string[]; values: Track[] } | undefined {
+  const tracks = timeline.tracks;
+  if (!tracks || tracks.size === 0) return undefined;
+  if (tracks instanceof TimelineTracksMap) {
+    return { keys: tracks.flatKeys, values: tracks.flatValues };
+  }
+  const wrapped = new TimelineTracksMap(tracks as Iterable<readonly [string, Track]>);
+  timeline.tracks = wrapped;
+  return { keys: wrapped.flatKeys, values: wrapped.flatValues };
+}
 
 /**
  * Batch Sampling System
@@ -120,6 +137,7 @@ export const BatchSamplingSystem: SystemDef = {
     }
     const now = performance.now();
     const config = world.config;
+    const timelineFlatEnabled = config.timelineFlat === true;
     const engineFrame =
       typeof ctx?.sampling?.engineFrame === 'number'
         ? ctx!.sampling!.engineFrame
@@ -147,6 +165,8 @@ export const BatchSamplingSystem: SystemDef = {
     const gpuStatus = metrics.getStatus?.();
     const gpuActive =
       !!gpuStatus?.enabled && !!gpuStatus?.gpuInitialized && !gpuStatus?.cpuFallbackActive;
+    const staticReuseEnabled = config.batchSamplingStaticReuse === true;
+    const seekInvalidation = consumeBatchSamplingSeekInvalidation();
 
     // GPU-First: Only skip if explicitly disabled
     if (config.gpuCompute === 'never') {
@@ -157,14 +177,16 @@ export const BatchSamplingSystem: SystemDef = {
     // Always prepare batches for GPU (GPU-first architecture)
     // CPU fallback is handled by InterpolationSystem when GPU unavailable
 
-    // Clear previous archetype batches (per-frame refresh)
-    processor.clearArchetypeBatches();
+    if (!staticReuseEnabled || seekInvalidation) {
+      processor.clearArchetypeBatches();
+    }
 
     // Per-archetype batch collection
     let totalEntities = 0;
 
     const slice = config.workSlicing;
-    const perFrame = slice?.enabled ? slice.batchSamplingArchetypesPerFrame : undefined;
+    const perFrame =
+      !seekInvalidation && slice?.enabled ? slice.batchSamplingArchetypesPerFrame : undefined;
     let toProcess: Iterable<import('../../archetype').Archetype>;
     if (typeof perFrame === 'number' && Number.isFinite(perFrame)) {
       const archetypeScratch = getArchetypeScratch();
@@ -330,12 +352,41 @@ export const BatchSamplingSystem: SystemDef = {
 
       // Create per-archetype batch if entities exist
       if (entityCount > 0) {
-        const lease = processor.acquireEntityIds(entityCount);
-        const entityIdsView = lease.buffer.subarray(0, entityCount);
-        for (let eIndex = 0; eIndex < entityCount; eIndex++) {
-          entityIdsView[eIndex] = archetype.getEntityId(entityIndicesBuf[eIndex]);
+        const entitySig = hashEntityIndices(entityIndicesBuf, entityCount);
+        const prevBatchRaw = processor.getArchetypeBatch(archetype.id);
+        const prevBatch =
+          prevBatchRaw && (prevBatchRaw as any).kind !== 'physics'
+            ? (prevBatchRaw as any)
+            : undefined;
+
+        let entityIdsView: ArrayLike<number>;
+        let entityIdsLeaseId: number | undefined;
+        let statesData: Float32Array;
+
+        if (
+          staticReuseEnabled &&
+          !seekInvalidation &&
+          prevBatch &&
+          prevBatch.entityCount === entityCount &&
+          prevBatch.entitySig === entitySig
+        ) {
+          entityIdsView = prevBatch.entityIds as ArrayLike<number>;
+          entityIdsLeaseId = prevBatch.entityIdsLeaseId as number | undefined;
+          statesData = prevBatch.statesData as Float32Array;
+        } else {
+          if (prevBatchRaw) {
+            processor.removeArchetypeBatch(archetype.id);
+          }
+          const lease = processor.acquireEntityIds(entityCount);
+          entityIdsLeaseId = lease.leaseId;
+          const view = lease.buffer.subarray(0, entityCount);
+          for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+            view[eIndex] = archetype.getEntityId(entityIndicesBuf[eIndex]);
+          }
+          entityIdsView = view;
+          statesData = bufferCache.getStatesBuffer(archetype.id, entityCount * 4);
         }
-        const statesData = bufferCache.getStatesBuffer(archetype.id, entityCount * 4);
+        let statesVersion = 2166136261 >>> 0;
         let runningCount = 0;
         let pausedCount = 0;
         for (let eIndex = 0; eIndex < entityCount; eIndex++) {
@@ -350,7 +401,8 @@ export const BatchSamplingSystem: SystemDef = {
             pausedCount++;
           }
           const offset = eIndex * 4;
-          statesData[offset] = typedStartTime ? typedStartTime[i] : Number(stateObj.startTime ?? 0);
+          const startTime = typedStartTime ? typedStartTime[i] : Number(stateObj.startTime ?? 0);
+          statesData[offset] = startTime;
           let currentTime = typedCurrentTime
             ? typedCurrentTime[i]
             : Number(stateObj.currentTime ?? 0);
@@ -367,66 +419,30 @@ export const BatchSamplingSystem: SystemDef = {
             }
           }
           statesData[offset + 1] = currentTime;
-          statesData[offset + 2] = typedPlaybackRate
+          const playbackRate = typedPlaybackRate
             ? typedPlaybackRate[i]
             : Number(stateObj.playbackRate ?? 0);
+          statesData[offset + 2] = playbackRate;
           statesData[offset + 3] = status;
+          statesVersion = hashMotionStateVersionStep(
+            statesVersion,
+            startTime,
+            currentTime,
+            playbackRate,
+            status as unknown as number,
+          );
         }
 
         let keyframesData: Float32Array;
         let preprocessedRawKeyframesPerEntity: Float32Array[] | undefined;
         let preprocessedChannelMapPerEntity: Uint32Array[] | undefined;
-
-        if (preprocessEnabled && channelCount > 0) {
-          preprocessedRawKeyframesPerEntity = new Array(entityCount);
-          preprocessedChannelMapPerEntity = new Array(entityCount);
-          for (let eIndex = 0; eIndex < entityCount; eIndex++) {
-            const i = entityIndicesBuf[eIndex];
-            const timeline = timelineBuffer[i] as { tracks?: TimelineData };
-            const tracks = timeline.tracks as TimelineData | undefined;
-            if (!tracks || tracks.size === 0) {
-              preprocessedRawKeyframesPerEntity[eIndex] = new Float32Array(0);
-              preprocessedChannelMapPerEntity[eIndex] = new Uint32Array(0);
-              continue;
+        let preprocessedClipModel:
+          | {
+              rawKeyframesByClip: Float32Array[];
+              channelMapByClip: Uint32Array[];
+              clipIndexByEntity: Uint32Array;
             }
-            const channelTracks: {
-              property: string;
-              track: {
-                startTime: number;
-                time: number;
-                startValue: number;
-                endValue: number;
-                easing: unknown;
-              }[];
-            }[] = [];
-            for (let cIndex = 0; cIndex < channelCount; cIndex++) {
-              const prop = rawChannels[cIndex].property;
-              const track = tracks.get(prop) as Track | undefined;
-              if (!track || track.length === 0) continue;
-              const truncated = track.slice(0, MAX_KEYFRAMES_PER_CHANNEL);
-              const converted = truncated.map((kf) => ({
-                startTime: kf.startTime,
-                time: kf.time,
-                startValue: kf.startValue,
-                endValue: kf.endValue,
-                easing: kf.easing,
-              }));
-              channelTracks.push({ property: prop, track: converted });
-            }
-            if (channelTracks.length === 0) {
-              preprocessedRawKeyframesPerEntity[eIndex] = new Float32Array(0);
-              preprocessedChannelMapPerEntity[eIndex] = new Uint32Array(0);
-              continue;
-            }
-            const { rawKeyframes, channelMaps } = preprocessChannelsToRawAndMap(
-              channelTracks,
-              preprocessOptions,
-              evaluateRawValue,
-            );
-            preprocessedRawKeyframesPerEntity[eIndex] = packRawKeyframes(rawKeyframes);
-            preprocessedChannelMapPerEntity[eIndex] = packChannelMaps(channelMaps);
-          }
-        }
+          | undefined;
 
         // Build signatures for static-cache decision
         let versionSig = 0 >>> 0;
@@ -443,11 +459,123 @@ export const BatchSamplingSystem: SystemDef = {
             : Number((timelineBuffer[i] as TimelineComponentData).version ?? 0);
           versionSig = (((versionSig * 31) >>> 0) ^ (v >>> 0)) >>> 0;
         }
-        const entitySig = hashEntityIndices(entityIndicesBuf, entityCount);
         versionSig = (((versionSig * 31) >>> 0) ^ (entitySig >>> 0)) >>> 0;
         versionSig = (((versionSig * 31) >>> 0) ^ (channelCount >>> 0)) >>> 0;
 
-        if (channelCount > 0) {
+        const canReusePreprocessed =
+          preprocessEnabled &&
+          channelCount > 0 &&
+          staticReuseEnabled &&
+          !seekInvalidation &&
+          prevBatch &&
+          prevBatch.entityCount === entityCount &&
+          prevBatch.entitySig === entitySig &&
+          prevBatch.keyframesVersion === versionSig &&
+          !!prevBatch.preprocessedKeyframes;
+
+        if (!canReusePreprocessed && preprocessEnabled && channelCount > 0) {
+          preprocessedRawKeyframesPerEntity = new Array(entityCount);
+          preprocessedChannelMapPerEntity = new Array(entityCount);
+          const rawKeyframesByClip: Float32Array[] = [];
+          const channelMapByClip: Uint32Array[] = [];
+          const clipIndexByEntity = new Uint32Array(entityCount);
+          const clipIndexByTracks = new Map<unknown, number>();
+          for (let eIndex = 0; eIndex < entityCount; eIndex++) {
+            const i = entityIndicesBuf[eIndex];
+            const timeline = timelineBuffer[i] as { tracks?: TimelineData };
+            if (timelineFlatEnabled) {
+              getFlatTracks(timeline);
+            }
+            const tracks = timeline.tracks as TimelineData | undefined;
+            if (!tracks || tracks.size === 0) {
+              let clipIndex = clipIndexByTracks.get(tracks);
+              if (clipIndex === undefined) {
+                clipIndex = rawKeyframesByClip.length;
+                clipIndexByTracks.set(tracks, clipIndex);
+                rawKeyframesByClip.push(new Float32Array(0));
+                channelMapByClip.push(new Uint32Array(0));
+              }
+              clipIndexByEntity[eIndex] = clipIndex;
+              preprocessedRawKeyframesPerEntity[eIndex] = rawKeyframesByClip[clipIndex];
+              preprocessedChannelMapPerEntity[eIndex] = channelMapByClip[clipIndex];
+              continue;
+            }
+            let clipIndex = clipIndexByTracks.get(tracks);
+            if (clipIndex !== undefined) {
+              clipIndexByEntity[eIndex] = clipIndex;
+              preprocessedRawKeyframesPerEntity[eIndex] = rawKeyframesByClip[clipIndex];
+              preprocessedChannelMapPerEntity[eIndex] = channelMapByClip[clipIndex];
+              continue;
+            }
+            const channelTracks: {
+              property: string;
+              track: {
+                startTime: number;
+                time: number;
+                startValue: number;
+                endValue: number;
+                easing: unknown;
+              }[];
+            }[] = [];
+            for (let cIndex = 0; cIndex < channelCount; cIndex++) {
+              const prop = rawChannels[cIndex].property;
+              const track = tracks.get(prop) as Track | undefined;
+              if (!track || track.length === 0) continue;
+              const truncated =
+                track.length > MAX_KEYFRAMES_PER_CHANNEL
+                  ? (track.slice(0, MAX_KEYFRAMES_PER_CHANNEL) as unknown as {
+                      startTime: number;
+                      time: number;
+                      startValue: number;
+                      endValue: number;
+                      easing: unknown;
+                    }[])
+                  : (track as unknown as {
+                      startTime: number;
+                      time: number;
+                      startValue: number;
+                      endValue: number;
+                      easing: unknown;
+                    }[]);
+              channelTracks.push({ property: prop, track: truncated });
+            }
+            if (channelTracks.length === 0) {
+              clipIndex = rawKeyframesByClip.length;
+              clipIndexByTracks.set(tracks, clipIndex);
+              rawKeyframesByClip.push(new Float32Array(0));
+              channelMapByClip.push(new Uint32Array(0));
+              clipIndexByEntity[eIndex] = clipIndex;
+              preprocessedRawKeyframesPerEntity[eIndex] = rawKeyframesByClip[clipIndex];
+              preprocessedChannelMapPerEntity[eIndex] = channelMapByClip[clipIndex];
+              continue;
+            }
+            const { rawKeyframes, channelMaps } = preprocessChannelsToRawAndMap(
+              channelTracks,
+              preprocessOptions,
+              evaluateRawValue,
+            );
+            clipIndex = rawKeyframesByClip.length;
+            clipIndexByTracks.set(tracks, clipIndex);
+            rawKeyframesByClip.push(packRawKeyframes(rawKeyframes));
+            channelMapByClip.push(packChannelMaps(channelMaps));
+            clipIndexByEntity[eIndex] = clipIndex;
+            preprocessedRawKeyframesPerEntity[eIndex] = rawKeyframesByClip[clipIndex];
+            preprocessedChannelMapPerEntity[eIndex] = channelMapByClip[clipIndex];
+          }
+          preprocessedClipModel = { rawKeyframesByClip, channelMapByClip, clipIndexByEntity };
+        }
+
+        const canReuseKeyframesData =
+          staticReuseEnabled &&
+          !seekInvalidation &&
+          prevBatch &&
+          prevBatch.entityCount === entityCount &&
+          prevBatch.entitySig === entitySig &&
+          prevBatch.keyframesVersion === versionSig;
+
+        if (canReuseKeyframesData) {
+          keyframesData = prevBatch.keyframesData as Float32Array;
+        } else if (channelCount > 0) {
           const required = entityCount * channelCount * MAX_KEYFRAMES_PER_CHANNEL * KEYFRAME_FLOATS;
           const keyframesPackedCacheMap = getKeyframesPackedCache();
           const cached = keyframesPackedCacheMap.get(archetype.id);
@@ -528,10 +656,20 @@ export const BatchSamplingSystem: SystemDef = {
           for (let eIndex = 0; eIndex < entityCount; eIndex++) {
             const i = entityIndicesBuf[eIndex];
             const timeline = timelineBuffer[i] as { tracks?: TimelineData };
-            const tracks = timeline.tracks as TimelineData | undefined;
-            if (!tracks || tracks.size === 0) continue;
-            for (const [, track] of tracks) {
-              if (Array.isArray(track)) totalKeyframes += track.length;
+            if (timelineFlatEnabled) {
+              const flat = getFlatTracks(timeline);
+              if (!flat) continue;
+              const values = flat.values;
+              for (let tIndex = 0; tIndex < values.length; tIndex++) {
+                const track = values[tIndex];
+                if (Array.isArray(track)) totalKeyframes += track.length;
+              }
+            } else {
+              const tracks = timeline.tracks as TimelineData | undefined;
+              if (!tracks || tracks.size === 0) continue;
+              for (const [, track] of tracks) {
+                if (Array.isArray(track)) totalKeyframes += track.length;
+              }
             }
           }
 
@@ -552,38 +690,75 @@ export const BatchSamplingSystem: SystemDef = {
             for (let eIndex = 0; eIndex < entityCount; eIndex++) {
               const i = entityIndicesBuf[eIndex];
               const timeline = timelineBuffer[i] as { tracks?: TimelineData };
-              const tracks = timeline.tracks as TimelineData | undefined;
-              if (!tracks || tracks.size === 0) continue;
-              for (const [, track] of tracks) {
-                if (!Array.isArray(track) || track.length === 0) continue;
-                for (let kIndex = 0; kIndex < track.length; kIndex++) {
-                  const kf = track[kIndex] as unknown as Keyframe & {
-                    bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
-                  };
-                  const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+              if (timelineFlatEnabled) {
+                const flat = getFlatTracks(timeline);
+                if (!flat) continue;
+                const values = flat.values;
+                for (let tIndex = 0; tIndex < values.length; tIndex++) {
+                  const track = values[tIndex];
+                  if (!Array.isArray(track) || track.length === 0) continue;
+                  for (let kIndex = 0; kIndex < track.length; kIndex++) {
+                    const kf = track[kIndex] as unknown as Keyframe & {
+                      bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
+                    };
+                    const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
 
-                  // Determine easing mode (Phase 1.1: Bezier support)
-                  let easingMode = EASING_MODE_STANDARD;
-                  if (kf.interp === 'hold') {
-                    easingMode = EASING_MODE_HOLD;
-                  } else if (kf.bezier || kf.interp === 'bezier') {
-                    easingMode = EASING_MODE_BEZIER;
+                    let easingMode = EASING_MODE_STANDARD;
+                    if (kf.interp === 'hold') {
+                      easingMode = EASING_MODE_HOLD;
+                    } else if (kf.bezier || kf.interp === 'bezier') {
+                      easingMode = EASING_MODE_BEZIER;
+                    }
+
+                    const startTime = kf.startTime ?? 0;
+                    const endTime = kf.time ?? 0;
+                    keyframesData[w] = startTime;
+                    const dur = endTime - startTime;
+                    keyframesData[w + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
+                    keyframesData[w + 2] = kf.startValue;
+                    keyframesData[w + 3] = kf.endValue;
+                    keyframesData[w + 4] = easingId;
+                    keyframesData[w + 5] = kf.bezier?.cx1 ?? 0;
+                    keyframesData[w + 6] = kf.bezier?.cy1 ?? 0;
+                    keyframesData[w + 7] = kf.bezier?.cx2 ?? 1;
+                    keyframesData[w + 8] = kf.bezier?.cy2 ?? 1;
+                    keyframesData[w + 9] = easingMode;
+                    w += KEYFRAME_FLOATS;
                   }
+                }
+              } else {
+                const tracks = timeline.tracks as TimelineData | undefined;
+                if (!tracks || tracks.size === 0) continue;
+                for (const [, track] of tracks) {
+                  if (!Array.isArray(track) || track.length === 0) continue;
+                  for (let kIndex = 0; kIndex < track.length; kIndex++) {
+                    const kf = track[kIndex] as unknown as Keyframe & {
+                      bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
+                    };
+                    const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
 
-                  const startTime = kf.startTime ?? 0;
-                  const endTime = kf.time ?? 0;
-                  keyframesData[w] = startTime;
-                  const dur = endTime - startTime;
-                  keyframesData[w + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
-                  keyframesData[w + 2] = kf.startValue;
-                  keyframesData[w + 3] = kf.endValue;
-                  keyframesData[w + 4] = easingId;
-                  keyframesData[w + 5] = kf.bezier?.cx1 ?? 0;
-                  keyframesData[w + 6] = kf.bezier?.cy1 ?? 0;
-                  keyframesData[w + 7] = kf.bezier?.cx2 ?? 1;
-                  keyframesData[w + 8] = kf.bezier?.cy2 ?? 1;
-                  keyframesData[w + 9] = easingMode;
-                  w += KEYFRAME_FLOATS;
+                    let easingMode = EASING_MODE_STANDARD;
+                    if (kf.interp === 'hold') {
+                      easingMode = EASING_MODE_HOLD;
+                    } else if (kf.bezier || kf.interp === 'bezier') {
+                      easingMode = EASING_MODE_BEZIER;
+                    }
+
+                    const startTime = kf.startTime ?? 0;
+                    const endTime = kf.time ?? 0;
+                    keyframesData[w] = startTime;
+                    const dur = endTime - startTime;
+                    keyframesData[w + 1] = dur > 0 ? dur : MIN_GPU_KEYFRAME_DURATION;
+                    keyframesData[w + 2] = kf.startValue;
+                    keyframesData[w + 3] = kf.endValue;
+                    keyframesData[w + 4] = easingId;
+                    keyframesData[w + 5] = kf.bezier?.cx1 ?? 0;
+                    keyframesData[w + 6] = kf.bezier?.cy1 ?? 0;
+                    keyframesData[w + 7] = kf.bezier?.cx2 ?? 1;
+                    keyframesData[w + 8] = kf.bezier?.cy2 ?? 1;
+                    keyframesData[w + 9] = easingMode;
+                    w += KEYFRAME_FLOATS;
+                  }
                 }
               }
             }
@@ -599,13 +774,10 @@ export const BatchSamplingSystem: SystemDef = {
           }
         }
 
-        let preprocessed:
-          | {
-              rawKeyframesPerEntity: Float32Array[];
-              channelMapPerEntity: Uint32Array[];
-            }
-          | undefined;
-        if (
+        let preprocessed: PreprocessedKeyframes | undefined;
+        if (canReusePreprocessed) {
+          preprocessed = prevBatch.preprocessedKeyframes as PreprocessedKeyframes;
+        } else if (
           preprocessEnabled &&
           channelCount > 0 &&
           preprocessedRawKeyframesPerEntity &&
@@ -614,23 +786,45 @@ export const BatchSamplingSystem: SystemDef = {
           preprocessed = {
             rawKeyframesPerEntity: preprocessedRawKeyframesPerEntity,
             channelMapPerEntity: preprocessedChannelMapPerEntity,
+            clipModel: preprocessedClipModel,
           };
         }
 
-        // Add per-archetype batch with adaptive workgroup hint
-        // P0-2: Pass keyframes version signature for fast change detection
-        const batch = processor.addArchetypeBatch(
-          archetype.id,
-          entityIdsView,
-          entityCount,
-          lease.leaseId,
-          statesData,
-          keyframesData,
-          versionSig, // P0-2: Version signature for O(1) change detection
-          preprocessed,
-        );
+        if (
+          staticReuseEnabled &&
+          !seekInvalidation &&
+          prevBatch &&
+          prevBatch.entityCount === entityCount &&
+          prevBatch.entitySig === entitySig &&
+          prevBatch.keyframesVersion === versionSig
+        ) {
+          prevBatch.statesVersion = statesVersion;
+          prevBatch.createdAt = Date.now();
+          prevBatch.statesData = statesData;
+          prevBatch.keyframesData = keyframesData;
+          prevBatch.keyframesVersion = versionSig;
+          prevBatch.entitySig = entitySig;
+          if (preprocessed) {
+            prevBatch.preprocessedKeyframes = preprocessed;
+          }
+        } else {
+          const batch = processor.addArchetypeBatch(
+            archetype.id,
+            entityIdsView,
+            entityCount,
+            entityIdsLeaseId,
+            statesData,
+            keyframesData,
+            versionSig,
+            preprocessed,
+          );
+          batch.statesVersion = statesVersion;
+          batch.entitySig = entitySig;
+        }
 
-        totalEntities += batch.entityCount;
+        totalEntities += entityCount;
+      } else if (staticReuseEnabled) {
+        processor.removeArchetypeBatch(archetype.id);
       }
 
       if (!gpuActive) {
@@ -654,10 +848,19 @@ export const BatchSamplingSystem: SystemDef = {
             : ((stateBuffer[i] as MotionStateData).status as unknown as MotionStatus);
           if (status !== MotionStatus.Running) continue;
           const timeline = timelineBuffer[i] as TimelineComponentData;
-          const tracks = timeline?.tracks as TimelineData | undefined;
-          if (!tracks || typeof tracks.keys !== 'function') continue;
-          for (const k of tracks.keys()) {
-            keys.add(String(k));
+          if (timelineFlatEnabled) {
+            const flat = getFlatTracks(timeline as unknown as { tracks?: TimelineData });
+            if (!flat) continue;
+            const flatKeys = flat.keys;
+            for (let kIndex = 0; kIndex < flatKeys.length; kIndex++) {
+              keys.add(flatKeys[kIndex]);
+            }
+          } else {
+            const tracks = timeline?.tracks as TimelineData | undefined;
+            if (!tracks || typeof tracks.keys !== 'function') continue;
+            for (const k of tracks.keys()) {
+              keys.add(String(k));
+            }
           }
           if (keys.size >= 32) break;
         }

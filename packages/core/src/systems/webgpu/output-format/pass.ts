@@ -96,6 +96,7 @@ export async function runOutputFormatPass(
   usedRawValueCount: number,
   rawStride: number,
   outputChannels: ChannelMapping[] | undefined,
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<GPUBuffer> {
   if (!outputFormatPassEnabled || !usedRawValueCount) {
     return rawOutputBuffer;
@@ -237,7 +238,12 @@ export async function runOutputFormatPass(
   pass.dispatchWorkgroups(workgroupsX, 1, 1);
   pass.end();
 
-  queue.submit([cmdEncoder.finish()]);
+  const commandBuffer = cmdEncoder.finish();
+  if (submit) {
+    submit(commandBuffer);
+  } else {
+    queue.submit([commandBuffer]);
+  }
   return formattedBuffer;
 }
 

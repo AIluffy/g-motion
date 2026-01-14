@@ -50,6 +50,8 @@ export const SpringSystem: SystemDef = {
     if (!world) {
       return;
     }
+    const config = ctx?.services.config ?? world.config;
+    const timelineFlatEnabled = (config as any).timelineFlat === true;
 
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
@@ -108,7 +110,37 @@ export const SpringSystem: SystemDef = {
         let allTracksAtRest = true;
 
         // Process each track in the timeline
-        for (const [key, track] of timeline.tracks) {
+        const tracks = timeline.tracks as any;
+        let flatKeys: string[] | undefined;
+        let flatValues: unknown[] | undefined;
+        let iter: Iterator<readonly [string, unknown]> | undefined;
+        if (
+          timelineFlatEnabled &&
+          Array.isArray(tracks?.flatKeys) &&
+          Array.isArray(tracks?.flatValues)
+        ) {
+          flatKeys = tracks.flatKeys as string[];
+          flatValues = tracks.flatValues as unknown[];
+        }
+        if (!flatKeys || !flatValues) {
+          iter = (timeline.tracks as Iterable<readonly [string, unknown]>)[Symbol.iterator]();
+        }
+
+        let tIndex = 0;
+        for (;;) {
+          let key: string;
+          let track: any;
+          if (flatKeys && flatValues) {
+            if (tIndex >= flatKeys.length) break;
+            key = flatKeys[tIndex];
+            track = flatValues[tIndex];
+            tIndex++;
+          } else {
+            const next = iter!.next();
+            if (next.done) break;
+            key = next.value[0];
+            track = next.value[1];
+          }
           if (!Array.isArray(track) || track.length === 0) continue;
 
           // Get target value from the first (or only) keyframe's endValue

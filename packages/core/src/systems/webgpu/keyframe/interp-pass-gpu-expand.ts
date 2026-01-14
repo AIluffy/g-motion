@@ -1,30 +1,19 @@
-/**
- * Keyframe Search Pass
- *
- * GPU compute pass to find active keyframes for current animation time.
- * Searches through packed keyframe data to find which keyframes are active
- * for each entity/channel combination.
- */
-
-import {
-  CHANNEL_MAP_STRIDE,
-  RAW_KEYFRAME_STRIDE,
-  SEARCH_RESULT_STRIDE,
-} from '../../../webgpu/keyframe-preprocess-shader';
 import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
+import { acquirePooledOutputBuffer, releasePooledOutputBuffer } from '../output-buffer-pool';
 import {
   getKeyframeEntryExpandPipeline,
-  getKeyframeSearchPipeline,
-  keyframeEntryExpandBindGroupLayout,
-  keyframeSearchBindGroupLayout,
+  getKeyframeInterpPipeline,
   getKeyframeSearchWindowPipeline,
+  keyframeEntryExpandBindGroupLayout,
+  keyframeInterpBindGroupLayout,
   keyframeSearchWindowBindGroupLayout,
 } from './pipelines';
-import type { KeyframePreprocessResult, KeyframeSearchResultGPU } from './types';
+import type { KeyframePreprocessResult } from './types';
 
 const s_keyframeEntryExpandParams = new Uint32Array(4);
+const s_keyframeSearchInterpParams = new Uint32Array(4);
 
-async function recordKeyframeSearchWindowPass(params: {
+export async function recordKeyframeSearchWindowPass(params: {
   device: GPUDevice;
   cmdEncoder: GPUCommandEncoder;
   entryCount: number;
@@ -72,39 +61,47 @@ async function recordKeyframeSearchWindowPass(params: {
   return true;
 }
 
-export async function runKeyframeSearchPass(
-  device: GPUDevice,
-  queue: GPUQueue,
-  archetypeId: string,
-  preprocess: KeyframePreprocessResult,
-  statesData: Float32Array,
-  channelCount: number,
-  useOptimizedShader: boolean,
-  persistentOverride?: ReturnType<typeof getPersistentGPUBufferManager>,
-  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
+export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
+  device: GPUDevice;
+  queue: GPUQueue;
+  archetypeId: string;
+  preprocess: KeyframePreprocessResult;
+  statesData: Float32Array;
+  channelCount: number;
+  entityCount: number;
+  entryCount: number;
+  useOptimizedSearch: boolean;
+  indexedSearchEnabled: boolean;
+  persistentOverride?: ReturnType<typeof getPersistentGPUBufferManager>;
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
   options?: {
-    entryExpansionOnGPUEnabled?: boolean;
-    indexedSearchEnabled?: boolean;
-    indexedSearchMinKeyframes?: number;
+    reuseOutputBuffer?: boolean;
     statesVersion?: number;
     statesConditionalUploadEnabled?: boolean;
     forceStatesUploadEnabled?: boolean;
-  },
-): Promise<KeyframeSearchResultGPU | null> {
-  const rawCount = preprocess.rawKeyframeData.length / RAW_KEYFRAME_STRIDE;
-  const entryCount = preprocess.mapData.length / CHANNEL_MAP_STRIDE;
-  if (!rawCount || !entryCount) {
-    return null;
-  }
+  };
+}): Promise<{ outputBuffer: GPUBuffer; outputBufferTag?: unknown } | null> {
+  const {
+    device,
+    queue,
+    archetypeId,
+    preprocess,
+    statesData,
+    channelCount,
+    entityCount,
+    entryCount,
+    useOptimizedSearch,
+    indexedSearchEnabled,
+    persistentOverride,
+    submit,
+    options,
+  } = params;
 
-  const indexedSearchEnabled =
-    options?.indexedSearchEnabled === true &&
-    rawCount >= (options?.indexedSearchMinKeyframes ?? 64) &&
-    !!preprocess.blockStartOffsetsBuffer &&
-    !!preprocess.blockStartTimesBuffer;
-
-  const entryExpansionOnGPUEnabled = options?.entryExpansionOnGPUEnabled !== false;
-  if (!entryExpansionOnGPUEnabled) {
+  if (
+    !preprocess.channelMapsBuffer ||
+    !preprocess.entityIndexByEntryBuffer ||
+    !preprocess.channelIndexByEntryBuffer
+  ) {
     return null;
   }
 
@@ -177,7 +174,7 @@ export async function runKeyframeSearchPass(
     s_keyframeEntryExpandParams[2] = 0;
     s_keyframeEntryExpandParams[3] = 0;
 
-    const paramsBuffer = persistent.getOrCreateBuffer(
+    const entryExpandParamsBuffer = persistent.getOrCreateBuffer(
       `keyframeEntryExpandParams:${archetypeId}`,
       s_keyframeEntryExpandParams,
       (GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST) as number,
@@ -187,24 +184,54 @@ export async function runKeyframeSearchPass(
       },
     );
 
-    const searchResultsBuffer = persistent.getOrCreateEmptyBuffer(
-      `keyframeSearchResults:${archetypeId}`,
-      entryCount * SEARCH_RESULT_STRIDE * 4,
-      GPUBufferUsage.STORAGE as number,
+    s_keyframeSearchInterpParams[0] = useOptimizedSearch ? 1 : 0;
+    s_keyframeSearchInterpParams[1] = 0;
+    s_keyframeSearchInterpParams[2] = 0;
+    s_keyframeSearchInterpParams[3] = 0;
+
+    const searchInterpParamsBuffer = persistent.getOrCreateBuffer(
+      `keyframeSearchInterpParams:${archetypeId}`,
+      s_keyframeSearchInterpParams,
+      (GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST) as number,
       {
-        label: `motion-keyframe-search-results-${archetypeId}`,
-        allowGrowth: true,
+        label: `motion-keyframe-search-interp-params-${archetypeId}`,
+        skipChangeDetection: false,
       },
-    ).buffer;
+    );
+
+    const outputsSize = entityCount * channelCount * 4;
+    const reuseOutputBuffer = options?.reuseOutputBuffer === true;
+    const outputBufferRes = reuseOutputBuffer
+      ? acquirePooledOutputBuffer({
+          device,
+          archetypeId,
+          requestedByteSize: outputsSize,
+          usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as number,
+          label: `motion-keyframe-interp-outputs-${archetypeId}`,
+        })
+      : null;
+    const outputBuffer =
+      outputBufferRes?.buffer ??
+      device.createBuffer({
+        size: outputsSize,
+        usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as number,
+        mappedAtCreation: false,
+        label: `motion-keyframe-interp-outputs-${archetypeId}`,
+      });
 
     const entryExpandPipeline = await getKeyframeEntryExpandPipeline(device);
-    const searchPipeline = await getKeyframeSearchPipeline(device, useOptimizedShader);
+    const interpPipeline = await getKeyframeInterpPipeline(device);
     if (
       !entryExpandPipeline ||
       !keyframeEntryExpandBindGroupLayout ||
-      !searchPipeline ||
-      !keyframeSearchBindGroupLayout
+      !interpPipeline ||
+      !keyframeInterpBindGroupLayout
     ) {
+      if (outputBufferRes) {
+        releasePooledOutputBuffer(outputBuffer);
+      } else {
+        outputBuffer.destroy();
+      }
       return null;
     }
 
@@ -215,7 +242,7 @@ export async function runKeyframeSearchPass(
         { binding: 1, resource: { buffer: preprocess.channelMapsBuffer } },
         { binding: 2, resource: { buffer: preprocess.entityIndexByEntryBuffer } },
         { binding: 3, resource: { buffer: preprocess.channelIndexByEntryBuffer } },
-        { binding: 4, resource: { buffer: paramsBuffer } },
+        { binding: 4, resource: { buffer: entryExpandParamsBuffer } },
         { binding: 5, resource: { buffer: searchTimesBuffer } },
         { binding: 6, resource: { buffer: keyframeOffsetsBuffer } },
         { binding: 7, resource: { buffer: keyframeCountsBuffer } },
@@ -223,8 +250,8 @@ export async function runKeyframeSearchPass(
       ],
     });
 
-    const searchBindGroup = device.createBindGroup({
-      layout: keyframeSearchBindGroupLayout,
+    const interpBindGroup = device.createBindGroup({
+      layout: keyframeInterpBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: preprocess.packedKeyframesBuffer } },
         { binding: 1, resource: { buffer: preprocess.keyframeStartTimesBuffer } },
@@ -232,11 +259,15 @@ export async function runKeyframeSearchPass(
         { binding: 3, resource: { buffer: searchTimesBuffer } },
         { binding: 4, resource: { buffer: keyframeOffsetsBuffer } },
         { binding: 5, resource: { buffer: keyframeCountsBuffer } },
-        { binding: 6, resource: { buffer: searchResultsBuffer } },
+        { binding: 6, resource: { buffer: outputIndicesBuffer } },
+        { binding: 7, resource: { buffer: outputBuffer } },
+        { binding: 8, resource: { buffer: searchInterpParamsBuffer } },
       ],
     });
 
-    const cmdEncoder = device.createCommandEncoder({ label: 'motion-keyframe-search-encoder' });
+    const cmdEncoder = device.createCommandEncoder({
+      label: `motion-keyframe-search-interp-encoder-${archetypeId}`,
+    });
 
     {
       const pass = cmdEncoder.beginComputePass();
@@ -259,13 +290,18 @@ export async function runKeyframeSearchPass(
         keyframeCountsBuffer,
       }))
     ) {
+      if (outputBufferRes) {
+        releasePooledOutputBuffer(outputBuffer);
+      } else {
+        outputBuffer.destroy();
+      }
       return null;
     }
 
     {
       const pass = cmdEncoder.beginComputePass();
-      pass.setPipeline(searchPipeline);
-      pass.setBindGroup(0, searchBindGroup);
+      pass.setPipeline(interpPipeline);
+      pass.setBindGroup(0, interpBindGroup);
       const workgroupsX = Math.ceil(entryCount / 64);
       pass.dispatchWorkgroups(workgroupsX, 1, 1);
       pass.end();
@@ -278,13 +314,7 @@ export async function runKeyframeSearchPass(
       queue.submit([commandBuffer]);
     }
 
-    return {
-      searchResultsBuffer,
-      searchResultsBufferPersistent: true,
-      outputIndicesBuffer,
-      outputIndicesBufferPersistent: true,
-      entryCount,
-    };
+    return { outputBuffer, outputBufferTag: outputBufferRes?.tag };
   } catch {
     return null;
   }

@@ -13,6 +13,7 @@ export interface StagingBufferEntry {
 
 export class StagingBufferPool {
   private pools = new Map<string, StagingBufferEntry[]>();
+  private entryByBuffer = new WeakMap<GPUBuffer, StagingBufferEntry>();
   private device: GPUDevice;
   private currentFrame = 0;
   private readonly initialSize = 1024; // 4KB default
@@ -37,6 +38,7 @@ export class StagingBufferPool {
     for (const entry of pool) {
       if (!entry.isInFlight && entry.size >= requiredSize) {
         entry.lastUsedFrame = this.currentFrame;
+        this.entryByBuffer.set(entry.buffer, entry);
         return entry.buffer;
       }
     }
@@ -58,6 +60,7 @@ export class StagingBufferPool {
         isInFlight: false,
       };
       pool.push(entry);
+      this.entryByBuffer.set(buffer, entry);
       return buffer;
     }
 
@@ -68,28 +71,18 @@ export class StagingBufferPool {
    * Mark buffer as in-flight (waiting for mapAsync)
    */
   markInFlight(buffer: GPUBuffer): void {
-    for (const pool of this.pools.values()) {
-      for (const entry of pool) {
-        if (entry.buffer === buffer) {
-          entry.isInFlight = true;
-          return;
-        }
-      }
-    }
+    const entry = this.entryByBuffer.get(buffer);
+    if (!entry) return;
+    entry.isInFlight = true;
   }
 
   /**
    * Mark buffer as available
    */
   markAvailable(buffer: GPUBuffer): void {
-    for (const pool of this.pools.values()) {
-      for (const entry of pool) {
-        if (entry.buffer === buffer) {
-          entry.isInFlight = false;
-          return;
-        }
-      }
-    }
+    const entry = this.entryByBuffer.get(buffer);
+    if (!entry) return;
+    entry.isInFlight = false;
   }
 
   /**

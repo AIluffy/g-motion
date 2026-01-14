@@ -141,7 +141,7 @@ export class PersistentGPUBufferManager {
       // P0-2 Optimization: Version-based change detection (O(1) instead of O(n))
       if (options?.contentVersion !== undefined) {
         const existingVersion = (existing as any).contentVersion;
-        if (existingVersion === options.contentVersion) {
+        if (!options.forceUpdate && existingVersion === options.contentVersion) {
           // Version matches, data unchanged
           this.stats.bytesSkipped += requiredSize;
           return existing.buffer;

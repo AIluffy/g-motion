@@ -35,9 +35,10 @@ export const InterpolationSystem: SystemDef = {
     const channelRegistry = resolveChannelRegistry(ctx, config);
     if (channelRegistry === false) return;
 
+    const timelineFlatEnabled = config.timelineFlat === true;
     const toProcess = resolveArchetypesToProcess(world, config);
     for (const archetype of toProcess) {
-      processArchetype(archetype, tickFrame, channelRegistry);
+      processArchetype(archetype, tickFrame, channelRegistry, timelineFlatEnabled);
     }
   },
 };
@@ -100,7 +101,12 @@ function resolveArchetypesToProcess(world: any, config: any): Iterable<any> {
 const WRITE_HANDLED = 1;
 const WRITE_CHANGED = 2;
 
-function processArchetype(archetype: any, tickFrame: number, channelRegistry: any): void {
+function processArchetype(
+  archetype: any,
+  tickFrame: number,
+  channelRegistry: any,
+  timelineFlatEnabled: boolean,
+): void {
   const stateBuffer = archetype.getBuffer('MotionState');
   const timelineBuffer = archetype.getBuffer('Timeline');
   const springBuffer = archetype.getBuffer('Spring');
@@ -151,20 +157,63 @@ function processArchetype(archetype: any, tickFrame: number, channelRegistry: an
 
     const t = typedCurrentTime ? typedCurrentTime[i] : state.currentTime;
 
-    for (const [key, track] of timeline.tracks) {
-      if (
-        processTrackKey(
-          key,
-          track,
-          t,
-          i,
-          gpuPropsForArchetype,
-          transformBuffer,
-          renderBuffer,
-          typedTransformBuffers,
-        )
-      ) {
-        changed = true;
+    if (timelineFlatEnabled) {
+      const tracks = timeline.tracks as any;
+      const keys = Array.isArray(tracks?.flatKeys) ? (tracks.flatKeys as string[]) : undefined;
+      const values = Array.isArray(tracks?.flatValues)
+        ? (tracks.flatValues as unknown[])
+        : undefined;
+      if (keys && values) {
+        for (let tIndex = 0; tIndex < keys.length; tIndex++) {
+          if (
+            processTrackKey(
+              keys[tIndex],
+              values[tIndex],
+              t,
+              i,
+              gpuPropsForArchetype,
+              transformBuffer,
+              renderBuffer,
+              typedTransformBuffers,
+            )
+          ) {
+            changed = true;
+          }
+        }
+      } else {
+        for (const [key, track] of timeline.tracks) {
+          if (
+            processTrackKey(
+              key,
+              track,
+              t,
+              i,
+              gpuPropsForArchetype,
+              transformBuffer,
+              renderBuffer,
+              typedTransformBuffers,
+            )
+          ) {
+            changed = true;
+          }
+        }
+      }
+    } else {
+      for (const [key, track] of timeline.tracks) {
+        if (
+          processTrackKey(
+            key,
+            track,
+            t,
+            i,
+            gpuPropsForArchetype,
+            transformBuffer,
+            renderBuffer,
+            typedTransformBuffers,
+          )
+        ) {
+          changed = true;
+        }
       }
     }
 

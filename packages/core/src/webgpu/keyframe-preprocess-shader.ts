@@ -8,12 +8,16 @@
 import keyframePreprocessShaderCode from './shaders/keyframe-preprocess.wgsl?raw';
 import keyframeSearchShaderCode from './shaders/keyframe-search.wgsl?raw';
 import keyframeSearchOptShaderCode from './shaders/keyframe-search-opt.wgsl?raw';
+import keyframeEntryExpandShaderCode from './shaders/keyframe-entry-expand.wgsl?raw';
+import keyframeSearchWindowShaderCode from './shaders/keyframe-search-window.wgsl?raw';
 import keyframeInterpFromSearchShaderCode from './shaders/keyframe-interp-from-search.wgsl?raw';
 import stringSearchShaderCode from './shaders/string-search.wgsl?raw';
 
 export const KEYFRAME_PREPROCESS_SHADER = keyframePreprocessShaderCode;
 export const KEYFRAME_SEARCH_SHADER = keyframeSearchShaderCode;
 export const KEYFRAME_SEARCH_SHADER_OPT = keyframeSearchOptShaderCode;
+export const KEYFRAME_ENTRY_EXPAND_SHADER = keyframeEntryExpandShaderCode;
+export const KEYFRAME_SEARCH_WINDOW_SHADER = keyframeSearchWindowShaderCode;
 export const KEYFRAME_INTERP_FROM_SEARCH_SHADER = keyframeInterpFromSearchShaderCode;
 export const STRING_SEARCH_SHADER = stringSearchShaderCode;
 

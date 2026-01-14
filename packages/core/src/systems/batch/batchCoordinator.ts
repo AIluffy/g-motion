@@ -101,6 +101,10 @@ export class BatchCoordinator {
     return this.gpuDispatcher.getArchetypeBatch(archetypeId);
   }
 
+  removeArchetypeBatch(archetypeId: string): boolean {
+    return this.gpuDispatcher.removeArchetypeBatch(archetypeId);
+  }
+
   clearArchetypeBatches(): void {
     this.gpuDispatcher.clearArchetypeBatches();
   }

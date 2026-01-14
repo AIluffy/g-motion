@@ -2,14 +2,11 @@ import type { GPUBatchDescriptor, GPUBatchWithPreprocessedKeyframes } from '../.
 import type { World } from '../../../world';
 import type { ComputeBatchProcessor } from '../../batch';
 import { getGPUChannelMappingRegistry } from '../../../webgpu/channel-mapping';
+import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
 import { dispatchGPUBatch } from '../dispatch';
 import { debugIO, float32Preview, firstEntityChannelPreview } from '../debug';
 import { processOutputBuffer } from '../output-buffer-processing';
-import {
-  runKeyframeInterpPass,
-  runKeyframePreprocessPass,
-  runKeyframeSearchPass,
-} from '../keyframe';
+import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../keyframe';
 import { maybeRunViewportCulling } from './viewport-culling-system';
 import type { WebGPUComputeRuntime } from './runtime';
 
@@ -23,8 +20,15 @@ export async function processInterpolationArchetype(params: {
   debugIOEnabled: boolean;
   preprocessEnabled: boolean;
   useOptimizedKeyframeSearch: boolean;
+  keyframeSearchIndexedEnabled: boolean;
+  keyframeSearchIndexedMinKeyframes: number;
+  keyframeEntryExpandOnGPUEnabled: boolean;
   viewportCullingEnabled: boolean;
   viewportCullingAsyncEnabled: boolean;
+  statesConditionalUploadEnabled: boolean;
+  forceStatesUploadEnabled: boolean;
+  outputBufferReuseEnabled: boolean;
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<void> {
   const {
     runtime,
@@ -36,14 +40,22 @@ export async function processInterpolationArchetype(params: {
     debugIOEnabled,
     preprocessEnabled,
     useOptimizedKeyframeSearch,
+    keyframeSearchIndexedEnabled,
+    keyframeSearchIndexedMinKeyframes,
+    keyframeEntryExpandOnGPUEnabled,
     viewportCullingEnabled,
     viewportCullingAsyncEnabled,
+    statesConditionalUploadEnabled,
+    forceStatesUploadEnabled,
+    outputBufferReuseEnabled,
+    submit,
   } = params;
 
   const sp = runtime.stagingPool;
   if (!sp) return;
 
   const queue = device.queue;
+  const persistent = getPersistentGPUBufferManager(device);
   const channelRegistry = getGPUChannelMappingRegistry();
 
   const table = channelRegistry.getChannels(archetypeId);
@@ -79,37 +91,48 @@ export async function processInterpolationArchetype(params: {
   }
 
   let outputBuffer: GPUBuffer | null = null;
+  let outputBufferTag: unknown | undefined;
   let entityCount = gpuBatch.entityCount;
   let entityIdsForReadback: ArrayLike<number> = gpuBatch.entityIds;
   let leaseId = gpuBatch.entityIdsLeaseId;
 
   if (preprocessEnabled && gpuBatch.preprocessedKeyframes && rawStride > 0) {
     const batchWithPreprocessed = gpuBatch as unknown as GPUBatchWithPreprocessedKeyframes;
-    const preprocessResult = await runKeyframePreprocessPass(device, queue, batchWithPreprocessed);
+    const preprocessResult = await runKeyframePreprocessPass(
+      device,
+      queue,
+      batchWithPreprocessed,
+      submit,
+      {
+        indexedSearchEnabled: keyframeSearchIndexedEnabled,
+        indexedSearchMinKeyframes: keyframeSearchIndexedMinKeyframes,
+      },
+    );
     if (preprocessResult) {
-      const searchResult = await runKeyframeSearchPass(
+      const interpOutput = await runKeyframeInterpPass(
         device,
         queue,
+        archetypeId,
         preprocessResult,
         gpuBatch.statesData,
         rawStride,
+        gpuBatch.entityCount,
         useOptimizedKeyframeSearch,
+        persistent,
+        submit,
+        {
+          entryExpansionOnGPUEnabled: keyframeEntryExpandOnGPUEnabled,
+          indexedSearchEnabled: keyframeSearchIndexedEnabled,
+          indexedSearchMinKeyframes: keyframeSearchIndexedMinKeyframes,
+          statesVersion: gpuBatch.statesVersion,
+          statesConditionalUploadEnabled,
+          forceStatesUploadEnabled,
+          reuseOutputBuffer: outputBufferReuseEnabled && runtime.readbackManager !== null,
+        },
       );
-      if (searchResult) {
-        const interpOutput = await runKeyframeInterpPass(
-          device,
-          queue,
-          preprocessResult.packedKeyframesBuffer,
-          searchResult.searchResultsBuffer,
-          searchResult.outputIndicesData,
-          searchResult.entryCount,
-          gpuBatch.entityCount,
-          rawStride,
-          archetypeId,
-        );
-        if (interpOutput) {
-          outputBuffer = interpOutput;
-        }
+      if (interpOutput) {
+        outputBuffer = interpOutput.outputBuffer;
+        outputBufferTag = interpOutput.outputBufferTag;
       }
     }
   }
@@ -122,8 +145,15 @@ export async function processInterpolationArchetype(params: {
       runtime.timingHelper,
       archetypeId,
       rawStride,
+      {
+        statesConditionalUploadEnabled,
+        forceStatesUploadEnabled,
+        reuseOutputBuffer: outputBufferReuseEnabled && runtime.readbackManager !== null,
+      },
+      submit,
     );
     outputBuffer = result.outputBuffer;
+    outputBufferTag = result.outputBufferTag;
     entityCount = result.entityCount;
   }
 
@@ -135,6 +165,8 @@ export async function processInterpolationArchetype(params: {
   }
 
   if (viewportCullingEnabled && world && entityCount > 0) {
+    const sourceOutputBuffer = outputBuffer;
+    const sourceOutputBufferTag = outputBufferTag;
     const cullRes = await maybeRunViewportCulling({
       runtime,
       device,
@@ -144,6 +176,7 @@ export async function processInterpolationArchetype(params: {
       archetypeId,
       batch: gpuBatch,
       outputBuffer,
+      sourceOutputBufferTag,
       entityCount,
       entityIdsForReadback,
       leaseId,
@@ -152,12 +185,14 @@ export async function processInterpolationArchetype(params: {
       rawChannels,
       outputChannels,
       asyncEnabled: viewportCullingAsyncEnabled,
+      submit,
     });
 
     if (cullRes.kind === 'enqueued') {
       return;
     }
     outputBuffer = cullRes.outputBuffer;
+    outputBufferTag = outputBuffer === sourceOutputBuffer ? sourceOutputBufferTag : undefined;
     entityCount = cullRes.entityCount;
     entityIdsForReadback = cullRes.entityIdsForReadback;
     leaseId = cullRes.leaseId;
@@ -173,17 +208,27 @@ export async function processInterpolationArchetype(params: {
     });
   }
 
-  await processOutputBuffer(device, queue, sp, runtime.readbackManager, processor, {
-    archetypeId,
-    outputBuffer,
-    entityCount,
-    entityIdsForReadback,
-    leaseId,
-    rawStride,
-    outputStride,
-    rawChannels,
-    outputChannels,
-  });
+  await processOutputBuffer(
+    device,
+    queue,
+    sp,
+    runtime.readbackManager,
+    processor,
+    {
+      archetypeId,
+      outputBuffer,
+      entityCount,
+      entityIdsForReadback,
+      leaseId,
+      rawStride,
+      outputStride,
+      rawChannels,
+      outputChannels,
+      keepOutputBuffer: outputBufferTag !== undefined,
+      readbackTag: outputBufferTag,
+    },
+    submit,
+  );
 }
 
 export function maybeDebugReadbackOutput(params: {

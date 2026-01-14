@@ -8,11 +8,13 @@ import {
 } from '../viewport';
 import { setPendingReadbackCount } from '../../../webgpu/sync-manager';
 import type { WebGPUComputeRuntime } from './runtime';
+import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
 
 export type CullingReadbackTag = {
   kind: 'culling';
   frameId: number;
   outputBuffer: GPUBuffer;
+  sourceOutputBufferTag?: unknown;
   rawStride: number;
   outputStride: number;
   rawChannels: Array<{ index: number; property: string }>;
@@ -40,6 +42,7 @@ export async function maybeRunViewportCulling(params: {
   archetypeId: string;
   batch: GPUBatchDescriptor;
   outputBuffer: GPUBuffer;
+  sourceOutputBufferTag?: unknown;
   entityCount: number;
   entityIdsForReadback: ArrayLike<number>;
   leaseId: number | undefined;
@@ -48,6 +51,7 @@ export async function maybeRunViewportCulling(params: {
   rawChannels: Array<{ index: number; property: string }>;
   outputChannels: Array<{ index: number; property: string }>;
   asyncEnabled: boolean;
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<ViewportCullingResult> {
   const {
     runtime,
@@ -58,6 +62,7 @@ export async function maybeRunViewportCulling(params: {
     archetypeId,
     batch,
     outputBuffer,
+    sourceOutputBufferTag,
     entityCount,
     entityIdsForReadback,
     leaseId,
@@ -66,7 +71,20 @@ export async function maybeRunViewportCulling(params: {
     rawChannels,
     outputChannels,
     asyncEnabled,
+    submit,
   } = params;
+
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 0;
+  const viewportH = typeof window !== 'undefined' ? window.innerHeight : 0;
+  if (!(viewportW > 0 && viewportH > 0)) {
+    return {
+      kind: 'continue',
+      outputBuffer,
+      entityCount,
+      entityIdsForReadback,
+      leaseId,
+    };
+  }
 
   const readbackManager = runtime.readbackManager;
 
@@ -89,6 +107,7 @@ export async function maybeRunViewportCulling(params: {
       batch,
       outputBuffer,
       rawStride,
+      submit,
     );
     if (pending) {
       runtime.latestAsyncCullingFrameByArchetype.set(archetypeId, runtime.webgpuFrameId);
@@ -96,14 +115,17 @@ export async function maybeRunViewportCulling(params: {
       if (typeof leaseId === 'number') {
         processor.releaseEntityIds(leaseId);
       }
-      try {
-        outputBuffer.destroy();
-      } catch {}
+      if (!sourceOutputBufferTag) {
+        try {
+          outputBuffer.destroy();
+        } catch {}
+      }
 
       const cullingTag: CullingReadbackTag = {
         kind: 'culling',
         frameId: runtime.webgpuFrameId,
         outputBuffer: pending.outputBuffer,
+        sourceOutputBufferTag,
         rawStride,
         outputStride,
         rawChannels,
@@ -158,7 +180,11 @@ export async function maybeRunViewportCulling(params: {
   );
   let nextOutputBuffer = outputBuffer;
   if (cullRes.outputBuffer !== outputBuffer) {
-    outputBuffer.destroy();
+    if (sourceOutputBufferTag) {
+      tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
+    } else {
+      outputBuffer.destroy();
+    }
     nextOutputBuffer = cullRes.outputBuffer;
   }
 

@@ -11,6 +11,7 @@ import type { WebGPUComputeRuntime } from './runtime';
 import type { CullingReadbackTag } from './viewport-culling-system';
 import type { PhysicsReadbackTag } from './physics-dispatch-system';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
+import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
 
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
@@ -40,6 +41,7 @@ export function processCompletedReadbacks(params: {
 
       if (kind === 'culling') {
         const cullingTag = tag as CullingReadbackTag;
+        const sourceOutputBufferTag = cullingTag.sourceOutputBufferTag;
         const latestFrame = runtime.latestAsyncCullingFrameByArchetype.get(res.archetypeId);
         const isStale =
           typeof latestFrame === 'number' &&
@@ -63,10 +65,11 @@ export function processCompletedReadbacks(params: {
             ? cullingTag.visibleCount
             : res.entityIds.length;
 
-        if (isStale || visibleCount <= 0) {
+        if (res.expired || isStale || visibleCount <= 0) {
           try {
             cullingTag.outputBuffer?.destroy?.();
           } catch {}
+          tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
           if (typeof res.leaseId === 'number') {
             processor.releaseEntityIds(res.leaseId);
           }
@@ -99,6 +102,7 @@ export function processCompletedReadbacks(params: {
             }
           })
           .finally(() => {
+            tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
             try {
               res.stagingBuffer.destroy();
             } catch {}
@@ -108,6 +112,14 @@ export function processCompletedReadbacks(params: {
       }
 
       const values = res.values;
+      if (res.expired) {
+        sp.markAvailable(res.stagingBuffer);
+        tryReleasePooledOutputBufferFromTag(res.tag);
+        if (typeof res.leaseId === 'number') {
+          processor.releaseEntityIds(res.leaseId);
+        }
+        continue;
+      }
       if (kind === 'physics' && values && values.length) {
         const physicsTag = tag as PhysicsReadbackTag;
         const validateEnabled =
@@ -187,6 +199,7 @@ export function processCompletedReadbacks(params: {
         });
       } catch {}
 
+      tryReleasePooledOutputBufferFromTag(res.tag);
       sp.markAvailable(res.stagingBuffer);
 
       if (typeof res.leaseId === 'number') {

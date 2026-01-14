@@ -148,6 +148,56 @@ export type Track = Keyframe[];
  */
 export type TimelineData = Map<string, Track>;
 
+export class TimelineTracksMap extends Map<string, Track> {
+  readonly flatKeys: string[] = [];
+  readonly flatValues: Track[] = [];
+  private readonly indexByKey = new Map<string, number>();
+
+  constructor(entries?: Iterable<readonly [string, Track]> | null) {
+    super();
+    if (entries) {
+      for (const [key, value] of entries) {
+        this.set(key, value);
+      }
+    }
+  }
+
+  override set(key: string, value: Track): this {
+    const existingIndex = this.indexByKey.get(key);
+    if (existingIndex === undefined) {
+      this.flatKeys.push(key);
+      this.flatValues.push(value);
+      this.indexByKey.set(key, this.flatKeys.length - 1);
+    } else {
+      this.flatValues[existingIndex] = value;
+    }
+    return super.set(key, value);
+  }
+
+  override delete(key: string): boolean {
+    const existingIndex = this.indexByKey.get(key);
+    const didDelete = super.delete(key);
+    if (!didDelete || existingIndex === undefined) {
+      return didDelete;
+    }
+
+    this.flatKeys.splice(existingIndex, 1);
+    this.flatValues.splice(existingIndex, 1);
+    this.indexByKey.delete(key);
+    for (let i = existingIndex; i < this.flatKeys.length; i++) {
+      this.indexByKey.set(this.flatKeys[i], i);
+    }
+    return true;
+  }
+
+  override clear(): void {
+    super.clear();
+    this.flatKeys.length = 0;
+    this.flatValues.length = 0;
+    this.indexByKey.clear();
+  }
+}
+
 /**
  * Transform component for spatial animations
  */
@@ -215,6 +265,11 @@ export interface VelocityData {
 export type PreprocessedKeyframes = {
   rawKeyframesPerEntity: Float32Array[];
   channelMapPerEntity: Uint32Array[];
+  clipModel?: {
+    rawKeyframesByClip: Float32Array[];
+    channelMapByClip: Uint32Array[];
+    clipIndexByEntity: Uint32Array;
+  };
 };
 
 export interface BatchDescriptor {
@@ -234,7 +289,9 @@ export interface WorkgroupBatchDescriptor extends LeasedBatchDescriptor {
 export interface GPUBatchDescriptor extends WorkgroupBatchDescriptor {
   statesData: Float32Array;
   keyframesData: Float32Array;
+  statesVersion?: number;
   keyframesVersion?: number;
+  entitySig?: number;
   preprocessedKeyframes?: PreprocessedKeyframes;
   gpuBuffers?: {
     statesBuffer: any;

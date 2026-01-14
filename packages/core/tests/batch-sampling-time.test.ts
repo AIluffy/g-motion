@@ -10,13 +10,14 @@ import {
   getGPUMetricsProvider,
   getAppContext,
   getErrorHandler,
+  markBatchSamplingSeekInvalidation,
 } from '../src';
 import { ComputeBatchProcessor } from '../src/systems/batch';
 
 describe('BatchSamplingSystem time semantics', () => {
   it('packs MotionState.currentTime into GPU states buffer (timeline time)', () => {
     const world = new World();
-    world.setConfig({ ...world.config, gpuCompute: 'always' });
+    world.setConfig({ ...world.config, gpuCompute: 'always', timelineFlat: true });
     world.registry.register('MotionState', MotionStateComponent);
     world.registry.register('Timeline', TimelineComponent);
     world.registry.register('Render', RenderComponent);
@@ -82,7 +83,7 @@ describe('BatchSamplingSystem time semantics', () => {
     const [, batch] = Array.from(batches.entries())[0];
     expect(batch.entityCount).toBe(1);
 
-    const statesBufferFlat = batch.statesData;
+    const statesBufferFlat = batch.statesData as Float32Array;
     expect(statesBufferFlat).toBeInstanceOf(Float32Array);
 
     const startTime = statesBufferFlat[0];
@@ -100,6 +101,7 @@ describe('BatchSamplingSystem time semantics', () => {
     world.setConfig({
       ...world.config,
       gpuCompute: 'always',
+      timelineFlat: true,
       workSlicing: { enabled: true, batchSamplingArchetypesPerFrame: 1 },
     });
     world.registry.register('MotionState', MotionStateComponent);
@@ -185,5 +187,277 @@ describe('BatchSamplingSystem time semantics', () => {
 
     const all = new Set([...keys1, ...keys2]);
     expect(all.size).toBe(2);
+  });
+
+  it('reuses previous archetype batch when static reuse enabled', () => {
+    const world = new World();
+    world.setConfig({
+      ...world.config,
+      gpuCompute: 'always',
+      timelineFlat: true,
+      batchSamplingStaticReuse: true,
+    });
+    world.registry.register('MotionState', MotionStateComponent);
+    world.registry.register('Timeline', TimelineComponent);
+    world.registry.register('Render', RenderComponent);
+
+    world.createEntity({
+      MotionState: {
+        delay: 0,
+        startTime: 0,
+        pausedAt: 0,
+        currentTime: 0,
+        playbackRate: 1,
+        status: MotionStatus.Running,
+        iteration: 0,
+      },
+      Timeline: {
+        tracks: new Map([
+          ['x', [{ startTime: 0, time: 100, startValue: 0, endValue: 10, easing: undefined }]],
+        ]),
+        duration: 100,
+        loop: 0,
+        repeat: 0,
+        version: 1,
+      },
+      Render: {
+        rendererId: 'object',
+        target: { x: 0 },
+        props: { x: 0 },
+      },
+    });
+
+    const scheduler = world.scheduler;
+    const appContext = getAppContext();
+    const batchProcessor = new ComputeBatchProcessor();
+    const metrics = getGPUMetricsProvider();
+    const errorHandler = getErrorHandler();
+    const services = {
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor,
+      metrics,
+      errorHandler,
+      appContext,
+    } as any;
+
+    scheduler.setServices(services);
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const archetypeId = Array.from(world.getArchetypes())[0].id;
+    const batch1 = batchProcessor.getArchetypeBatch(archetypeId) as any;
+    expect(batch1).toBeTruthy();
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const batch2 = batchProcessor.getArchetypeBatch(archetypeId) as any;
+    expect(batch2).toBeTruthy();
+    expect(batch2).toBe(batch1);
+  });
+
+  it('invalidates reused batch when entity count changes', () => {
+    const world = new World();
+    world.setConfig({
+      ...world.config,
+      gpuCompute: 'always',
+      timelineFlat: true,
+      batchSamplingStaticReuse: true,
+    });
+    world.registry.register('MotionState', MotionStateComponent);
+    world.registry.register('Timeline', TimelineComponent);
+    world.registry.register('Render', RenderComponent);
+
+    world.createEntity({
+      MotionState: {
+        delay: 0,
+        startTime: 0,
+        pausedAt: 0,
+        currentTime: 0,
+        playbackRate: 1,
+        status: MotionStatus.Running,
+        iteration: 0,
+      },
+      Timeline: { tracks: new Map(), duration: 1000, loop: 0, repeat: 0, version: 1 },
+      Render: { rendererId: 'primitive', target: { value: 0 }, props: { value: 0 } },
+    });
+
+    const scheduler = world.scheduler;
+    const appContext = getAppContext();
+    const batchProcessor = new ComputeBatchProcessor();
+    const metrics = getGPUMetricsProvider();
+    const errorHandler = getErrorHandler();
+    const services = {
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor,
+      metrics,
+      errorHandler,
+      appContext,
+    } as any;
+
+    scheduler.setServices(services);
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const archetype = Array.from(world.getArchetypes())[0];
+    const batch1 = batchProcessor.getArchetypeBatch(archetype.id) as any;
+    expect(batch1).toBeTruthy();
+
+    world.createEntity({
+      MotionState: {
+        delay: 0,
+        startTime: 0,
+        pausedAt: 0,
+        currentTime: 0,
+        playbackRate: 1,
+        status: MotionStatus.Running,
+        iteration: 0,
+      },
+      Timeline: { tracks: new Map(), duration: 1000, loop: 0, repeat: 0, version: 1 },
+      Render: { rendererId: 'primitive', target: { value: 0 }, props: { value: 0 } },
+    });
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const batch2 = batchProcessor.getArchetypeBatch(archetype.id) as any;
+    expect(batch2).toBeTruthy();
+    expect(batch2).not.toBe(batch1);
+  });
+
+  it('invalidates reused batch when timeline version changes', () => {
+    const world = new World();
+    world.setConfig({
+      ...world.config,
+      gpuCompute: 'always',
+      timelineFlat: true,
+      batchSamplingStaticReuse: true,
+    });
+    world.registry.register('MotionState', MotionStateComponent);
+    world.registry.register('Timeline', TimelineComponent);
+    world.registry.register('Render', RenderComponent);
+
+    world.createEntity({
+      MotionState: {
+        delay: 0,
+        startTime: 0,
+        pausedAt: 0,
+        currentTime: 0,
+        playbackRate: 1,
+        status: MotionStatus.Running,
+        iteration: 0,
+      },
+      Timeline: {
+        tracks: new Map([
+          ['x', [{ startTime: 0, time: 100, startValue: 0, endValue: 10, easing: undefined }]],
+        ]),
+        duration: 100,
+        loop: 0,
+        repeat: 0,
+        version: 1,
+      },
+      Render: { rendererId: 'object', target: { x: 0 }, props: { x: 0 } },
+    });
+
+    const scheduler = world.scheduler;
+    const appContext = getAppContext();
+    const batchProcessor = new ComputeBatchProcessor();
+    const metrics = getGPUMetricsProvider();
+    const errorHandler = getErrorHandler();
+    const services = {
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor,
+      metrics,
+      errorHandler,
+      appContext,
+    } as any;
+
+    scheduler.setServices(services);
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const archetype = Array.from(world.getArchetypes())[0];
+    const batch1 = batchProcessor.getArchetypeBatch(archetype.id) as any;
+    expect(batch1).toBeTruthy();
+
+    const timelineTyped = archetype.getTypedBuffer('Timeline', 'version') as any;
+    if (timelineTyped) {
+      timelineTyped[0] = (timelineTyped[0] ?? 0) + 1;
+    } else {
+      const buf = archetype.getBuffer('Timeline') as any[];
+      buf[0].version = (buf[0].version ?? 0) + 1;
+    }
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const batch2 = batchProcessor.getArchetypeBatch(archetype.id) as any;
+    expect(batch2).toBeTruthy();
+    expect(batch2).not.toBe(batch1);
+  });
+
+  it('forces invalidation on seek trigger', () => {
+    const world = new World();
+    world.setConfig({
+      ...world.config,
+      gpuCompute: 'always',
+      timelineFlat: true,
+      batchSamplingStaticReuse: true,
+    });
+    world.registry.register('MotionState', MotionStateComponent);
+    world.registry.register('Timeline', TimelineComponent);
+    world.registry.register('Render', RenderComponent);
+
+    world.createEntity({
+      MotionState: {
+        delay: 0,
+        startTime: 0,
+        pausedAt: 0,
+        currentTime: 0,
+        playbackRate: 1,
+        status: MotionStatus.Running,
+        iteration: 0,
+      },
+      Timeline: {
+        tracks: new Map([
+          ['x', [{ startTime: 0, time: 100, startValue: 0, endValue: 10, easing: undefined }]],
+        ]),
+        duration: 100,
+        loop: 0,
+        repeat: 0,
+        version: 1,
+      },
+      Render: { rendererId: 'object', target: { x: 0 }, props: { x: 0 } },
+    });
+
+    const scheduler = world.scheduler;
+    const appContext = getAppContext();
+    const batchProcessor = new ComputeBatchProcessor();
+    const metrics = getGPUMetricsProvider();
+    const errorHandler = getErrorHandler();
+    const services = {
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor,
+      metrics,
+      errorHandler,
+      appContext,
+    } as any;
+
+    scheduler.setServices(services);
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const archetypeId = Array.from(world.getArchetypes())[0].id;
+    const batch1 = batchProcessor.getArchetypeBatch(archetypeId) as any;
+    expect(batch1).toBeTruthy();
+
+    markBatchSamplingSeekInvalidation();
+
+    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const batch2 = batchProcessor.getArchetypeBatch(archetypeId) as any;
+    expect(batch2).toBeTruthy();
+    expect(batch2).not.toBe(batch1);
   });
 });

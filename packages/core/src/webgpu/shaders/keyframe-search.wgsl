@@ -16,10 +16,12 @@ struct SearchResult {
 }
 
 @group(0) @binding(0) var<storage, read> keyframes: array<PackedKeyframe>;
-@group(0) @binding(1) var<storage, read> searchTimes: array<f32>;
-@group(0) @binding(2) var<storage, read> keyframeOffsets: array<u32>; // Per-entity keyframe start offset
-@group(0) @binding(3) var<storage, read> keyframeCounts: array<u32>;  // Per-entity keyframe count
-@group(0) @binding(4) var<storage, read_write> results: array<SearchResult>;
+@group(0) @binding(1) var<storage, read> keyframeStartTimes: array<f32>;
+@group(0) @binding(2) var<storage, read> keyframeDurations: array<f32>;
+@group(0) @binding(3) var<storage, read> searchTimes: array<f32>;
+@group(0) @binding(4) var<storage, read> keyframeOffsets: array<u32>; // Per-entity keyframe start offset
+@group(0) @binding(5) var<storage, read> keyframeCounts: array<u32>;  // Per-entity keyframe count
+@group(0) @binding(6) var<storage, read_write> results: array<SearchResult>;
 
 var<workgroup> cachedOffsets: array<u32, 64>;
 var<workgroup> cachedCounts: array<u32, 64>;
@@ -62,14 +64,10 @@ fn unpackHalfs(p: u32) -> vec2<f32> {
     return vec2<f32>(halfToFloatBits(lo), halfToFloatBits(hi));
 }
 
-fn getStartAndEndTime(kf: PackedKeyframe) -> vec2<f32> {
-    let t = unpackHalfs(kf.w0);
-    let v = unpackHalfs(kf.w1);
-    let start = t.x;
-    let duration = t.y;
-    let endTime = start + duration;
-    let _unused = v;
-    return vec2<f32>(start, endTime);
+fn getStartAndEndTime(keyframeIndex: u32) -> vec2<f32> {
+    let start = keyframeStartTimes[keyframeIndex];
+    let duration = keyframeDurations[keyframeIndex];
+    return vec2<f32>(start, start + duration);
 }
 
 fn linearSearchKeyframe(time: f32, startOffset: u32, count: u32) -> SearchResult {
@@ -86,8 +84,7 @@ fn linearSearchKeyframe(time: f32, startOffset: u32, count: u32) -> SearchResult
     var lastIndex = 0u;
 
     for (var i = 0u; i < count; i = i + 1u) {
-        let kf = keyframes[startOffset + i];
-        let times = getStartAndEndTime(kf);
+        let times = getStartAndEndTime(startOffset + i);
         let start = times.x;
         let endTime = times.y;
 
@@ -139,8 +136,7 @@ fn binarySearchKeyframe(time: f32, startOffset: u32, count: u32) -> SearchResult
 
     while (left < right) {
         let mid = (left + right) / 2u;
-        let kf = keyframes[startOffset + mid];
-        let times = getStartAndEndTime(kf);
+        let times = getStartAndEndTime(startOffset + mid);
         let start = times.x;
         let endTime = times.y;
 

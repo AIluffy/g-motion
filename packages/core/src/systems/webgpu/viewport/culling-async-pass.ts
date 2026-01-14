@@ -24,6 +24,7 @@ export async function runViewportCullingCompactionPassAsync(
   batch: ViewportCullingBatchDescriptor,
   rawOutputBuffer: GPUBuffer,
   rawStride: number,
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<{
   entityCountMax: number;
   outputBuffer: GPUBuffer;
@@ -241,7 +242,7 @@ export async function runViewportCullingCompactionPassAsync(
 
   encoder.copyBufferToBuffer(visibleCountGPU, 0, readback, 0, 4);
   encoder.copyBufferToBuffer(compactedEntityIdsGPU, 0, readback, 4, entityCount * 4);
-  queue.submit([encoder.finish()]);
+  const commandBuffer = encoder.finish();
 
   renderStatesGPU.destroy();
   boundsGPU.destroy();
@@ -250,7 +251,24 @@ export async function runViewportCullingCompactionPassAsync(
   visibleCountGPU.destroy();
   compactedEntityIdsGPU.destroy();
 
-  const mapPromise = readback.mapAsync((GPUMapMode as any).READ).then(() => undefined);
+  let resolveMap: (() => void) | null = null;
+  let rejectMap: ((e: unknown) => void) | null = null;
+  const mapPromise = new Promise<void>((resolve, reject) => {
+    resolveMap = resolve;
+    rejectMap = reject;
+  });
+
+  const afterSubmit = () => {
+    const p = readback.mapAsync((GPUMapMode as any).READ).then(() => undefined);
+    p.then(() => resolveMap?.()).catch((e) => rejectMap?.(e));
+  };
+
+  if (submit) {
+    submit(commandBuffer, afterSubmit);
+  } else {
+    queue.submit([commandBuffer]);
+    afterSubmit();
+  }
 
   return {
     entityCountMax: entityCount,

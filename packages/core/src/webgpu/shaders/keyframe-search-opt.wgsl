@@ -14,10 +14,12 @@ struct SearchResult {
 }
 
 @group(0) @binding(0) var<storage, read> keyframes: array<PackedKeyframe>;
-@group(0) @binding(1) var<storage, read> searchTimes: array<f32>;
-@group(0) @binding(2) var<storage, read> keyframeOffsets: array<u32>;
-@group(0) @binding(3) var<storage, read> keyframeCounts: array<u32>;
-@group(0) @binding(4) var<storage, read_write> results: array<SearchResult>;
+@group(0) @binding(1) var<storage, read> keyframeStartTimes: array<f32>;
+@group(0) @binding(2) var<storage, read> keyframeDurations: array<f32>;
+@group(0) @binding(3) var<storage, read> searchTimes: array<f32>;
+@group(0) @binding(4) var<storage, read> keyframeOffsets: array<u32>;
+@group(0) @binding(5) var<storage, read> keyframeCounts: array<u32>;
+@group(0) @binding(6) var<storage, read_write> results: array<SearchResult>;
 
 var<workgroup> cachedOffsets: array<u32, 64>;
 var<workgroup> cachedCounts: array<u32, 64>;
@@ -61,10 +63,9 @@ fn unpackHalfs(p: u32) -> vec2<f32> {
     return vec2<f32>(halfToFloatBits(lo), halfToFloatBits(hi));
 }
 
-fn getStartAndEndTime(kf: PackedKeyframe) -> vec2<f32> {
-    let t = unpackHalfs(kf.w0);
-    let start = t.x;
-    let duration = t.y;
+fn getStartAndEndTime(keyframeIndex: u32) -> vec2<f32> {
+    let start = keyframeStartTimes[keyframeIndex];
+    let duration = keyframeDurations[keyframeIndex];
     let endTime = start + duration;
     return vec2<f32>(start, endTime);
 }
@@ -86,8 +87,7 @@ fn linearSearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> Sea
         var ends: array<f32, PREFETCH_LIMIT_SMALL>;
         var i = 0u;
         while (i < count && i < PREFETCH_LIMIT_SMALL) {
-            let kf = keyframes[startOffset + i];
-            let times = getStartAndEndTime(kf);
+            let times = getStartAndEndTime(startOffset + i);
             let s = times.x;
             let e = times.y;
             starts[i] = s;
@@ -131,8 +131,7 @@ fn linearSearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> Sea
 
     var k = 0u;
     while (k < count) {
-        let kf = keyframes[startOffset + k];
-        let times = getStartAndEndTime(kf);
+        let times = getStartAndEndTime(startOffset + k);
         let start = times.x;
         let endTime = times.y;
 
@@ -153,7 +152,7 @@ fn linearSearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> Sea
         k = k + 1u;
     }
 
-    if (time < keyframes[startOffset].startTime) {
+    if (time < getStartAndEndTime(startOffset).x) {
         result.keyframeIndex = startOffset;
         result.progress = 0.0;
         return result;
@@ -180,8 +179,7 @@ fn binarySearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> Sea
 
     while (left < right) {
         let mid = (left + right) / 2u;
-        let kf = keyframes[startOffset + mid];
-        let times = getStartAndEndTime(kf);
+        let times = getStartAndEndTime(startOffset + mid);
         let start = times.x;
         let endTime = times.y;
 

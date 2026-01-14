@@ -1,4 +1,5 @@
 import type { MotionAppConfig } from '@g-motion/core';
+import { markBatchSamplingSeekInvalidation } from '@g-motion/core';
 import type { MotionStateComponentData, TimelineComponentData } from '../../component-types';
 import { FrameSampler } from '../frameSampler';
 import type { BatchCoordinator } from './batchCoordinator';
@@ -9,6 +10,7 @@ export class FrameNavigator {
   seek(timeMs: number): void {
     this.coordinator.forEachControl(
       () => {
+        markBatchSamplingSeekInvalidation();
         const world = this.coordinator.getWorld();
         for (const entityId of this.coordinator.getEntityIdView()) {
           const archetype = world.getEntityArchetype(entityId);
@@ -39,6 +41,7 @@ export class FrameNavigator {
   seekFrame(framePosition: number, fps?: number): void {
     this.coordinator.forEachControl(
       () => {
+        markBatchSamplingSeekInvalidation();
         const world = this.coordinator.getWorld();
         const resolvedFps = this.getResolvedFps(fps);
         const sampler = new FrameSampler(resolvedFps);

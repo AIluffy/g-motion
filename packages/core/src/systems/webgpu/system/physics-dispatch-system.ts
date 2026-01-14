@@ -27,8 +27,9 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   dtMs: number;
   dtSec: number;
   maxVelocity: number;
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<void> {
-  const { runtime, device, processor, config, batch, dtMs, dtSec, maxVelocity } = params;
+  const { runtime, device, processor, config, batch, dtMs, dtSec, maxVelocity, submit } = params;
 
   const sp = runtime.stagingPool;
   const readbackManager = runtime.readbackManager;
@@ -126,6 +127,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
     paramsBuffer: physicsParamsBuffer,
     outputBuffer,
     finishedBuffer,
+    submit,
   });
 
   const stagingSize = outputBytes + finishedBytes;
@@ -148,9 +150,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   });
   copyEncoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputBytes);
   copyEncoder.copyBufferToBuffer(finishedBuffer, 0, stagingBuffer, outputBytes, finishedBytes);
-  queue.submit([copyEncoder.finish()]);
-  outputBuffer.destroy();
-  finishedBuffer.destroy();
+  const commandBuffer = copyEncoder.finish();
 
   const decode: PendingReadback['decode'] = (mappedRange: ArrayBuffer) => {
     const outValues = new Float32Array(mappedRange.slice(0, outputBytes));
@@ -167,15 +167,40 @@ export async function dispatchPhysicsBatchForArchetype(params: {
     };
   };
 
-  const mapPromise = stagingBuffer.mapAsync(GPUMapMode.READ);
-  readbackManager?.enqueueMapAsyncDecoded(
-    baseArchetypeId,
-    stagingBuffer,
-    mapPromise,
-    stagingSize,
-    decode,
-    200,
-    { kind: 'physics' as const },
-  );
-  setPendingReadbackCount(readbackManager?.getPendingCount?.() ?? 0);
+  let mapPromise: Promise<void> | null = null;
+  let resolveMapPromise: (() => void) | null = null;
+  let rejectMapPromise: ((e: unknown) => void) | null = null;
+
+  if (readbackManager) {
+    mapPromise = new Promise<void>((resolve, reject) => {
+      resolveMapPromise = resolve;
+      rejectMapPromise = reject;
+    });
+    readbackManager.enqueueMapAsyncDecoded(
+      baseArchetypeId,
+      stagingBuffer,
+      mapPromise,
+      stagingSize,
+      decode,
+      200,
+      { kind: 'physics' as const },
+    );
+    setPendingReadbackCount(readbackManager.getPendingCount());
+  }
+
+  const afterSubmit = () => {
+    outputBuffer.destroy();
+    finishedBuffer.destroy();
+    if (readbackManager) {
+      const p = stagingBuffer.mapAsync(GPUMapMode.READ);
+      p.then(() => resolveMapPromise?.()).catch((e) => rejectMapPromise?.(e));
+    }
+  };
+
+  if (submit) {
+    submit(commandBuffer, afterSubmit);
+  } else {
+    queue.submit([commandBuffer]);
+    afterSubmit();
+  }
 }

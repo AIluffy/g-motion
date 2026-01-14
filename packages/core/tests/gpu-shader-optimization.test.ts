@@ -66,8 +66,10 @@ import {
   RAW_KEYFRAME_STRIDE,
   PACKED_KEYFRAME_STRIDE,
   packRawKeyframes,
+  KEYFRAME_ENTRY_EXPAND_SHADER,
   KEYFRAME_SEARCH_SHADER,
   KEYFRAME_SEARCH_SHADER_OPT,
+  KEYFRAME_SEARCH_WINDOW_SHADER,
   STRING_SEARCH_SHADER,
   packChannelMaps,
   hashPropertyName,
@@ -83,8 +85,65 @@ import {
   __resolveKeyframeSearchOptimizedFlagForTests,
   __getKeyframeSearchShaderModeForTests,
 } from '../src/systems/webgpu/system';
+import {
+  __resolveWebGPUReadbackModeForTests,
+  isKeyframeEntryExpandOnGPUEnabled,
+} from '../src/systems/webgpu/system-config';
+import { __buildKeyframeSearchIndexForTests } from '../src/systems/webgpu/keyframe/preprocess-pass';
 
 describe('GPU Shader Optimization', () => {
+  describe('P2-2: Keyframe Search Index', () => {
+    it('should export keyframe search window shader code', () => {
+      expect(KEYFRAME_SEARCH_WINDOW_SHADER).toBeDefined();
+      expect(typeof KEYFRAME_SEARCH_WINDOW_SHADER).toBe('string');
+      expect(KEYFRAME_SEARCH_WINDOW_SHADER.length).toBeGreaterThan(0);
+    });
+
+    it('should build block start offsets and times', () => {
+      const totalKeyframes = 25;
+      const rawKeyframeData = new Float32Array(totalKeyframes * RAW_KEYFRAME_STRIDE);
+      for (let i = 0; i < totalKeyframes; i++) {
+        rawKeyframeData[i * RAW_KEYFRAME_STRIDE + 0] = i * 10;
+      }
+
+      const mapData = new Uint32Array([1, 0, 0, 16, 2, 1, 16, 9]);
+
+      const { blockStartOffsets, blockStartTimes } = __buildKeyframeSearchIndexForTests({
+        rawKeyframeData,
+        mapData,
+      });
+
+      expect(blockStartOffsets.length).toBe(2);
+      expect(blockStartOffsets[0]).toBe(0);
+      expect(blockStartOffsets[1]).toBe(2);
+
+      expect(blockStartTimes.length).toBe(4);
+      expect(blockStartTimes[0]).toBe(0);
+      expect(blockStartTimes[1]).toBe(80);
+      expect(blockStartTimes[2]).toBe(160);
+      expect(blockStartTimes[3]).toBe(240);
+    });
+  });
+
+  describe('P1-2: WebGPU Readback Mode', () => {
+    it('should default to full readback', () => {
+      expect(__resolveWebGPUReadbackModeForTests(undefined)).toBe('full');
+      expect(__resolveWebGPUReadbackModeForTests({})).toBe('full');
+    });
+
+    it('should support visible readback mode', () => {
+      expect(__resolveWebGPUReadbackModeForTests({ webgpuReadbackMode: 'visible' })).toBe(
+        'visible',
+      );
+    });
+
+    it('should fall back to full on unknown value', () => {
+      expect(__resolveWebGPUReadbackModeForTests({ webgpuReadbackMode: 'nope' } as any)).toBe(
+        'full',
+      );
+    });
+  });
+
   describe('Phase 1.1: Bezier Curve Support', () => {
     it('should have correct KEYFRAME_STRIDE (10 floats)', () => {
       expect(KEYFRAME_STRIDE).toBe(10);
@@ -666,7 +725,7 @@ describe('GPU Shader Optimization', () => {
     });
 
     it('should compute progress based on start and duration from packed data', () => {
-      expect(KEYFRAME_SEARCH_SHADER).toContain('let times = getStartAndEndTime(kf);');
+      expect(KEYFRAME_SEARCH_SHADER).toContain('let times = getStartAndEndTime(startOffset + i);');
       expect(KEYFRAME_SEARCH_SHADER).toContain('let start = times.x;');
       expect(KEYFRAME_SEARCH_SHADER).toContain('let endTime = times.y;');
       expect(KEYFRAME_SEARCH_SHADER).toContain('if (duration > 0.0)');
@@ -684,6 +743,28 @@ describe('GPU Shader Optimization', () => {
       expect(KEYFRAME_SEARCH_SHADER).toContain('const ADAPTIVE_SEARCH_THRESHOLD');
       expect(KEYFRAME_SEARCH_SHADER).toContain('var<workgroup> cachedOffsets');
       expect(KEYFRAME_SEARCH_SHADER).toContain('var<workgroup> cachedCounts');
+    });
+  });
+
+  describe('P2-1: Keyframe Entry Expansion Shader', () => {
+    it('should export entry expansion shader with correct entry point', () => {
+      expect(typeof KEYFRAME_ENTRY_EXPAND_SHADER).toBe('string');
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER.length).toBeGreaterThan(0);
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('fn expandEntries');
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('@compute @workgroup_size(64)');
+    });
+
+    it('should compute adjusted time from currentTime and playbackRate', () => {
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('currentTime');
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('playbackRate');
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('currentTime * playbackRate');
+    });
+
+    it('should expose experimental flag for enabling GPU entry expansion', () => {
+      expect(isKeyframeEntryExpandOnGPUEnabled(undefined)).toBe(true);
+      expect(isKeyframeEntryExpandOnGPUEnabled({})).toBe(true);
+      expect(isKeyframeEntryExpandOnGPUEnabled({ keyframeEntryExpandOnGPU: true })).toBe(true);
+      expect(isKeyframeEntryExpandOnGPUEnabled({ keyframeEntryExpandOnGPU: false })).toBe(false);
     });
   });
 

@@ -42,6 +42,8 @@ const EASING_HOLD: u32 = 101u;
 @group(0) @binding(1) var<storage, read> channelMaps: array<ChannelMap>;
 @group(0) @binding(2) var<storage, read_write> packedKeyframes: array<PackedKeyframe>;
 @group(0) @binding(3) var<storage, read_write> keyframeIndices: array<u32>; // Sorted indices
+@group(0) @binding(4) var<storage, read_write> keyframeStartTimes: array<f32>;
+@group(0) @binding(5) var<storage, read_write> keyframeDurations: array<f32>;
 
 fn isNan(value: f32) -> bool {
     return value != value;
@@ -156,6 +158,13 @@ fn packKeyframes(@builtin(global_invocation_id) global_id: vec3<u32>) {
     packed.w3 = packHalfs(cx2, cy2);
     packed.flags = packEasingFlags(easingId, easingMode);
     packedKeyframes[index] = packed;
+
+    if (index < arrayLength(&keyframeStartTimes)) {
+        keyframeStartTimes[index] = startTime;
+    }
+    if (index < arrayLength(&keyframeDurations)) {
+        keyframeDurations[index] = duration;
+    }
 }
 
 // Sort keyframes by start time (parallel bitonic sort)

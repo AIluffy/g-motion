@@ -21,6 +21,7 @@ const pickedArchetypesScratch: Archetype[] = [];
 
 let archetypeCursor = 0;
 let frameId = 0;
+let batchSamplingSeekInvalidation = 0;
 
 // Export the buffer cache instance
 export const bufferCache = new BatchBufferCache();
@@ -60,6 +61,16 @@ export function incrementFrameId(): number {
   return frameId++;
 }
 
+export function markBatchSamplingSeekInvalidation(): void {
+  batchSamplingSeekInvalidation++;
+}
+
+export function consumeBatchSamplingSeekInvalidation(): boolean {
+  if (batchSamplingSeekInvalidation === 0) return false;
+  batchSamplingSeekInvalidation = 0;
+  return true;
+}
+
 export function __resetBatchSamplingCachesForTests(): void {
   keyframesPackedCache.clear();
   entityIndicesScratchByArchetype.clear();
@@ -67,6 +78,7 @@ export function __resetBatchSamplingCachesForTests(): void {
   pickedArchetypesScratch.length = 0;
   archetypeCursor = 0;
   frameId = 0;
+  batchSamplingSeekInvalidation = 0;
   bufferCache.clear();
   resetArchetypeBufferCache();
 }
@@ -78,4 +90,23 @@ export function hashEntityIndices(buf: Int32Array, len: number): number {
     h = (h * 16777619) >>> 0;
   }
   return h >>> 0;
+}
+
+export function hashMotionStateVersionStep(
+  h: number,
+  startTime: number,
+  currentTime: number,
+  playbackRate: number,
+  status: number,
+): number {
+  let next = h >>> 0;
+  next ^= ((startTime * 1000) | 0) >>> 0;
+  next = Math.imul(next, 16777619) >>> 0;
+  next ^= ((currentTime * 1000) | 0) >>> 0;
+  next = Math.imul(next, 16777619) >>> 0;
+  next ^= ((playbackRate * 1024) | 0) >>> 0;
+  next = Math.imul(next, 16777619) >>> 0;
+  next ^= (status | 0) >>> 0;
+  next = Math.imul(next, 16777619) >>> 0;
+  return next >>> 0;
 }

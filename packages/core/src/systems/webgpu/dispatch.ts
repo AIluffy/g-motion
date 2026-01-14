@@ -6,6 +6,8 @@ import { getPipelineForWorkgroup, selectWorkgroupSize } from './pipeline';
 import type { TimingHelper } from '../../webgpu/timing-helper';
 import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-manager';
 import { createDebugger } from '@g-motion/utils';
+import type { OutputBufferReadbackTag } from './output-buffer-pool';
+import { acquirePooledOutputBuffer } from './output-buffer-pool';
 
 const warn = createDebugger('WebGPUDispatch', 'warn');
 
@@ -31,8 +33,15 @@ export async function dispatchGPUBatch(
   timingHelper: TimingHelper | null,
   archetypeId: string,
   channelCount: number,
+  options?: {
+    statesConditionalUploadEnabled: boolean;
+    forceStatesUploadEnabled: boolean;
+    reuseOutputBuffer?: boolean;
+  },
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<{
   outputBuffer: GPUBuffer;
+  outputBufferTag?: OutputBufferReadbackTag;
   entityCount: number;
   archetypeId: string;
 }> {
@@ -45,6 +54,15 @@ export async function dispatchGPUBatch(
 
   // 1. Get or create persistent GPU buffers with incremental update
   // P0-1 Optimization: States buffer (skip change detection - changes every frame)
+  // P0-2 Optimization: Optional conditional upload via statesVersion
+  const statesConditionalUploadEnabled = options?.statesConditionalUploadEnabled === true;
+  const forceStatesUploadEnabled = options?.forceStatesUploadEnabled === true;
+  const statesContentVersion =
+    statesConditionalUploadEnabled && typeof batch.statesVersion === 'number'
+      ? batch.statesVersion
+      : undefined;
+  const shouldForceUploadStates = forceStatesUploadEnabled || !statesConditionalUploadEnabled;
+
   const stateGPUBuffer = bufferManager.getOrCreateBuffer(
     `states:${archetypeId}`,
     batch.statesData,
@@ -52,7 +70,9 @@ export async function dispatchGPUBatch(
     {
       label: `state-${archetypeId}`,
       allowGrowth: true, // Allow buffer to grow if entity count increases
-      skipChangeDetection: true, // States contain currentTime which changes every frame
+      skipChangeDetection: shouldForceUploadStates, // Default behavior: always upload
+      contentVersion: statesContentVersion,
+      forceUpdate: forceStatesUploadEnabled,
     },
   );
 
@@ -76,11 +96,28 @@ export async function dispatchGPUBatch(
       ? Math.max(batch.entityCount, Math.floor(stateBufferSize / bytesPerState))
       : batch.entityCount;
 
-  const outputBuffer = device.createBuffer({
-    size: entityCapacity * Math.max(channelCount, 1) * 4,
-    usage: (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as any,
-    label: `output-${archetypeId}`,
-  });
+  const outputBytes = entityCapacity * Math.max(channelCount, 1) * 4;
+  const outputUsage = (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC) as any;
+  const reuseOutputBuffer = options?.reuseOutputBuffer === true;
+  let outputBufferTag: OutputBufferReadbackTag | undefined;
+  let outputBuffer: GPUBuffer;
+  if (reuseOutputBuffer) {
+    const acquired = acquirePooledOutputBuffer({
+      device,
+      archetypeId,
+      requestedByteSize: outputBytes,
+      usage: outputUsage,
+      label: `output-${archetypeId}`,
+    });
+    outputBuffer = acquired.buffer;
+    outputBufferTag = acquired.tag;
+  } else {
+    outputBuffer = device.createBuffer({
+      size: outputBytes,
+      usage: outputUsage as any,
+      label: `output-${archetypeId}`,
+    });
+  }
 
   // 2. Get pipeline (with adaptive workgroup support)
   const pipeline = await getPipelineForWorkgroup(device, batch.workgroupHint, 'interp');
@@ -112,9 +149,10 @@ export async function dispatchGPUBatch(
   });
 
   // Begin compute pass with GPU timing if supported
-  const passEncoder = timingHelper
-    ? timingHelper.beginComputePass(cmdEncoder)
-    : cmdEncoder.beginComputePass();
+  const passWithTiming = timingHelper
+    ? timingHelper.beginComputePassWithToken(cmdEncoder)
+    : { pass: cmdEncoder.beginComputePass(), token: null as any };
+  const passEncoder = passWithTiming.pass;
 
   passEncoder.setPipeline(pipeline);
   passEncoder.setBindGroup(0, bindGroup);
@@ -122,30 +160,33 @@ export async function dispatchGPUBatch(
   passEncoder.end();
 
   const commandBuffer = cmdEncoder.finish();
-  queue.submit([commandBuffer]);
 
-  // Retrieve GPU timing asynchronously (non-blocking, 1-2 frame latency)
-  if (timingHelper && timingHelper.hasTimestampSupport()) {
-    timingHelper
-      .getResult()
-      .then((gpuTimeNs) => {
-        const gpuTimeMs = gpuTimeNs / 1_000_000;
+  const afterSubmit =
+    timingHelper && timingHelper.hasTimestampSupport() && passWithTiming.token
+      ? () => {
+          timingHelper
+            .getResultForToken(passWithTiming.token)
+            .then((gpuTimeNs) => {
+              const gpuTimeMs = gpuTimeNs / 1_000_000;
+              getGPUMetricsProvider().recordMetric({
+                batchId: `${archetypeId}-timing`,
+                entityCount: batch.entityCount,
+                timestamp: performance.now(),
+                gpu: true,
+                gpuComputeTimeMs: gpuTimeMs,
+                gpuComputeTimeNs: gpuTimeNs,
+                workgroupsDispatched: workgroupsX,
+              });
+            })
+            .catch(() => {});
+        }
+      : undefined;
 
-        // Update the most recent metric for this archetype with GPU timing
-        // Note: This arrives 1-2 frames late, which is acceptable for monitoring
-        getGPUMetricsProvider().recordMetric({
-          batchId: `${archetypeId}-timing`,
-          entityCount: batch.entityCount,
-          timestamp: performance.now(),
-          gpu: true,
-          gpuComputeTimeMs: gpuTimeMs,
-          gpuComputeTimeNs: gpuTimeNs,
-          workgroupsDispatched: workgroupsX,
-        });
-      })
-      .catch(() => {
-        // Silently ignore timing errors to avoid per-frame logging
-      });
+  if (submit) {
+    submit(commandBuffer, afterSubmit);
+  } else {
+    queue.submit([commandBuffer]);
+    afterSubmit?.();
   }
 
   // 5. Persistent buffers are NOT destroyed (reused next frame)
@@ -156,7 +197,7 @@ export async function dispatchGPUBatch(
   // bufferManager.nextFrame(); // Called in WebGPUComputeSystem
 
   // Return output buffer for readback via staging pool
-  return { outputBuffer, entityCount: batch.entityCount, archetypeId };
+  return { outputBuffer, outputBufferTag, entityCount: batch.entityCount, archetypeId };
 }
 
 export async function dispatchPhysicsBatch(input: {
@@ -170,6 +211,7 @@ export async function dispatchPhysicsBatch(input: {
   paramsBuffer: GPUBuffer;
   outputBuffer: GPUBuffer;
   finishedBuffer: GPUBuffer;
+  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<{
   archetypeId: string;
   slotCount: number;
@@ -187,6 +229,7 @@ export async function dispatchPhysicsBatch(input: {
     paramsBuffer,
     outputBuffer,
     finishedBuffer,
+    submit,
   } = input;
 
   if (slotCount <= 0) {
@@ -215,35 +258,46 @@ export async function dispatchPhysicsBatch(input: {
     label: `dispatch-physics-${archetypeId}`,
   });
 
-  const passEncoder = timingHelper
-    ? timingHelper.beginComputePass(cmdEncoder)
-    : cmdEncoder.beginComputePass();
+  const passWithTiming = timingHelper
+    ? timingHelper.beginComputePassWithToken(cmdEncoder)
+    : { pass: cmdEncoder.beginComputePass(), token: null as any };
+  const passEncoder = passWithTiming.pass;
 
   passEncoder.setPipeline(pipeline);
   passEncoder.setBindGroup(0, bindGroup);
   passEncoder.dispatchWorkgroups(workgroupsX, 1, 1);
   passEncoder.end();
 
-  queue.submit([cmdEncoder.finish()]);
+  const commandBuffer = cmdEncoder.finish();
 
-  if (timingHelper && timingHelper.hasTimestampSupport()) {
-    timingHelper
-      .getResult()
-      .then((gpuTimeNs) => {
-        const gpuTimeMs = gpuTimeNs / 1_000_000;
-        getGPUMetricsProvider().recordMetric({
-          batchId: `${archetypeId}-physics-timing`,
-          entityCount: slotCount,
-          timestamp: performance.now(),
-          gpu: true,
-          gpuComputeTimeMs: gpuTimeMs,
-          gpuComputeTimeNs: gpuTimeNs,
-          workgroupsDispatched: workgroupsX,
-        });
-      })
-      .catch((error) => {
-        warn('timingHelper.getResult failed', { archetypeId, slotCount, error });
-      });
+  const afterSubmit =
+    timingHelper && timingHelper.hasTimestampSupport() && passWithTiming.token
+      ? () => {
+          timingHelper
+            .getResultForToken(passWithTiming.token)
+            .then((gpuTimeNs) => {
+              const gpuTimeMs = gpuTimeNs / 1_000_000;
+              getGPUMetricsProvider().recordMetric({
+                batchId: `${archetypeId}-physics-timing`,
+                entityCount: slotCount,
+                timestamp: performance.now(),
+                gpu: true,
+                gpuComputeTimeMs: gpuTimeMs,
+                gpuComputeTimeNs: gpuTimeNs,
+                workgroupsDispatched: workgroupsX,
+              });
+            })
+            .catch((error) => {
+              warn('timingHelper.getResult failed', { archetypeId, slotCount, error });
+            });
+        }
+      : undefined;
+
+  if (submit) {
+    submit(commandBuffer, afterSubmit);
+  } else {
+    queue.submit([commandBuffer]);
+    afterSubmit?.();
   }
 
   return { archetypeId, slotCount, outputBuffer, finishedBuffer };

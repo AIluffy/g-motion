@@ -17,10 +17,28 @@ struct SearchResult {
     _pad: f32,
 }
 
+struct Params {
+    useOptimizedSearch: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
 @group(0) @binding(0) var<storage, read> keyframes: array<PackedKeyframe>;
-@group(0) @binding(1) var<storage, read> results: array<SearchResult>;
-@group(0) @binding(2) var<storage, read> outputIndices: array<u32>;
-@group(0) @binding(3) var<storage, read_write> outputs: array<f32>;
+@group(0) @binding(1) var<storage, read> keyframeStartTimes: array<f32>;
+@group(0) @binding(2) var<storage, read> keyframeDurations: array<f32>;
+@group(0) @binding(3) var<storage, read> searchTimes: array<f32>;
+@group(0) @binding(4) var<storage, read> keyframeOffsets: array<u32>;
+@group(0) @binding(5) var<storage, read> keyframeCounts: array<u32>;
+@group(0) @binding(6) var<storage, read> outputIndices: array<u32>;
+@group(0) @binding(7) var<storage, read_write> outputs: array<f32>;
+@group(0) @binding(8) var<uniform> params: Params;
+
+var<workgroup> cachedOffsets: array<u32, 64>;
+var<workgroup> cachedCounts: array<u32, 64>;
+
+const ADAPTIVE_SEARCH_THRESHOLD: u32 = 20u;
+const PREFETCH_LIMIT_SMALL: u32 = 32u;
 
 fn halfToFloatBits(half: u32) -> f32 {
     let sign = (half & 0x8000u) >> 15u;
@@ -58,10 +76,15 @@ fn unpackHalfs(p: u32) -> vec2<f32> {
     return vec2<f32>(halfToFloatBits(lo), halfToFloatBits(hi));
 }
 
-fn getPackedTimes(kf: PackedKeyframe) -> vec2<f32> {
-    let t = unpackHalfs(kf.w0);
-    let start = t.x;
-    let duration = t.y;
+fn getStartAndEndTime(keyframeIndex: u32) -> vec2<f32> {
+    let start = keyframeStartTimes[keyframeIndex];
+    let duration = keyframeDurations[keyframeIndex];
+    return vec2<f32>(start, start + duration);
+}
+
+fn getPackedTimes(keyframeIndex: u32) -> vec2<f32> {
+    let start = keyframeStartTimes[keyframeIndex];
+    let duration = keyframeDurations[keyframeIndex];
     return vec2<f32>(start, duration);
 }
 
@@ -370,15 +393,275 @@ fn applyEasing(t: f32, easingId: f32) -> f32 {
     }
 }
 
+fn linearSearchKeyframe(time: f32, startOffset: u32, count: u32) -> SearchResult {
+    var result: SearchResult;
+    result.keyframeIndex = 0u;
+    result.isActive = 0u;
+    result.progress = 0.0;
+    result._pad = 0.0;
+
+    if (count == 0u) {
+        return result;
+    }
+
+    var lastIndex = 0u;
+    for (var i = 0u; i < count; i = i + 1u) {
+        let times = getStartAndEndTime(startOffset + i);
+        let start = times.x;
+        let endTime = times.y;
+
+        if (time >= start && time <= endTime) {
+            result.keyframeIndex = startOffset + i;
+            result.isActive = 1u;
+            let duration = endTime - start;
+            if (duration > 0.0) {
+                result.progress = (time - start) / duration;
+            }
+            return result;
+        }
+
+        if (time > endTime) {
+            lastIndex = i;
+        }
+    }
+
+    let firstTimes = getStartAndEndTime(startOffset);
+    if (time < firstTimes.x) {
+        result.keyframeIndex = startOffset;
+        result.progress = 0.0;
+        return result;
+    }
+
+    let clampedIndex = min(lastIndex, count - 1u);
+    result.keyframeIndex = startOffset + clampedIndex;
+    result.progress = 1.0;
+    return result;
+}
+
+fn binarySearchKeyframe(time: f32, startOffset: u32, count: u32) -> SearchResult {
+    var result: SearchResult;
+    result.keyframeIndex = 0u;
+    result.isActive = 0u;
+    result.progress = 0.0;
+    result._pad = 0.0;
+
+    if (count == 0u) {
+        return result;
+    }
+
+    var left = 0u;
+    var right = count;
+
+    while (left < right) {
+        let mid = (left + right) / 2u;
+        let times = getStartAndEndTime(startOffset + mid);
+        let start = times.x;
+        let endTime = times.y;
+
+        if (time < start) {
+            right = mid;
+        } else if (time > endTime) {
+            left = mid + 1u;
+        } else {
+            result.keyframeIndex = startOffset + mid;
+            result.isActive = 1u;
+            let duration = endTime - start;
+            if (duration > 0.0) {
+                result.progress = (time - start) / duration;
+            }
+            return result;
+        }
+    }
+
+    if (left > 0u && left < count) {
+        result.keyframeIndex = startOffset + left - 1u;
+        result.progress = 1.0;
+    } else if (left == 0u && count > 0u) {
+        result.keyframeIndex = startOffset;
+        result.progress = 0.0;
+    }
+
+    return result;
+}
+
+fn adaptiveSearchKeyframe(time: f32, startOffset: u32, count: u32) -> SearchResult {
+    if (count < ADAPTIVE_SEARCH_THRESHOLD) {
+        return linearSearchKeyframe(time, startOffset, count);
+    }
+    return binarySearchKeyframe(time, startOffset, count);
+}
+
+fn linearSearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> SearchResult {
+    var result: SearchResult;
+    result.keyframeIndex = 0u;
+    result.isActive = 0u;
+    result.progress = 0.0;
+    result._pad = 0.0;
+
+    if (count == 0u) {
+        return result;
+    }
+
+    var lastIndex = 0u;
+
+    if (count <= PREFETCH_LIMIT_SMALL) {
+        var starts: array<f32, PREFETCH_LIMIT_SMALL>;
+        var ends: array<f32, PREFETCH_LIMIT_SMALL>;
+        var i = 0u;
+        while (i < count && i < PREFETCH_LIMIT_SMALL) {
+            let times = getStartAndEndTime(startOffset + i);
+            starts[i] = times.x;
+            ends[i] = times.y;
+            i = i + 1u;
+        }
+
+        var j = 0u;
+        while (j < count && j < PREFETCH_LIMIT_SMALL) {
+            let start = starts[j];
+            let endTime = ends[j];
+
+            if (time >= start && time <= endTime) {
+                result.keyframeIndex = startOffset + j;
+                result.isActive = 1u;
+                let duration = endTime - start;
+                if (duration > 0.0) {
+                    result.progress = (time - start) / duration;
+                }
+                return result;
+            }
+
+            if (time > endTime) {
+                lastIndex = j;
+            }
+
+            j = j + 1u;
+        }
+
+        if (time < starts[0u]) {
+            result.keyframeIndex = startOffset;
+            result.progress = 0.0;
+            return result;
+        }
+
+        let clampedIndex = min(lastIndex, count - 1u);
+        result.keyframeIndex = startOffset + clampedIndex;
+        result.progress = 1.0;
+        return result;
+    }
+
+    var k = 0u;
+    while (k < count) {
+        let times = getStartAndEndTime(startOffset + k);
+        let start = times.x;
+        let endTime = times.y;
+
+        if (time >= start && time <= endTime) {
+            result.keyframeIndex = startOffset + k;
+            result.isActive = 1u;
+            let duration = endTime - start;
+            if (duration > 0.0) {
+                result.progress = (time - start) / duration;
+            }
+            return result;
+        }
+
+        if (time > endTime) {
+            lastIndex = k;
+        }
+
+        k = k + 1u;
+    }
+
+    if (time < getStartAndEndTime(startOffset).x) {
+        result.keyframeIndex = startOffset;
+        result.progress = 0.0;
+        return result;
+    }
+
+    let clampedIndex = min(lastIndex, count - 1u);
+    result.keyframeIndex = startOffset + clampedIndex;
+    result.progress = 1.0;
+    return result;
+}
+
+fn binarySearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> SearchResult {
+    var result: SearchResult;
+    result.keyframeIndex = 0u;
+    result.isActive = 0u;
+    result.progress = 0.0;
+    result._pad = 0.0;
+
+    if (count == 0u) {
+        return result;
+    }
+
+    var left = 0u;
+    var right = count;
+
+    while (left < right) {
+        let mid = (left + right) / 2u;
+        let times = getStartAndEndTime(startOffset + mid);
+        let start = times.x;
+        let endTime = times.y;
+
+        if (time < start) {
+            right = mid;
+        } else if (time > endTime) {
+            left = mid + 1u;
+        } else {
+            result.keyframeIndex = startOffset + mid;
+            result.isActive = 1u;
+            let duration = endTime - start;
+            if (duration > 0.0) {
+                result.progress = (time - start) / duration;
+            }
+            return result;
+        }
+    }
+
+    if (left > 0u && left < count) {
+        result.keyframeIndex = startOffset + left - 1u;
+        result.progress = 1.0;
+    } else if (left == 0u && count > 0u) {
+        result.keyframeIndex = startOffset;
+        result.progress = 0.0;
+    }
+
+    return result;
+}
+
+fn adaptiveSearchKeyframeOptimized(time: f32, startOffset: u32, count: u32) -> SearchResult {
+    if (count < ADAPTIVE_SEARCH_THRESHOLD) {
+        return linearSearchKeyframeOptimized(time, startOffset, count);
+    }
+    return binarySearchKeyframeOptimized(time, startOffset, count);
+}
+
 @compute @workgroup_size(64)
-fn interpolateFromSearch(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn interpolateFromSearch(
+    @builtin(global_invocation_id) global_id: vec3<u32>,
+    @builtin(local_invocation_id) local_id: vec3<u32>,
+) {
     let index = global_id.x;
-    let count = arrayLength(&results);
+    let count = arrayLength(&searchTimes);
     if (index >= count) {
         return;
     }
 
-    let res = results[index];
+    let localIndex = local_id.x;
+    cachedOffsets[localIndex] = keyframeOffsets[index];
+    cachedCounts[localIndex] = keyframeCounts[index];
+    workgroupBarrier();
+
+    let time = searchTimes[index];
+    let offset = cachedOffsets[localIndex];
+    let kfCount = cachedCounts[localIndex];
+
+    let res = select(
+        adaptiveSearchKeyframe(time, offset, kfCount),
+        adaptiveSearchKeyframeOptimized(time, offset, kfCount),
+        params.useOptimizedSearch == 1u,
+    );
     let outIndex = outputIndices[index];
 
     if (res.isActive == 0u) {
@@ -389,7 +672,7 @@ fn interpolateFromSearch(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     let kf = keyframes[res.keyframeIndex];
-    let times = getPackedTimes(kf);
+    let times = getPackedTimes(res.keyframeIndex);
     let values = getPackedValues(kf);
     let easingInfo = getEasingIdAndMode(kf);
     let duration = times.y;

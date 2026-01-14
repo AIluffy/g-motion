@@ -132,6 +132,20 @@ export class GPUBatchDispatcher {
     return this.archetypeBatches.get(archetypeId);
   }
 
+  removeArchetypeBatch(archetypeId: string): boolean {
+    const batch = this.archetypeBatches.get(archetypeId);
+    if (!batch) return false;
+
+    const leaseId = batch.entityIdsLeaseId;
+    if (typeof leaseId === 'number' && !this.leasePool.isInFlight(leaseId)) {
+      this.leasePool.release(leaseId);
+    }
+
+    const removed = this.archetypeBatches.delete(archetypeId);
+    this.stats.setArchetypeCount(this.archetypeBatches.size);
+    return removed;
+  }
+
   clearArchetypeBatches(): void {
     for (const batch of this.archetypeBatches.values()) {
       const leaseId = batch.entityIdsLeaseId;

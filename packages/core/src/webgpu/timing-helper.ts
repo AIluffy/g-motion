@@ -26,7 +26,11 @@ function assert(condition: boolean, message = ''): asserts condition {
   }
 }
 
-type State = 'free' | 'need resolve' | 'need finish' | 'wait for result';
+export type TimingToken = {
+  commandBuffer: GPUCommandBuffer | null;
+  resultBuffer: GPUBuffer;
+  queryPairIndex: number;
+};
 
 /**
  * Helper class for measuring GPU execution time via timestamp queries.
@@ -50,24 +54,17 @@ export class TimingHelper {
   private device: GPUDevice;
   private querySet: GPUQuerySet | null = null;
   private resolveBuffer: GPUBuffer | null = null;
-  private resultBuffer: GPUBuffer | null = null;
-  private commandBuffer: GPUCommandBuffer | null = null;
-  private resultBuffers: GPUBuffer[] = [];
-  private state: State = 'free';
+  private queryPairCapacity = 0;
+  private frameCursor = 0;
+  private freeResultBuffers: GPUBuffer[] = [];
+  private legacyToken: TimingToken | null = null;
 
   constructor(device: GPUDevice) {
     this.device = device;
     this.canTimestamp = device.features.has('timestamp-query');
 
     if (this.canTimestamp) {
-      this.querySet = device.createQuerySet({
-        type: 'timestamp',
-        count: 2,
-      });
-      this.resolveBuffer = device.createBuffer({
-        size: this.querySet.count * 8,
-        usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
-      });
+      this.ensureCapacity(64);
     }
   }
 
@@ -79,7 +76,9 @@ export class TimingHelper {
     encoder: GPUCommandEncoder,
     descriptor: GPUComputePassDescriptor = {},
   ): GPUComputePassEncoder {
-    return this.#beginTimestampPass(encoder, 'beginComputePass', descriptor);
+    const { pass, token } = this.beginComputePassWithToken(encoder, descriptor);
+    this.legacyToken = token;
+    return pass;
   }
 
   /**
@@ -90,7 +89,9 @@ export class TimingHelper {
     encoder: GPUCommandEncoder,
     descriptor: GPURenderPassDescriptor,
   ): GPURenderPassEncoder {
-    return this.#beginTimestampPass(encoder, 'beginRenderPass', descriptor);
+    const { pass, token } = this.beginRenderPassWithToken(encoder, descriptor);
+    this.legacyToken = token;
+    return pass;
   }
 
   /**
@@ -100,33 +101,13 @@ export class TimingHelper {
    * @returns Promise resolving to GPU time in nanoseconds (0 if timestamps unavailable)
    */
   async getResult(): Promise<number> {
-    if (!this.canTimestamp) {
-      return 0;
-    }
-
+    const token = this.legacyToken;
+    this.legacyToken = null;
     assert(
-      this.state === 'wait for result',
-      'you must call encoder.finish and submit the command buffer before you can read the result',
+      !!token,
+      'you must call beginComputePass/beginRenderPass and finish the encoder before getResult',
     );
-    assert(!!this.commandBuffer, 'internal error: no command buffer tracked');
-    assert(
-      !s_unsubmittedCommandBuffers.has(this.commandBuffer),
-      'you must submit the command buffer before you can read the result',
-    );
-
-    this.commandBuffer = null;
-    this.state = 'free';
-
-    const resultBuffer = this.resultBuffer!;
-    await resultBuffer.mapAsync(GPUMapMode.READ);
-    const times = new BigUint64Array(resultBuffer.getMappedRange());
-    const duration = Number(times[1] - times[0]);
-    resultBuffer.unmap();
-
-    // Recycle result buffer for next use
-    this.resultBuffers.push(resultBuffer);
-
-    return duration;
+    return this.getResultForToken(token);
   }
 
   /**
@@ -137,100 +118,125 @@ export class TimingHelper {
     return this.canTimestamp;
   }
 
-  /**
-   * Internal method to wrap pass creation with timestamp writes.
-   */
-  private beginTimestampPass<T extends GPUComputePassEncoder | GPURenderPassEncoder>(
+  beginFrame(): void {
+    this.frameCursor = 0;
+  }
+
+  beginComputePassWithToken(
+    encoder: GPUCommandEncoder,
+    descriptor: GPUComputePassDescriptor = {},
+  ): { pass: GPUComputePassEncoder; token: TimingToken | null } {
+    return this.beginTimestampPassWithToken(encoder, 'beginComputePass', descriptor);
+  }
+
+  beginRenderPassWithToken(
+    encoder: GPUCommandEncoder,
+    descriptor: GPURenderPassDescriptor,
+  ): { pass: GPURenderPassEncoder; token: TimingToken | null } {
+    return this.beginTimestampPassWithToken(encoder, 'beginRenderPass', descriptor);
+  }
+
+  async getResultForToken(token: TimingToken): Promise<number> {
+    if (!this.canTimestamp) {
+      return 0;
+    }
+    assert(
+      !!token.commandBuffer,
+      'you must call encoder.finish and submit the command buffer before you can read the result',
+    );
+    assert(
+      !s_unsubmittedCommandBuffers.has(token.commandBuffer),
+      'you must submit the command buffer before you can read the result',
+    );
+
+    const resultBuffer = token.resultBuffer;
+    await resultBuffer.mapAsync(GPUMapMode.READ);
+    const times = new BigUint64Array(resultBuffer.getMappedRange());
+    const duration = Number(times[1] - times[0]);
+    resultBuffer.unmap();
+
+    this.freeResultBuffers.push(resultBuffer);
+    return duration;
+  }
+
+  private ensureCapacity(pairs: number): void {
+    if (!this.canTimestamp) return;
+    if (this.queryPairCapacity >= pairs) return;
+
+    const nextPairs = Math.max(2, Math.pow(2, Math.ceil(Math.log2(pairs))));
+    const queryCount = nextPairs * 2;
+    const resolveSize = nextPairs * 16;
+
+    try {
+      (this.querySet as any)?.destroy?.();
+    } catch {}
+    try {
+      this.resolveBuffer?.destroy();
+    } catch {}
+
+    this.querySet = this.device.createQuerySet({
+      type: 'timestamp',
+      count: queryCount,
+    });
+    this.resolveBuffer = this.device.createBuffer({
+      size: resolveSize,
+      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+    });
+    this.queryPairCapacity = nextPairs;
+  }
+
+  private beginTimestampPassWithToken<T extends GPUComputePassEncoder | GPURenderPassEncoder>(
     encoder: GPUCommandEncoder,
     fnName: 'beginComputePass' | 'beginRenderPass',
     descriptor: any,
-  ): T {
+  ): { pass: T; token: TimingToken | null } {
     if (!this.canTimestamp) {
-      return encoder[fnName](descriptor) as T;
+      return { pass: encoder[fnName](descriptor) as T, token: null };
     }
 
-    assert(this.state === 'free', `state not free (current: ${this.state})`);
-    this.state = 'need resolve';
+    this.ensureCapacity(this.frameCursor + 1);
+    const queryPairIndex = this.frameCursor++;
+
+    const resultBuffer =
+      this.freeResultBuffers.pop() ||
+      this.device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      });
+
+    const token: TimingToken = {
+      commandBuffer: null,
+      resultBuffer,
+      queryPairIndex,
+    };
 
     const pass = encoder[fnName]({
       ...descriptor,
       timestampWrites: {
         querySet: this.querySet!,
-        beginningOfPassWriteIndex: 0,
-        endOfPassWriteIndex: 1,
+        beginningOfPassWriteIndex: queryPairIndex * 2,
+        endOfPassWriteIndex: queryPairIndex * 2 + 1,
       },
     }) as T;
 
-    // Wrap pass.end() to trigger resolve
     const originalEnd = pass.end.bind(pass);
     pass.end = () => {
       originalEnd();
-      this.#resolveTiming(encoder);
+      const offset = queryPairIndex * 16;
+      encoder.resolveQuerySet(this.querySet!, queryPairIndex * 2, 2, this.resolveBuffer!, offset);
+      encoder.copyBufferToBuffer(this.resolveBuffer!, offset, resultBuffer, 0, 16);
     };
 
-    // Wrap encoder.finish() to track command buffer
     const originalFinish = encoder.finish.bind(encoder);
     encoder.finish = (descriptor?: GPUCommandBufferDescriptor) => {
       const cb = originalFinish(descriptor);
-      this.#trackCommandBuffer(cb);
+      token.commandBuffer = cb;
+      s_unsubmittedCommandBuffers.add(cb);
       return cb;
     };
 
-    return pass;
+    return { pass, token };
   }
-
-  /**
-   * Resolve timestamp queries into a result buffer.
-   */
-  private resolveTiming(encoder: GPUCommandEncoder): void {
-    if (!this.canTimestamp) {
-      return;
-    }
-
-    assert(
-      this.state === 'need resolve',
-      'you must use timingHelper.beginComputePass or timingHelper.beginRenderPass',
-    );
-    this.state = 'need finish';
-
-    // Reuse or create result buffer
-    this.resultBuffer =
-      this.resultBuffers.pop() ||
-      this.device.createBuffer({
-        size: this.resolveBuffer!.size,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-      });
-
-    encoder.resolveQuerySet(this.querySet!, 0, 2, this.resolveBuffer!, 0);
-    encoder.copyBufferToBuffer(
-      this.resolveBuffer!,
-      0,
-      this.resultBuffer,
-      0,
-      this.resultBuffer.size,
-    );
-  }
-
-  // Use # prefix for private method (already declared with 'private')
-  #resolveTiming = this.resolveTiming;
-
-  /**
-   * Track command buffer to prevent premature result reads.
-   */
-  private trackCommandBuffer(cb: GPUCommandBuffer): void {
-    if (!this.canTimestamp) {
-      return;
-    }
-
-    assert(this.state === 'need finish', 'you must call encoder.finish');
-    this.commandBuffer = cb;
-    s_unsubmittedCommandBuffers.add(cb);
-    this.state = 'wait for result';
-  }
-
-  #trackCommandBuffer = this.trackCommandBuffer;
-
-  #beginTimestampPass = this.beginTimestampPass;
 }
 
 let sharedTimingHelper: TimingHelper | null = null;

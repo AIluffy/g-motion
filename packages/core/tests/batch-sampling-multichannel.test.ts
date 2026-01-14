@@ -21,7 +21,7 @@ import { ComputeBatchProcessor } from '../src/systems/batch';
 describe('BatchSamplingSystem multi-channel keyframes packing', () => {
   it('packs per-entity per-channel keyframes according to channel mapping', () => {
     const world = new World();
-    world.setConfig({ ...world.config, gpuCompute: 'always' });
+    world.setConfig({ ...world.config, gpuCompute: 'always', timelineFlat: true });
     world.registry.register('MotionState', MotionStateComponent);
     world.registry.register('Timeline', TimelineComponent);
     world.registry.register('Render', RenderComponent);
@@ -107,7 +107,7 @@ describe('BatchSamplingSystem multi-channel keyframes packing', () => {
     expect(batch.entityCount).toBe(1);
     expect(batch.entityIds[0]).toBe(entityId);
 
-    const keyframes = batch.keyframesData;
+    const keyframes = batch.keyframesData as Float32Array;
     // Updated: 2 channels * 4 keyframes per channel * KEYFRAME_STRIDE (10) floats per keyframe
     expect(keyframes.length).toBe(2 * 4 * KEYFRAME_STRIDE);
 

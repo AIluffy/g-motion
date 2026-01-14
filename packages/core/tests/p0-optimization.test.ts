@@ -145,6 +145,70 @@ describe('P0 Optimization: Persistent Buffer Manager', () => {
       expect(statsAfter.incrementalUpdates).toBe(statsBefore.incrementalUpdates + 1);
     });
 
+    it('should upload when forceUpdate=true even if contentVersion matches', () => {
+      const data1 = new Float32Array([1, 2, 3, 4]);
+      const data2 = new Float32Array([5, 6, 7, 8]); // Different data
+      const version = 123;
+
+      manager.getOrCreateBuffer('states:test', data1, 0x0008 | 0x0004, {
+        contentVersion: version,
+      });
+
+      const statsBefore = manager.getStats();
+
+      manager.getOrCreateBuffer('states:test', data2, 0x0008 | 0x0004, {
+        contentVersion: version,
+        forceUpdate: true,
+      });
+
+      const statsAfter = manager.getStats();
+      expect(statsAfter.totalUpdates).toBe(statsBefore.totalUpdates + 1);
+    });
+
+    it('should track versions per key independently', () => {
+      const dataA1 = new Float32Array([1, 2, 3, 4]);
+      const dataB1 = new Float32Array([5, 6, 7, 8]);
+      const v1 = 1;
+      const v2 = 2;
+
+      manager.getOrCreateBuffer('states:a', dataA1, 0x0008 | 0x0004, { contentVersion: v1 });
+      manager.getOrCreateBuffer('states:b', dataB1, 0x0008 | 0x0004, { contentVersion: v2 });
+
+      const infoA = manager.getBufferInfo('states:a');
+      const infoB = manager.getBufferInfo('states:b');
+      expect(infoA?.contentVersion).toBe(v1);
+      expect(infoB?.contentVersion).toBe(v2);
+    });
+
+    it('skips upload when paused and uploads on seek/resume version bumps', () => {
+      const pausedData = new Float32Array([0, 100, 1, 2]);
+      const seekedData = new Float32Array([0, 250, 1, 2]);
+      const resumedData = new Float32Array([0, 250, 1, 1]);
+
+      manager.getOrCreateBuffer('states:scene', pausedData, 0x0008 | 0x0004, {
+        contentVersion: 1,
+      });
+      const statsAfterFirst = manager.getStats();
+
+      manager.getOrCreateBuffer('states:scene', pausedData, 0x0008 | 0x0004, {
+        contentVersion: 1,
+      });
+      const statsAfterPausedFrame = manager.getStats();
+      expect(statsAfterPausedFrame.totalUpdates).toBe(statsAfterFirst.totalUpdates);
+
+      manager.getOrCreateBuffer('states:scene', seekedData, 0x0008 | 0x0004, {
+        contentVersion: 2,
+      });
+      const statsAfterSeek = manager.getStats();
+      expect(statsAfterSeek.totalUpdates).toBe(statsAfterPausedFrame.totalUpdates + 1);
+
+      manager.getOrCreateBuffer('states:scene', resumedData, 0x0008 | 0x0004, {
+        contentVersion: 3,
+      });
+      const statsAfterResume = manager.getStats();
+      expect(statsAfterResume.totalUpdates).toBe(statsAfterSeek.totalUpdates + 1);
+    });
+
     it('should fallback to element comparison when no version provided', () => {
       const data1 = new Float32Array([1, 2, 3, 4]);
       const data2 = new Float32Array([1, 2, 3, 4]); // Same data
