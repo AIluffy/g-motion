@@ -755,9 +755,8 @@ describe('GPU Shader Optimization', () => {
     });
 
     it('should compute adjusted time from currentTime and playbackRate', () => {
-      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('currentTime');
-      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('playbackRate');
-      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('currentTime * playbackRate');
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('let timelineTime =');
+      expect(KEYFRAME_ENTRY_EXPAND_SHADER).toContain('states[stateBase + 1u]');
     });
 
     it('should expose experimental flag for enabling GPU entry expansion', () => {

@@ -23,6 +23,8 @@ export interface CachedArchetypeBuffers {
   // Typed buffers (SoA)
   typedStatus: Float32Array | Float64Array | Int32Array | undefined;
   typedStartTime: Float32Array | Float64Array | Int32Array | undefined;
+  typedPausedAt: Float32Array | Float64Array | Int32Array | undefined;
+  typedDelay: Float32Array | Float64Array | Int32Array | undefined;
   typedCurrentTime: Float32Array | Float64Array | Int32Array | undefined;
   typedPlaybackRate: Float32Array | Float64Array | Int32Array | undefined;
   typedIteration: Float32Array | Float64Array | Int32Array | undefined;

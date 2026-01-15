@@ -11,7 +11,6 @@ import {
   MotionStatus,
 } from '@g-motion/core';
 import { createDebugger, hasDomWithQuerySelectorAll } from '@g-motion/utils';
-import { TimelineSystem } from './systems/timeline';
 import { InterpolationSystem } from './systems/interpolation';
 import { RovingResolverSystem } from './systems/rovingResolver';
 import { motion as builderMotion } from './api/builder';
@@ -71,7 +70,6 @@ function initEngine(world: World) {
 export function registerAnimationSystems(world: World) {
   debug('Registering animation systems for world');
   world.scheduler.add(TimeSystem);
-  world.scheduler.add(TimelineSystem);
   world.scheduler.add(RovingResolverSystem);
   world.scheduler.add(InterpolationSystem);
   world.scheduler.add(BatchSamplingSystem);

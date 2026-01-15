@@ -1,4 +1,5 @@
 import { SCHEDULER_LIMITS } from './constants';
+import { getNowMs } from './utils';
 
 export class SchedulerLoop {
   private running = false;
@@ -19,7 +20,7 @@ export class SchedulerLoop {
     if (this.running) return;
     if (!this.deps.hasServices()) return;
     this.running = true;
-    this.lastTime = performance.now();
+    this.lastTime = getNowMs();
     this.loop();
   }
 
@@ -39,11 +40,11 @@ export class SchedulerLoop {
 
   wakeForGPUResults(tailMs: number): void {
     if (!this.deps.hasServices()) return;
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const now = getNowMs();
     this.extendKeepAlive(now + tailMs);
     if (this.running) return;
     this.running = true;
-    this.lastTime = typeof performance !== 'undefined' ? performance.now() : now;
+    this.lastTime = now;
     this.loop();
   }
 
@@ -54,7 +55,7 @@ export class SchedulerLoop {
       return;
     }
 
-    const time = performance.now();
+    const time = getNowMs();
     const dt = time - this.lastTime;
     const frameDuration = this.deps.getFrameDurationMs();
     if (frameDuration && dt < frameDuration) {
@@ -66,7 +67,7 @@ export class SchedulerLoop {
     const safeDt = Math.min(dt, SCHEDULER_LIMITS.MAX_FRAME_TIME_MS);
     this.deps.processFrame(safeDt);
 
-    const now = performance.now();
+    const now = time;
     if (!this.deps.shouldContinue(now, this.keepAliveUntil)) {
       this.running = false;
       return;

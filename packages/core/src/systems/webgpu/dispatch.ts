@@ -8,6 +8,7 @@ import { getPersistentGPUBufferManager } from '../../webgpu/persistent-buffer-ma
 import { createDebugger } from '@g-motion/utils';
 import type { OutputBufferReadbackTag } from './output-buffer-pool';
 import { acquirePooledOutputBuffer } from './output-buffer-pool';
+import type { WebGPUFrameEncoder } from './frame-encoder';
 
 const warn = createDebugger('WebGPUDispatch', 'warn');
 
@@ -38,6 +39,7 @@ export async function dispatchGPUBatch(
     forceStatesUploadEnabled: boolean;
     reuseOutputBuffer?: boolean;
   },
+  frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<{
   outputBuffer: GPUBuffer;
@@ -144,6 +146,14 @@ export async function dispatchGPUBatch(
   const workgroupSize = selectWorkgroupSize(batch.workgroupHint);
   const workgroupsX = Math.ceil(batch.entityCount / workgroupSize);
 
+  if (frame) {
+    const passEncoder = frame.beginComputePass();
+    passEncoder.setPipeline(pipeline);
+    passEncoder.setBindGroup(0, bindGroup);
+    passEncoder.dispatchWorkgroups(workgroupsX, 1, 1);
+    return { outputBuffer, outputBufferTag, entityCount: batch.entityCount, archetypeId };
+  }
+
   const cmdEncoder = device.createCommandEncoder({
     label: `dispatch-${archetypeId}`,
   });
@@ -211,6 +221,7 @@ export async function dispatchPhysicsBatch(input: {
   paramsBuffer: GPUBuffer;
   outputBuffer: GPUBuffer;
   finishedBuffer: GPUBuffer;
+  frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<{
   archetypeId: string;
@@ -229,6 +240,7 @@ export async function dispatchPhysicsBatch(input: {
     paramsBuffer,
     outputBuffer,
     finishedBuffer,
+    frame,
     submit,
   } = input;
 
@@ -253,6 +265,14 @@ export async function dispatchPhysicsBatch(input: {
 
   const workgroupSize = selectWorkgroupSize(workgroupHint);
   const workgroupsX = Math.ceil(slotCount / workgroupSize);
+
+  if (frame) {
+    const passEncoder = frame.beginComputePass();
+    passEncoder.setPipeline(pipeline);
+    passEncoder.setBindGroup(0, bindGroup);
+    passEncoder.dispatchWorkgroups(workgroupsX, 1, 1);
+    return { archetypeId, slotCount, outputBuffer, finishedBuffer };
+  }
 
   const cmdEncoder = device.createCommandEncoder({
     label: `dispatch-physics-${archetypeId}`,

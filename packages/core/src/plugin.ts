@@ -141,6 +141,7 @@ export interface EngineServices {
 export interface SystemContext {
   services: EngineServices;
   dt: number;
+  nowMs: number;
   sampling?: {
     engineFrame: number;
     timeMs: number;

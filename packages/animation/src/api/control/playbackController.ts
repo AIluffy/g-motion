@@ -1,4 +1,4 @@
-import { MotionStatus } from '@g-motion/core';
+import { MotionStatus, computeStartTimeForTimelineTime, getNowMs } from '@g-motion/core';
 import type { MotionStateComponentData, TimelineComponentData } from '../../component-types';
 import type { BatchCoordinator } from './batchCoordinator';
 
@@ -30,7 +30,7 @@ export class PlaybackController {
             | undefined;
 
           if (state && state.status === MotionStatus.Running) {
-            state.pausedAt = performance.now();
+            state.pausedAt = getNowMs();
             world.setMotionStatus(entityId, MotionStatus.Paused);
           }
         }
@@ -54,7 +54,7 @@ export class PlaybackController {
           if (!state) continue;
 
           if (state.status === MotionStatus.Paused && state.pausedAt) {
-            const pausedDuration = performance.now() - state.pausedAt;
+            const pausedDuration = getNowMs() - state.pausedAt;
             state.startTime += pausedDuration;
             state.pausedAt = 0;
 
@@ -90,13 +90,23 @@ export class PlaybackController {
             | undefined;
           if (!state || !timeline) continue;
 
+          const nowMs = getNowMs();
           const currentRate = state.playbackRate ?? 1;
           const newRate = currentRate === 0 ? -1 : -Math.abs(currentRate);
           state.playbackRate = newRate;
+          state.startTime = computeStartTimeForTimelineTime({
+            nowMs,
+            delay: state.delay ?? 0,
+            playbackRate: newRate,
+            duration: Number(timeline.duration ?? 0),
+            timelineTime: state.currentTime ?? 0,
+          });
           const index = archetype.getInternalEntityIndices().get(entityId);
           if (index !== undefined) {
             const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
             if (typedPlaybackRate) typedPlaybackRate[index] = newRate;
+            const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+            if (typedStartTime) typedStartTime[index] = state.startTime;
           }
 
           world.setMotionStatus(entityId, MotionStatus.Running);
@@ -117,14 +127,30 @@ export class PlaybackController {
           const state = archetype.getEntityData(entityId, 'MotionState') as
             | MotionStateComponentData
             | undefined;
-          if (state && Number.isFinite(rate)) {
-            state.playbackRate = rate;
-            const index = archetype.getInternalEntityIndices().get(entityId);
-            if (index !== undefined) {
-              const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
-              if (typedPlaybackRate) typedPlaybackRate[index] = rate;
-            }
+          const timeline = archetype.getEntityData(entityId, 'Timeline') as
+            | TimelineComponentData
+            | undefined;
+          if (!state || !timeline || !Number.isFinite(rate)) continue;
+
+          const nowMs = getNowMs();
+          state.playbackRate = rate;
+          state.startTime = computeStartTimeForTimelineTime({
+            nowMs,
+            delay: state.delay ?? 0,
+            playbackRate: rate,
+            duration: Number(timeline.duration ?? 0),
+            timelineTime: state.currentTime ?? 0,
+          });
+          const index = archetype.getInternalEntityIndices().get(entityId);
+          if (index !== undefined) {
+            const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+            if (typedPlaybackRate) typedPlaybackRate[index] = rate;
+            const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+            if (typedStartTime) typedStartTime[index] = state.startTime;
           }
+
+          world.setMotionStatus(entityId, MotionStatus.Running);
+          world.scheduler.ensureRunning();
         }
       },
       (control) => control.setPlaybackRate(rate),

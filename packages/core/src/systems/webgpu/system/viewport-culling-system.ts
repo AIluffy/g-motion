@@ -9,6 +9,7 @@ import {
 import { setPendingReadbackCount } from '../../../webgpu/sync-manager';
 import type { WebGPUComputeRuntime } from './runtime';
 import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export type CullingReadbackTag = {
   kind: 'culling';
@@ -51,6 +52,7 @@ export async function maybeRunViewportCulling(params: {
   rawChannels: Array<{ index: number; property: string }>;
   outputChannels: Array<{ index: number; property: string }>;
   asyncEnabled: boolean;
+  frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<ViewportCullingResult> {
   const {
@@ -71,6 +73,7 @@ export async function maybeRunViewportCulling(params: {
     rawChannels,
     outputChannels,
     asyncEnabled,
+    frame,
     submit,
   } = params;
 
@@ -107,6 +110,7 @@ export async function maybeRunViewportCulling(params: {
       batch,
       outputBuffer,
       rawStride,
+      frame,
       submit,
     );
     if (pending) {

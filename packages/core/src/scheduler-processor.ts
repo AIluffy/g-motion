@@ -1,6 +1,6 @@
 import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
 import { createDebugger } from '@g-motion/utils';
-import { FrameSampler } from './utils';
+import { FrameSampler, getNowMs } from './utils';
 import { getErrorHandler } from './context';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors';
 import { getPersistentGPUBufferManager } from './webgpu/persistent-buffer-manager';
@@ -37,9 +37,11 @@ export class SchedulerProcessor {
     const samplingRate =
       typeof config.metricsSamplingRate === 'number' ? config.metricsSamplingRate : 1;
 
+    const nowMs = getNowMs();
     const ctx: SystemContext = {
       services,
       dt: dtMs,
+      nowMs,
       sampling: {
         engineFrame: this.engineFrame,
         timeMs: this.elapsedMs,

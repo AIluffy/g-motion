@@ -45,6 +45,7 @@ import {
 import { __resetOutputFormatPassForTests } from './output-format';
 import { __resetViewportCullingPassForTests } from './viewport';
 import { __resetKeyframePassesForTests } from './keyframe';
+import { createWebGPUFrameEncoder } from './frame-encoder';
 
 import { createWebGPUComputeRuntime } from './system/runtime';
 import {
@@ -331,6 +332,13 @@ async function processArchetypeBatches(params: {
 
   const batchedSubmitEnabled = isWebGPUBatchedSubmitEnabled(config);
   const queue = device.queue;
+  const frame = batchedSubmitEnabled
+    ? createWebGPUFrameEncoder({
+        device,
+        timingHelper: runtime.timingHelper,
+        label: `motion-frame-${runtime.webgpuFrameId}`,
+      })
+    : undefined;
   const pendingCommandBuffers: GPUCommandBuffer[] = [];
   const afterSubmitCallbacks: Array<() => void> = [];
 
@@ -345,7 +353,15 @@ async function processArchetypeBatches(params: {
   };
 
   const flush = () => {
-    if (!batchedSubmitEnabled || pendingCommandBuffers.length === 0) {
+    if (!batchedSubmitEnabled) {
+      return;
+    }
+    if (frame) {
+      const res = frame.finish();
+      pendingCommandBuffers.push(res.commandBuffer);
+      if (res.afterSubmit) afterSubmitCallbacks.push(res.afterSubmit);
+    }
+    if (pendingCommandBuffers.length === 0) {
       return;
     }
     const toSubmit = pendingCommandBuffers.slice();
@@ -370,6 +386,7 @@ async function processArchetypeBatches(params: {
             dtMs,
             dtSec,
             maxVelocity,
+            frame,
             submit,
           });
           continue;
@@ -393,6 +410,7 @@ async function processArchetypeBatches(params: {
           statesConditionalUploadEnabled,
           forceStatesUploadEnabled,
           outputBufferReuseEnabled,
+          frame,
           submit,
         });
       } catch {

@@ -8,6 +8,7 @@ import {
 } from './webgpu/sync-manager';
 import { SchedulerLoop } from './scheduler-loop';
 import { SchedulerProcessor } from './scheduler-processor';
+import { getNowMs } from './utils';
 
 const GPU_TAIL_KEEP_ALIVE_MS = WebGPUConstants.GPU.TAIL_KEEP_ALIVE_MS;
 
@@ -84,7 +85,7 @@ export class SystemScheduler {
     }
     // Auto-stop if no active entities and scheduler is running
     else if (count === 0) {
-      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const now = getNowMs();
       this.loopRunner.extendKeepAlive(now + GPU_TAIL_KEEP_ALIVE_MS);
     }
   }

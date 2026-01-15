@@ -1,5 +1,4 @@
-import { World, TimelineData, MotionStatus } from '@g-motion/core';
-import { WorldProvider } from '@g-motion/core';
+import { World, TimelineData, MotionStatus, WorldProvider, getNowMs } from '@g-motion/core';
 import { AnimationControl } from './control';
 import { TrackBuilder } from './track';
 import { applyAdjust } from './adjust';
@@ -167,7 +166,7 @@ export class MotionBuilder {
     const components: any = {
       MotionState: {
         delay: resolvedOptions.delay ?? 0,
-        startTime: performance.now() + (resolvedOptions.delay ?? 0),
+        startTime: getNowMs(),
         pausedAt: 0,
         currentTime: 0,
         playbackRate: 1,

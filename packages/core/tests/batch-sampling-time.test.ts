@@ -15,7 +15,7 @@ import {
 import { ComputeBatchProcessor } from '../src/systems/batch';
 
 describe('BatchSamplingSystem time semantics', () => {
-  it('packs MotionState.currentTime into GPU states buffer (timeline time)', () => {
+  it('packs stateless timeline time into GPU states buffer', () => {
     const world = new World();
     world.setConfig({ ...world.config, gpuCompute: 'always', timelineFlat: true });
     world.registry.register('MotionState', MotionStateComponent);
@@ -72,10 +72,9 @@ describe('BatchSamplingSystem time semantics', () => {
 
     scheduler.setServices(services);
 
-    const dt = 100;
-    TimeSystem.update(dt, { services, dt });
-
-    BatchSamplingSystem.update(0, { services, dt: 0 } as any);
+    const nowMs = 123;
+    TimeSystem.update(0, { services, dt: 0, nowMs } as any);
+    BatchSamplingSystem.update(0, { services, dt: 0, nowMs } as any);
 
     const batches = batchProcessor.getArchetypeBatches();
     expect(batches.size).toBe(1);
@@ -91,7 +90,8 @@ describe('BatchSamplingSystem time semantics', () => {
     const playbackRate = statesBufferFlat[2];
 
     expect(startTime).toBe(0);
-    expect(currentTime).toBeCloseTo(stateBuffer[0].currentTime, 5);
+    expect(currentTime).toBe(123);
+    expect(stateBuffer[0].currentTime).toBe(123);
     expect(playbackRate).toBe(1);
     expect(currentTime).toBeGreaterThan(0);
   });
@@ -174,7 +174,7 @@ describe('BatchSamplingSystem time semantics', () => {
 
     scheduler.setServices(services);
 
-    TimeSystem.update(16, { services, dt: 16 });
+    TimeSystem.update(16, { services, dt: 16, nowMs: 16 } as any);
 
     BatchSamplingSystem.update(0, { services, dt: 0 } as any);
     const keys1 = Array.from(batchProcessor.getArchetypeBatches().keys());

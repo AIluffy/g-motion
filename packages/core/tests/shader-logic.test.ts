@@ -48,7 +48,7 @@ describe('Compute Shader Logic', () => {
 
     it('should calculate progress based on time and duration', () => {
       // Verify calculation logic
-      expect(INTERPOLATION_SHADER).toContain('elapsedTime');
+      expect(INTERPOLATION_SHADER).toContain('state.currentTime');
       expect(INTERPOLATION_SHADER).toContain('adjustedElapsedTime');
       expect(INTERPOLATION_SHADER).toContain('kf.duration');
     });

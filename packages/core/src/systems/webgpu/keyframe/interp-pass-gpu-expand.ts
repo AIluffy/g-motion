@@ -9,27 +9,30 @@ import {
   keyframeSearchWindowBindGroupLayout,
 } from './pipelines';
 import type { KeyframePreprocessResult } from './types';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 const s_keyframeEntryExpandParams = new Uint32Array(4);
 const s_keyframeSearchInterpParams = new Uint32Array(4);
 
 export async function recordKeyframeSearchWindowPass(params: {
   device: GPUDevice;
-  cmdEncoder: GPUCommandEncoder;
   entryCount: number;
   preprocess: KeyframePreprocessResult;
   searchTimesBuffer: GPUBuffer;
   keyframeOffsetsBuffer: GPUBuffer;
   keyframeCountsBuffer: GPUBuffer;
+  cmdEncoder?: GPUCommandEncoder;
+  pass?: GPUComputePassEncoder;
 }): Promise<boolean> {
   const {
     device,
-    cmdEncoder,
     entryCount,
     preprocess,
     searchTimesBuffer,
     keyframeOffsetsBuffer,
     keyframeCountsBuffer,
+    cmdEncoder,
+    pass,
   } = params;
   if (
     !preprocess.channelMapsBuffer ||
@@ -53,11 +56,20 @@ export async function recordKeyframeSearchWindowPass(params: {
       { binding: 5, resource: { buffer: keyframeCountsBuffer } },
     ],
   });
-  const pass = cmdEncoder.beginComputePass();
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
-  pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
-  pass.end();
+  if (pass) {
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+    return true;
+  }
+  if (cmdEncoder) {
+    const p = cmdEncoder.beginComputePass();
+    p.setPipeline(pipeline);
+    p.setBindGroup(0, bindGroup);
+    p.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+    p.end();
+    return true;
+  }
   return true;
 }
 
@@ -73,6 +85,7 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
   useOptimizedSearch: boolean;
   indexedSearchEnabled: boolean;
   persistentOverride?: ReturnType<typeof getPersistentGPUBufferManager>;
+  frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
   options?: {
     reuseOutputBuffer?: boolean;
@@ -93,6 +106,7 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
     useOptimizedSearch,
     indexedSearchEnabled,
     persistentOverride,
+    frame,
     submit,
     options,
   } = params;
@@ -264,6 +278,40 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
         { binding: 8, resource: { buffer: searchInterpParamsBuffer } },
       ],
     });
+
+    if (frame) {
+      const pass = frame.beginComputePass();
+
+      pass.setPipeline(entryExpandPipeline);
+      pass.setBindGroup(0, entryExpandBindGroup);
+      pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+
+      if (
+        indexedSearchEnabled &&
+        !(await recordKeyframeSearchWindowPass({
+          device,
+          entryCount,
+          preprocess,
+          searchTimesBuffer,
+          keyframeOffsetsBuffer,
+          keyframeCountsBuffer,
+          pass,
+        }))
+      ) {
+        if (outputBufferRes) {
+          releasePooledOutputBuffer(outputBuffer);
+        } else {
+          outputBuffer.destroy();
+        }
+        return null;
+      }
+
+      pass.setPipeline(interpPipeline);
+      pass.setBindGroup(0, interpBindGroup);
+      pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+
+      return { outputBuffer, outputBufferTag: outputBufferRes?.tag };
+    }
 
     const cmdEncoder = device.createCommandEncoder({
       label: `motion-keyframe-search-interp-encoder-${archetypeId}`,

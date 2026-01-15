@@ -37,10 +37,8 @@ fn expandEntries(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let channelIndex = channelIndexByEntry[entryIndex];
 
     let stateBase = entityIndex * 4u;
-    let currentTime = states[stateBase + 1u];
-    let playbackRate = states[stateBase + 2u];
-    outSearchTimes[entryIndex] = currentTime * playbackRate;
+    let timelineTime = states[stateBase + 1u];
+    outSearchTimes[entryIndex] = timelineTime;
 
     outOutputIndices[entryIndex] = entityIndex * params.channelCount + channelIndex;
 }
-

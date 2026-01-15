@@ -15,6 +15,7 @@ import {
 } from './culling-types';
 import { getCullingCompactPipeline, cullingCompactBindGroupLayout } from './culling-pipeline';
 import { resolveViewportBounds } from '../viewport-bounds';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export async function runViewportCullingCompactionPassAsync(
   device: GPUDevice,
@@ -24,6 +25,7 @@ export async function runViewportCullingCompactionPassAsync(
   batch: ViewportCullingBatchDescriptor,
   rawOutputBuffer: GPUBuffer,
   rawStride: number,
+  frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<{
   entityCountMax: number;
@@ -225,13 +227,7 @@ export async function runViewportCullingCompactionPassAsync(
     ],
   });
 
-  const encoder = device.createCommandEncoder({ label: `motion-cull-compact-${archetypeId}` });
-  const pass = encoder.beginComputePass();
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
   const workgroupsX = Math.ceil(entityCount / 64);
-  pass.dispatchWorkgroups(workgroupsX, 1, 1);
-  pass.end();
 
   const readback = device.createBuffer({
     size: 4 + entityCount * 4,
@@ -239,17 +235,6 @@ export async function runViewportCullingCompactionPassAsync(
     mappedAtCreation: false,
     label: `motion-cull-readback-${archetypeId}`,
   });
-
-  encoder.copyBufferToBuffer(visibleCountGPU, 0, readback, 0, 4);
-  encoder.copyBufferToBuffer(compactedEntityIdsGPU, 0, readback, 4, entityCount * 4);
-  const commandBuffer = encoder.finish();
-
-  renderStatesGPU.destroy();
-  boundsGPU.destroy();
-  frustumGPU.destroy();
-  paramsGPU.destroy();
-  visibleCountGPU.destroy();
-  compactedEntityIdsGPU.destroy();
 
   let resolveMap: (() => void) | null = null;
   let rejectMap: ((e: unknown) => void) | null = null;
@@ -262,6 +247,63 @@ export async function runViewportCullingCompactionPassAsync(
     const p = readback.mapAsync((GPUMapMode as any).READ).then(() => undefined);
     p.then(() => resolveMap?.()).catch((e) => rejectMap?.(e));
   };
+
+  if (frame) {
+    const pass = frame.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(workgroupsX, 1, 1);
+
+    frame.recordCopy(visibleCountGPU, 0, readback, 0, 4);
+    frame.recordCopy(compactedEntityIdsGPU, 0, readback, 4, entityCount * 4);
+
+    frame.recordAfterSubmit(() => {
+      try {
+        renderStatesGPU.destroy();
+      } catch {}
+      try {
+        boundsGPU.destroy();
+      } catch {}
+      try {
+        frustumGPU.destroy();
+      } catch {}
+      try {
+        paramsGPU.destroy();
+      } catch {}
+      try {
+        visibleCountGPU.destroy();
+      } catch {}
+      try {
+        compactedEntityIdsGPU.destroy();
+      } catch {}
+      afterSubmit();
+    });
+
+    return {
+      entityCountMax: entityCount,
+      outputBuffer: compactedOutputsGPU,
+      readback,
+      mapPromise,
+    };
+  }
+
+  const encoder = device.createCommandEncoder({ label: `motion-cull-compact-${archetypeId}` });
+  const pass = encoder.beginComputePass();
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, bindGroup);
+  pass.dispatchWorkgroups(workgroupsX, 1, 1);
+  pass.end();
+
+  encoder.copyBufferToBuffer(visibleCountGPU, 0, readback, 0, 4);
+  encoder.copyBufferToBuffer(compactedEntityIdsGPU, 0, readback, 4, entityCount * 4);
+  const commandBuffer = encoder.finish();
+
+  renderStatesGPU.destroy();
+  boundsGPU.destroy();
+  frustumGPU.destroy();
+  paramsGPU.destroy();
+  visibleCountGPU.destroy();
+  compactedEntityIdsGPU.destroy();
 
   if (submit) {
     submit(commandBuffer, afterSubmit);

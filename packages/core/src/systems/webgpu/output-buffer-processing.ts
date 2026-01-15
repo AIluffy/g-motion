@@ -10,6 +10,7 @@ import { AsyncReadbackManager } from '../../webgpu/async-readback';
 import { ComputeBatchProcessor } from '../batch/processor';
 import { setPendingReadbackCount } from '../../webgpu/sync-manager';
 import { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
+import type { WebGPUFrameEncoder } from './frame-encoder';
 
 export interface ProcessOutputBufferInput {
   archetypeId: string;
@@ -32,6 +33,7 @@ export async function processOutputBuffer(
   readbackManager: AsyncReadbackManager | null,
   processor: ComputeBatchProcessor,
   input: ProcessOutputBufferInput,
+  frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<void> {
   const {
@@ -70,6 +72,7 @@ export async function processOutputBuffer(
     usedRawValueCount,
     rawStride,
     outputChannels.length ? outputChannels : undefined,
+    frame,
     submit,
   );
 
@@ -113,12 +116,6 @@ export async function processOutputBuffer(
   }
   sp.markInFlight(stagingBuffer);
 
-  const copyEncoder = device.createCommandEncoder({
-    label: `copy-output-${archetypeId}`,
-  });
-  copyEncoder.copyBufferToBuffer(formattedBuffer, 0, stagingBuffer, 0, byteSize);
-  const commandBuffer = copyEncoder.finish();
-
   let mapPromise: Promise<void> | null = null;
   let resolveMapPromise: (() => void) | null = null;
   let rejectMapPromise: ((e: unknown) => void) | null = null;
@@ -156,6 +153,18 @@ export async function processOutputBuffer(
       p.then(() => resolveMapPromise?.()).catch((e) => rejectMapPromise?.(e));
     }
   };
+
+  if (frame) {
+    frame.recordCopy(formattedBuffer, 0, stagingBuffer, 0, byteSize);
+    frame.recordAfterSubmit(afterSubmit);
+    return;
+  }
+
+  const copyEncoder = device.createCommandEncoder({
+    label: `copy-output-${archetypeId}`,
+  });
+  copyEncoder.copyBufferToBuffer(formattedBuffer, 0, stagingBuffer, 0, byteSize);
+  const commandBuffer = copyEncoder.finish();
 
   if (submit) {
     submit(commandBuffer, afterSubmit);

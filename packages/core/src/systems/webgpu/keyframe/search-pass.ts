@@ -21,26 +21,40 @@ import {
   keyframeSearchWindowBindGroupLayout,
 } from './pipelines';
 import type { KeyframePreprocessResult, KeyframeSearchResultGPU } from './types';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 const s_keyframeEntryExpandParams = new Uint32Array(4);
 
+type KeyframeSearchPassOptions = {
+  entryExpansionOnGPUEnabled?: boolean;
+  indexedSearchEnabled?: boolean;
+  indexedSearchMinKeyframes?: number;
+  statesVersion?: number;
+  statesConditionalUploadEnabled?: boolean;
+  forceStatesUploadEnabled?: boolean;
+};
+
+type KeyframeSearchPassSubmit = (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
+
 async function recordKeyframeSearchWindowPass(params: {
   device: GPUDevice;
-  cmdEncoder: GPUCommandEncoder;
   entryCount: number;
   preprocess: KeyframePreprocessResult;
   searchTimesBuffer: GPUBuffer;
   keyframeOffsetsBuffer: GPUBuffer;
   keyframeCountsBuffer: GPUBuffer;
+  cmdEncoder?: GPUCommandEncoder;
+  pass?: GPUComputePassEncoder;
 }): Promise<boolean> {
   const {
     device,
-    cmdEncoder,
     entryCount,
     preprocess,
     searchTimesBuffer,
     keyframeOffsetsBuffer,
     keyframeCountsBuffer,
+    cmdEncoder,
+    pass,
   } = params;
   if (
     !preprocess.channelMapsBuffer ||
@@ -64,11 +78,20 @@ async function recordKeyframeSearchWindowPass(params: {
       { binding: 5, resource: { buffer: keyframeCountsBuffer } },
     ],
   });
-  const pass = cmdEncoder.beginComputePass();
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
-  pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
-  pass.end();
+  if (pass) {
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+    return true;
+  }
+  if (cmdEncoder) {
+    const p = cmdEncoder.beginComputePass();
+    p.setPipeline(pipeline);
+    p.setBindGroup(0, bindGroup);
+    p.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+    p.end();
+    return true;
+  }
   return true;
 }
 
@@ -81,16 +104,45 @@ export async function runKeyframeSearchPass(
   channelCount: number,
   useOptimizedShader: boolean,
   persistentOverride?: ReturnType<typeof getPersistentGPUBufferManager>,
-  submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
-  options?: {
-    entryExpansionOnGPUEnabled?: boolean;
-    indexedSearchEnabled?: boolean;
-    indexedSearchMinKeyframes?: number;
-    statesVersion?: number;
-    statesConditionalUploadEnabled?: boolean;
-    forceStatesUploadEnabled?: boolean;
-  },
+  frame?: WebGPUFrameEncoder | KeyframeSearchPassSubmit | KeyframeSearchPassOptions,
+  submit?: KeyframeSearchPassSubmit | KeyframeSearchPassOptions,
+  options?: KeyframeSearchPassOptions,
 ): Promise<KeyframeSearchResultGPU | null> {
+  const isFrameEncoder = (v: unknown): v is WebGPUFrameEncoder => {
+    return (
+      !!v &&
+      typeof v === 'object' &&
+      'beginComputePass' in v &&
+      typeof (v as { beginComputePass: unknown }).beginComputePass === 'function'
+    );
+  };
+
+  let resolvedFrame: WebGPUFrameEncoder | undefined;
+  let resolvedSubmit: KeyframeSearchPassSubmit | undefined;
+  let resolvedOptions: KeyframeSearchPassOptions | undefined;
+
+  if (isFrameEncoder(frame)) {
+    resolvedFrame = frame;
+    if (typeof submit === 'function') {
+      resolvedSubmit = submit;
+      resolvedOptions = options;
+    } else {
+      resolvedSubmit = undefined;
+      resolvedOptions = (submit as KeyframeSearchPassOptions) ?? options;
+    }
+  } else if (typeof frame === 'function') {
+    resolvedFrame = undefined;
+    resolvedSubmit = frame as KeyframeSearchPassSubmit;
+    resolvedOptions = (submit as KeyframeSearchPassOptions) ?? options;
+  } else {
+    resolvedFrame = undefined;
+    resolvedSubmit = typeof submit === 'function' ? submit : undefined;
+    resolvedOptions =
+      (frame as KeyframeSearchPassOptions) ??
+      (typeof submit === 'object' ? (submit as KeyframeSearchPassOptions) : undefined) ??
+      options;
+  }
+
   const rawCount = preprocess.rawKeyframeData.length / RAW_KEYFRAME_STRIDE;
   const entryCount = preprocess.mapData.length / CHANNEL_MAP_STRIDE;
   if (!rawCount || !entryCount) {
@@ -98,12 +150,12 @@ export async function runKeyframeSearchPass(
   }
 
   const indexedSearchEnabled =
-    options?.indexedSearchEnabled === true &&
-    rawCount >= (options?.indexedSearchMinKeyframes ?? 64) &&
+    resolvedOptions?.indexedSearchEnabled === true &&
+    rawCount >= (resolvedOptions?.indexedSearchMinKeyframes ?? 64) &&
     !!preprocess.blockStartOffsetsBuffer &&
     !!preprocess.blockStartTimesBuffer;
 
-  const entryExpansionOnGPUEnabled = options?.entryExpansionOnGPUEnabled !== false;
+  const entryExpansionOnGPUEnabled = resolvedOptions?.entryExpansionOnGPUEnabled !== false;
   if (!entryExpansionOnGPUEnabled) {
     return null;
   }
@@ -111,11 +163,11 @@ export async function runKeyframeSearchPass(
   try {
     const persistent = persistentOverride ?? getPersistentGPUBufferManager(device);
 
-    const statesConditionalUploadEnabled = options?.statesConditionalUploadEnabled === true;
-    const forceStatesUploadEnabled = options?.forceStatesUploadEnabled === true;
+    const statesConditionalUploadEnabled = resolvedOptions?.statesConditionalUploadEnabled === true;
+    const forceStatesUploadEnabled = resolvedOptions?.forceStatesUploadEnabled === true;
     const statesContentVersion =
-      statesConditionalUploadEnabled && typeof options?.statesVersion === 'number'
-        ? options.statesVersion
+      statesConditionalUploadEnabled && typeof resolvedOptions?.statesVersion === 'number'
+        ? resolvedOptions.statesVersion
         : undefined;
     const shouldForceUploadStates = forceStatesUploadEnabled || !statesConditionalUploadEnabled;
 
@@ -236,6 +288,40 @@ export async function runKeyframeSearchPass(
       ],
     });
 
+    if (resolvedFrame) {
+      const pass = resolvedFrame.beginComputePass();
+      pass.setPipeline(entryExpandPipeline);
+      pass.setBindGroup(0, entryExpandBindGroup);
+      pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+
+      if (
+        indexedSearchEnabled &&
+        !(await recordKeyframeSearchWindowPass({
+          device,
+          entryCount,
+          preprocess,
+          searchTimesBuffer,
+          keyframeOffsetsBuffer,
+          keyframeCountsBuffer,
+          pass,
+        }))
+      ) {
+        return null;
+      }
+
+      pass.setPipeline(searchPipeline);
+      pass.setBindGroup(0, searchBindGroup);
+      pass.dispatchWorkgroups(Math.ceil(entryCount / 64), 1, 1);
+
+      return {
+        searchResultsBuffer,
+        searchResultsBufferPersistent: true,
+        outputIndicesBuffer,
+        outputIndicesBufferPersistent: true,
+        entryCount,
+      };
+    }
+
     const cmdEncoder = device.createCommandEncoder({ label: 'motion-keyframe-search-encoder' });
 
     {
@@ -272,8 +358,8 @@ export async function runKeyframeSearchPass(
     }
 
     const commandBuffer = cmdEncoder.finish();
-    if (submit) {
-      submit(commandBuffer);
+    if (resolvedSubmit) {
+      resolvedSubmit(commandBuffer);
     } else {
       queue.submit([commandBuffer]);
     }

@@ -21,8 +21,6 @@ const archetypeScratch: any[] = [];
 const pickedArchetypesScratch: any[] = [];
 let archetypeCursor = 0;
 
-let frameId = 0;
-
 export const InterpolationSystem: SystemDef = {
   name: 'InterpolationSystem',
   order: 20,
@@ -65,12 +63,19 @@ function resolveChannelRegistry(
 }
 
 function resolveTickFrame(ctx: SystemContext | undefined, config: any): number {
-  const engineFrame =
-    typeof ctx?.sampling?.engineFrame === 'number' ? ctx!.sampling!.engineFrame : frameId++;
   if ((config as any).samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number') {
     return ctx!.sampling!.frame;
   }
-  return engineFrame;
+
+  if (typeof ctx?.sampling?.engineFrame === 'number') {
+    return ctx.sampling.engineFrame;
+  }
+
+  if (typeof ctx?.nowMs === 'number' && Number.isFinite(ctx.nowMs)) {
+    return Math.floor(ctx.nowMs / (1000 / 60));
+  }
+
+  return 0;
 }
 
 function resolveArchetypesToProcess(world: any, config: any): Iterable<any> {
@@ -118,7 +123,6 @@ function processArchetype(
   const typedTransformBuffers = extractTransformTypedBuffers(archetype);
   const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
   const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
-  const typedDelay = archetype.getTypedBuffer('MotionState', 'delay');
   const typedTickInterval = archetype.getTypedBuffer('MotionState', 'tickInterval');
   const typedTickPhase = archetype.getTypedBuffer('MotionState', 'tickPhase');
 
@@ -135,9 +139,6 @@ function processArchetype(
     const timeline = timelineBuffer[i] as TimelineComponentData & {
       tracks: Map<string, unknown>;
     };
-
-    const delay = typedDelay ? typedDelay[i] : state.delay;
-    if (delay && delay > 0) continue;
 
     const status = typedStatus ? (typedStatus[i] as unknown as MotionStatus) : state.status;
     if (status !== MotionStatus.Running && status !== MotionStatus.Finished) continue;

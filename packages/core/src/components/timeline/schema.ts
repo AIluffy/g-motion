@@ -3,7 +3,7 @@ import { ComponentDef } from '../../plugin';
 export const TimelineComponent: ComponentDef = {
   schema: {
     tracks: 'object',
-    duration: 'float32',
+    duration: 'float64',
     loop: 'int32',
     repeat: 'int32',
     version: 'int32',

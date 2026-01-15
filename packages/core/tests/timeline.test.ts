@@ -21,7 +21,7 @@ describe('Timeline Component', () => {
     expect(TimelineComponent).toBeDefined();
     expect(TimelineComponent.schema).toBeDefined();
     expect(TimelineComponent.schema.tracks).toBe('object');
-    expect(TimelineComponent.schema.duration).toBe('float32');
+    expect(TimelineComponent.schema.duration).toBe('float64');
     expect(TimelineComponent.schema.loop).toBe('int32');
     expect(TimelineComponent.schema.repeat).toBe('int32');
     expect(TimelineComponent.schema.version).toBe('int32');

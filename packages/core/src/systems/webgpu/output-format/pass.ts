@@ -16,6 +16,7 @@ import { outputFormatBufferPool, trackBuffer } from './buffer-pool';
 import { getOutputFormatPipeline, outputFormatBindGroupLayout } from './pipeline';
 import { resetOutputFormatPassState } from './pipeline';
 import { makeChannelsKey } from './types';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 let outputFormatPassEnabled = true;
 
@@ -96,6 +97,7 @@ export async function runOutputFormatPass(
   usedRawValueCount: number,
   rawStride: number,
   outputChannels: ChannelMapping[] | undefined,
+  frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
 ): Promise<GPUBuffer> {
   if (!outputFormatPassEnabled || !usedRawValueCount) {
@@ -215,11 +217,6 @@ export async function runOutputFormatPass(
     `motion-output-format-formatted-${archetypeId}`,
   );
 
-  const cmdEncoder = device.createCommandEncoder({
-    label: `motion-output-format-encoder-${archetypeId}`,
-  });
-
-  const pass = cmdEncoder.beginComputePass();
   const bindGroup = device.createBindGroup({
     layout: outputFormatBindGroupLayout,
     entries: [
@@ -230,11 +227,24 @@ export async function runOutputFormatPass(
     ],
   });
 
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
-
   const workgroupSize = 64;
   const workgroupsX = Math.ceil(usedOutputValueCount / workgroupSize);
+
+  if (frame) {
+    const pass = frame.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(workgroupsX, 1, 1);
+    return formattedBuffer;
+  }
+
+  const cmdEncoder = device.createCommandEncoder({
+    label: `motion-output-format-encoder-${archetypeId}`,
+  });
+
+  const pass = cmdEncoder.beginComputePass();
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, bindGroup);
   pass.dispatchWorkgroups(workgroupsX, 1, 1);
   pass.end();
 

@@ -13,6 +13,7 @@ import {
 } from '../../../webgpu/keyframe-preprocess-shader';
 import { tryRunKeyframeInterpPassWithGpuEntryExpand } from './interp-pass-gpu-expand';
 import type { KeyframePreprocessResult } from './types';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export async function runKeyframeInterpPass(
   device: GPUDevice,
@@ -24,6 +25,7 @@ export async function runKeyframeInterpPass(
   entityCount: number,
   useOptimizedSearch: boolean,
   persistentOverride?: ReturnType<typeof getPersistentGPUBufferManager>,
+  frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
   options?: {
     entryExpansionOnGPUEnabled?: boolean;
@@ -61,6 +63,7 @@ export async function runKeyframeInterpPass(
       useOptimizedSearch,
       indexedSearchEnabled,
       persistentOverride,
+      frame,
       submit,
       options: {
         reuseOutputBuffer: options?.reuseOutputBuffer,

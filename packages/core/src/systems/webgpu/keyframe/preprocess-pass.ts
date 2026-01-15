@@ -16,6 +16,7 @@ import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer
 import { getKeyframePreprocessPipeline, keyframePreprocessBindGroupLayout } from './pipelines';
 import { s_keyframePreprocessCPUCache } from './caches';
 import type { KeyframePreprocessResult } from './types';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 const KEYFRAME_SEARCH_INDEX_BLOCK_SIZE = 8;
 
@@ -117,6 +118,7 @@ export async function runKeyframePreprocessPass(
   device: GPUDevice,
   queue: GPUQueue,
   batch: KeyframePreprocessBatchDescriptor,
+  frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
   options?: {
     indexedSearchEnabled?: boolean;
@@ -528,23 +530,34 @@ export async function runKeyframePreprocessPass(
     ],
   });
 
-  const cmdEncoder = device.createCommandEncoder({
-    label: `motion-keyframe-preprocess-encoder-${batch.archetypeId}`,
-  });
-  const pass = cmdEncoder.beginComputePass();
-  pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
   const workgroupsX = Math.ceil(totalRawKeyframes / 64);
-  pass.dispatchWorkgroups(workgroupsX, 1, 1);
-  pass.end();
-  const commandBuffer = cmdEncoder.finish();
-  if (submit) {
-    submit(commandBuffer, () => {
+
+  if (frame) {
+    const pass = frame.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(workgroupsX, 1, 1);
+    frame.recordAfterSubmit(() => {
       keyframeIndicesBuffer.destroy();
     });
   } else {
-    queue.submit([commandBuffer]);
-    keyframeIndicesBuffer.destroy();
+    const cmdEncoder = device.createCommandEncoder({
+      label: `motion-keyframe-preprocess-encoder-${batch.archetypeId}`,
+    });
+    const pass = cmdEncoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(workgroupsX, 1, 1);
+    pass.end();
+    const commandBuffer = cmdEncoder.finish();
+    if (submit) {
+      submit(commandBuffer, () => {
+        keyframeIndicesBuffer.destroy();
+      });
+    } else {
+      queue.submit([commandBuffer]);
+      keyframeIndicesBuffer.destroy();
+    }
   }
   persistent.markBufferClean(packedKey, batch.keyframesVersion);
   persistent.markBufferClean(startTimesKey, batch.keyframesVersion);

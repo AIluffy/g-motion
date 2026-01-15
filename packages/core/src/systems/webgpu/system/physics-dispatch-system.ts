@@ -8,6 +8,7 @@ import { markPhysicsGPUEntity, setPendingReadbackCount } from '../../../webgpu/s
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';
 import type { WebGPUComputeRuntime } from './runtime';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export type PhysicsReadbackTag = {
   kind: 'physics';
@@ -27,9 +28,11 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   dtMs: number;
   dtSec: number;
   maxVelocity: number;
+  frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<void> {
-  const { runtime, device, processor, config, batch, dtMs, dtSec, maxVelocity, submit } = params;
+  const { runtime, device, processor, config, batch, dtMs, dtSec, maxVelocity, frame, submit } =
+    params;
 
   const sp = runtime.stagingPool;
   const readbackManager = runtime.readbackManager;
@@ -127,6 +130,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
     paramsBuffer: physicsParamsBuffer,
     outputBuffer,
     finishedBuffer,
+    frame,
     submit,
   });
 
@@ -144,13 +148,6 @@ export async function dispatchPhysicsBatchForArchetype(params: {
     processor.markEntityIdsInFlight(leaseId);
   }
   sp.markInFlight(stagingBuffer);
-
-  const copyEncoder = device.createCommandEncoder({
-    label: `copy-physics-${baseArchetypeId}`,
-  });
-  copyEncoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputBytes);
-  copyEncoder.copyBufferToBuffer(finishedBuffer, 0, stagingBuffer, outputBytes, finishedBytes);
-  const commandBuffer = copyEncoder.finish();
 
   const decode: PendingReadback['decode'] = (mappedRange: ArrayBuffer) => {
     const outValues = new Float32Array(mappedRange.slice(0, outputBytes));
@@ -196,6 +193,20 @@ export async function dispatchPhysicsBatchForArchetype(params: {
       p.then(() => resolveMapPromise?.()).catch((e) => rejectMapPromise?.(e));
     }
   };
+
+  if (frame) {
+    frame.recordCopy(outputBuffer, 0, stagingBuffer, 0, outputBytes);
+    frame.recordCopy(finishedBuffer, 0, stagingBuffer, outputBytes, finishedBytes);
+    frame.recordAfterSubmit(afterSubmit);
+    return;
+  }
+
+  const copyEncoder = device.createCommandEncoder({
+    label: `copy-physics-${baseArchetypeId}`,
+  });
+  copyEncoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputBytes);
+  copyEncoder.copyBufferToBuffer(finishedBuffer, 0, stagingBuffer, outputBytes, finishedBytes);
+  const commandBuffer = copyEncoder.finish();
 
   if (submit) {
     submit(commandBuffer, afterSubmit);

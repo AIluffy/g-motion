@@ -9,6 +9,7 @@ import { processOutputBuffer } from '../output-buffer-processing';
 import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../keyframe';
 import { maybeRunViewportCulling } from './viewport-culling-system';
 import type { WebGPUComputeRuntime } from './runtime';
+import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export async function processInterpolationArchetype(params: {
   runtime: WebGPUComputeRuntime;
@@ -28,6 +29,7 @@ export async function processInterpolationArchetype(params: {
   statesConditionalUploadEnabled: boolean;
   forceStatesUploadEnabled: boolean;
   outputBufferReuseEnabled: boolean;
+  frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<void> {
   const {
@@ -48,6 +50,7 @@ export async function processInterpolationArchetype(params: {
     statesConditionalUploadEnabled,
     forceStatesUploadEnabled,
     outputBufferReuseEnabled,
+    frame,
     submit,
   } = params;
 
@@ -102,6 +105,7 @@ export async function processInterpolationArchetype(params: {
       device,
       queue,
       batchWithPreprocessed,
+      frame,
       submit,
       {
         indexedSearchEnabled: keyframeSearchIndexedEnabled,
@@ -119,6 +123,7 @@ export async function processInterpolationArchetype(params: {
         gpuBatch.entityCount,
         useOptimizedKeyframeSearch,
         persistent,
+        frame,
         submit,
         {
           entryExpansionOnGPUEnabled: keyframeEntryExpandOnGPUEnabled,
@@ -150,6 +155,7 @@ export async function processInterpolationArchetype(params: {
         forceStatesUploadEnabled,
         reuseOutputBuffer: outputBufferReuseEnabled && runtime.readbackManager !== null,
       },
+      frame,
       submit,
     );
     outputBuffer = result.outputBuffer;
@@ -185,6 +191,7 @@ export async function processInterpolationArchetype(params: {
       rawChannels,
       outputChannels,
       asyncEnabled: viewportCullingAsyncEnabled,
+      frame,
       submit,
     });
 
@@ -227,6 +234,7 @@ export async function processInterpolationArchetype(params: {
       keepOutputBuffer: outputBufferTag !== undefined,
       readbackTag: outputBufferTag,
     },
+    frame,
     submit,
   );
 }

@@ -135,7 +135,12 @@ export const BatchSamplingSystem: SystemDef = {
     if (!world || !metrics || !processor || !appContext) {
       return;
     }
-    const now = performance.now();
+    const nowMs =
+      typeof ctx?.nowMs === 'number'
+        ? ctx.nowMs
+        : typeof performance !== 'undefined'
+          ? performance.now()
+          : Date.now();
     const config = world.config;
     const timelineFlatEnabled = config.timelineFlat === true;
     const engineFrame =
@@ -220,6 +225,8 @@ export const BatchSamplingSystem: SystemDef = {
       let renderBuffer: Array<unknown> | undefined;
       let typedStatus: Float32Array | Float64Array | Int32Array | undefined;
       let typedStartTime: Float32Array | Float64Array | Int32Array | undefined;
+      let typedPausedAt: Float32Array | Float64Array | Int32Array | undefined;
+      let typedDelay: Float32Array | Float64Array | Int32Array | undefined;
       let typedCurrentTime: Float32Array | Float64Array | Int32Array | undefined;
       let typedPlaybackRate: Float32Array | Float64Array | Int32Array | undefined;
       let typedIteration: Float32Array | Float64Array | Int32Array | undefined;
@@ -236,6 +243,8 @@ export const BatchSamplingSystem: SystemDef = {
         renderBuffer = cachedBuffers.renderBuffer;
         typedStatus = cachedBuffers.typedStatus;
         typedStartTime = cachedBuffers.typedStartTime;
+        typedPausedAt = cachedBuffers.typedPausedAt;
+        typedDelay = cachedBuffers.typedDelay;
         typedCurrentTime = cachedBuffers.typedCurrentTime;
         typedPlaybackRate = cachedBuffers.typedPlaybackRate;
         typedIteration = cachedBuffers.typedIteration;
@@ -253,6 +262,8 @@ export const BatchSamplingSystem: SystemDef = {
         inertiaBuffer = archetype.getBuffer?.('Inertia');
         typedStatus = archetype.getTypedBuffer('MotionState', 'status');
         typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+        typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');
+        typedDelay = archetype.getTypedBuffer('MotionState', 'delay');
         typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
         typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
         typedIteration = archetype.getTypedBuffer('MotionState', 'iteration');
@@ -269,6 +280,8 @@ export const BatchSamplingSystem: SystemDef = {
           inertiaBuffer,
           typedStatus,
           typedStartTime,
+          typedPausedAt,
+          typedDelay,
           typedCurrentTime,
           typedPlaybackRate,
           typedIteration,
@@ -327,6 +340,13 @@ export const BatchSamplingSystem: SystemDef = {
           ? (typedStatus[i] as unknown as MotionStatus)
           : (stateObj.status as unknown as MotionStatus);
         if (status !== MotionStatus.Running) {
+          continue;
+        }
+
+        const timelineTime = typedCurrentTime
+          ? (typedCurrentTime[i] as unknown as number)
+          : Number(stateObj.currentTime ?? 0);
+        if (!(Number.isFinite(timelineTime) && timelineTime >= 0)) {
           continue;
         }
 
@@ -403,31 +423,19 @@ export const BatchSamplingSystem: SystemDef = {
           const offset = eIndex * 4;
           const startTime = typedStartTime ? typedStartTime[i] : Number(stateObj.startTime ?? 0);
           statesData[offset] = startTime;
-          let currentTime = typedCurrentTime
-            ? typedCurrentTime[i]
-            : Number(stateObj.currentTime ?? 0);
-          const timeline = timelineBuffer[i] as TimelineComponentData;
-          const duration = Number(timeline?.duration ?? 0);
-          const hasSpring = !!(springBuffer && springBuffer[i] != null);
-          if (!hasSpring && duration > 0 && currentTime >= duration) {
-            const maxRepeat = timeline?.repeat ?? (timeline?.loop ? -1 : 0);
-            const iteration = typedIteration ? typedIteration[i] : Number(stateObj.iteration ?? 0);
-            if (maxRepeat === -1 || iteration < maxRepeat) {
-              currentTime = currentTime % duration;
-            } else {
-              currentTime = duration;
-            }
-          }
-          statesData[offset + 1] = currentTime;
           const playbackRate = typedPlaybackRate
             ? typedPlaybackRate[i]
-            : Number(stateObj.playbackRate ?? 0);
+            : Number(stateObj.playbackRate ?? 1);
+          const timelineTime = typedCurrentTime
+            ? (typedCurrentTime[i] as unknown as number)
+            : Number(stateObj.currentTime ?? 0);
+          statesData[offset + 1] = timelineTime;
           statesData[offset + 2] = playbackRate;
           statesData[offset + 3] = status;
           statesVersion = hashMotionStateVersionStep(
             statesVersion,
             startTime,
-            currentTime,
+            timelineTime,
             playbackRate,
             status as unknown as number,
           );
@@ -1099,7 +1107,7 @@ export const BatchSamplingSystem: SystemDef = {
     // Update context for WebGPUComputeSystem to access per-archetype batches
     if (totalEntities > 0) {
       appContext.updateBatchContext({
-        lastBatchId: `batch-${Math.floor(now / 1000)}`,
+        lastBatchId: `batch-${Math.floor(nowMs / 1000)}`,
         entityCount: totalEntities,
         archetypeBatchesReady: true,
       });

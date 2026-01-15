@@ -82,7 +82,8 @@ export class FrameNavigator {
     const state = archetype.getEntityData(primaryEntityId, 'MotionState') as
       | MotionStateComponentData
       | undefined;
-    return state?.currentTime ?? 0;
+    const t = state?.currentTime ?? 0;
+    return t < 0 ? 0 : t;
   }
 
   getDuration(primaryEntityId: number): number {
