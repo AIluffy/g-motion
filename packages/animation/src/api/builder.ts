@@ -2,7 +2,7 @@ import { World, TimelineData, MotionStatus, WorldProvider, getNowMs } from '@g-m
 import { AnimationControl } from './control';
 import { TrackBuilder } from './track';
 import { applyAdjust } from './adjust';
-import { runBatchAnimation, BatchTemplate } from './batch-runner';
+import { runBatchAnimation, BatchTemplate } from '../batch-runner';
 export type { MarkOptions, ResolvedMarkOptions } from './mark';
 import {
   MarkOptions,
@@ -17,7 +17,7 @@ import { addKeyframesForTarget } from './keyframes';
 import { analyzeSpringTracks, analyzeInertiaTracks, buildInertiaComponent } from './physics';
 import { buildRenderComponent } from './render';
 import { AnimationValidator } from './animationValidator';
-import { ComponentRegistrar } from './componentRegistrar';
+import { ComponentRegistrar } from '../registery';
 import { GPUChannelMapper } from './gpuChannelMapper';
 import type { VisualTarget } from './visualTarget';
 import { getOrCreateVisualTarget } from './visualTarget';

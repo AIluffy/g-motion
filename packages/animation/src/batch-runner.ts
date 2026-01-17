@@ -1,5 +1,5 @@
-import { AnimationControl } from './control';
-import { MarkOptions, ResolvedMarkOptions } from './mark';
+import { AnimationControl } from './api/control';
+import { MarkOptions, ResolvedMarkOptions } from './api/mark';
 
 export type BatchTemplate = { staticResolved: ResolvedMarkOptions[]; dynamic: MarkOptions[] };
 

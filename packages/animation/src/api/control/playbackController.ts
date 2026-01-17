@@ -1,5 +1,10 @@
-import { MotionStatus, computeStartTimeForTimelineTime, getNowMs } from '@g-motion/core';
-import type { MotionStateComponentData, TimelineComponentData } from '../../component-types';
+import {
+  MotionStatus,
+  TimelineComponentData,
+  computeStartTimeForTimelineTime,
+  getNowMs,
+} from '@g-motion/core';
+import type { MotionStateComponentData } from '../../component-types';
 import type { BatchCoordinator } from './batchCoordinator';
 
 export class PlaybackController {

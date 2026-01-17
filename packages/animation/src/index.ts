@@ -1,30 +1,16 @@
-import {
-  World,
-  WorldProvider,
-  TimeSystem,
-  RenderSystem,
-  BatchSamplingSystem,
-  WebGPUComputeSystem,
-  GPUResultApplySystem,
-  ActiveEntityMonitorSystem,
-  getEngineForWorld,
-  MotionStatus,
-} from '@g-motion/core';
-import { createDebugger, hasDomWithQuerySelectorAll } from '@g-motion/utils';
-import { RovingResolverSystem } from './systems/rovingResolver';
-import { TimelineSystem } from './systems/timeline';
+import { getEngineForWorld, MotionStatus, World, WorldProvider } from '@g-motion/core';
+import { hasDomWithQuerySelectorAll } from '@g-motion/utils';
 import { motion as builderMotion } from './api/builder';
+import type { DomAnimationScope } from './api/control';
+import { AnimationControl, registerControlWithScope } from './api/control';
 import {
   resolveTargets,
   type SelectorCache,
   type TargetScopeRoot,
   type TargetType,
 } from './api/mark';
-import type { DomAnimationScope } from './api/control';
-import { registerControlWithScope, AnimationControl } from './api/control';
 import { isVisualTargetCached } from './api/visualTarget';
-
-const debug = createDebugger('Animation');
+import { registerAnimationSystems } from './registery';
 
 function initEngine(world: World) {
   getEngineForWorld(world);
@@ -54,29 +40,9 @@ function initEngine(world: World) {
   }
 
   if (!(world as any).__animationSystemsRegistered) {
-    debug('Initializing engine, registering systems');
     registerAnimationSystems(world);
     (world as any).__animationSystemsRegistered = true;
   }
-}
-
-/**
- * Register animation systems into a specific World instance.
- * This enables per-world system registration for multi-world isolation.
- *
- * Note: All animations now default to GPU compute path with CPU fallback.
- * ThresholdMonitorSystem has been removed - GPU is always attempted first.
- */
-export function registerAnimationSystems(world: World) {
-  debug('Registering animation systems for world');
-  world.scheduler.add(TimeSystem);
-  world.scheduler.add(TimelineSystem);
-  world.scheduler.add(RovingResolverSystem);
-  world.scheduler.add(BatchSamplingSystem);
-  world.scheduler.add(WebGPUComputeSystem);
-  world.scheduler.add(GPUResultApplySystem);
-  world.scheduler.add(ActiveEntityMonitorSystem);
-  world.scheduler.add(RenderSystem);
 }
 
 type MotionOptions = {
@@ -192,14 +158,14 @@ export function createScopedMotion(root: Element): ScopedMotionFn {
   return scopedMotion;
 }
 
-export * from './api/control';
-export * from './api/builder';
-export * from './api/gpu-status';
-export * from './api/track';
-export * from './api/adjust';
-export * from './api/mark';
-export * from './api/animate';
-export type { FrameRoundingMode } from '@g-motion/utils';
 export { FrameSampler } from '@g-motion/utils';
-export { engine } from './engine';
+export type { FrameRoundingMode } from '@g-motion/utils';
+export * from './api/adjust';
+export * from './api/animate';
+export * from './api/builder';
+export * from './api/control';
+export * from './api/gpu-status';
+export * from './api/mark';
+export * from './api/track';
 export * from './api/visualTarget';
+export { engine } from './engine';

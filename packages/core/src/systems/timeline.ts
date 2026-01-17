@@ -1,4 +1,6 @@
-import { SystemDef, SystemContext, MotionStatus, getNowMs } from '@g-motion/core';
+import { MotionStatus } from '../components/state';
+import { SystemContext, SystemDef } from '../plugin';
+import { getNowMs } from '../utils';
 
 function mod(n: number, d: number): number {
   const r = n % d;

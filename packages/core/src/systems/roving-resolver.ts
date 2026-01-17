@@ -1,7 +1,9 @@
-import { SystemDef, SystemContext } from '@g-motion/core';
-import type { TimelineComponentData } from '../component-types';
+import { SystemContext, SystemDef } from '../plugin';
+import type { Keyframe, TimelineComponentData } from '../types';
 
 type GaussianKernel = { weights: number[]; radius: number };
+
+type RovingKeyframe = Partial<Keyframe>;
 
 const DEFAULT_SMOOTH_KERNEL: GaussianKernel = (() => {
   const radius = 2; // window = 2*radius+1 => 5
@@ -57,56 +59,60 @@ export const RovingResolverSystem: SystemDef = {
       if (!timelineBuffer) continue;
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const timeline = timelineBuffer[i] as TimelineComponentData & {
-          tracks: Map<string, Array<Record<string, unknown>>>;
-          duration: number;
-          version?: number;
-          rovingApplied?: number;
-        };
-        const ver = typedVersion ? (typedVersion[i] as unknown as number) : (timeline.version ?? 0);
-        const applied = typedApplied
-          ? (typedApplied[i] as unknown as number)
-          : (timeline.rovingApplied ?? 0);
+        const timelineValue = timelineBuffer[i];
+        if (!timelineValue) continue;
+        const timeline = timelineValue as TimelineComponentData;
+
+        const ver = typedVersion ? typedVersion[i] : (timeline.version ?? 0);
+        const applied = typedApplied ? typedApplied[i] : (timeline.rovingApplied ?? 0);
         if (applied === ver) {
           continue;
         }
         const tracks = timeline.tracks;
+        if (!tracks || tracks.size === 0) {
+          if (typedApplied) {
+            typedApplied[i] = ver;
+          } else {
+            timeline.rovingApplied = ver;
+          }
+          continue;
+        }
         let durationDirty = false;
 
         for (const [, track] of tracks) {
           if (!track || track.length === 0) continue;
 
-          const needsRoving = track.some(
-            (kf: Record<string, unknown>) => !Number.isFinite(kf.time as number),
-          );
+          const rovingTrack = track as unknown as RovingKeyframe[];
+          const needsRoving = rovingTrack.some((kf) => !Number.isFinite(kf.time ?? NaN));
           if (!needsRoving) continue;
 
           // Estimate per-segment length via absolute delta of values
           const lengths: number[] = [];
-          for (let idx = 0; idx < track.length; idx++) {
+          for (let idx = 0; idx < rovingTrack.length; idx++) {
             const prevVal =
-              idx === 0
-                ? ((track[idx].startValue as number) ?? 0)
-                : (track[idx - 1].endValue as number);
-            const curVal = track[idx].endValue as number;
-            lengths.push(Math.abs((curVal ?? 0) - (prevVal ?? 0)));
+              idx === 0 ? (rovingTrack[idx].startValue ?? 0) : (rovingTrack[idx - 1].endValue ?? 0);
+            const curVal = rovingTrack[idx].endValue ?? 0;
+            lengths.push(Math.abs(curVal - prevVal));
           }
 
           const smoothedLengths = smooth(lengths, DEFAULT_SMOOTH_KERNEL);
-          const totalDuration = timeline.duration || 1000;
+          const totalDuration = Number.isFinite(timeline.duration ?? NaN)
+            ? timeline.duration!
+            : 1000;
           const durations = distributeDurations(smoothedLengths, totalDuration);
 
           // Assign times cumulatively
           let cursor = 0;
-          for (let idx = 0; idx < track.length; idx++) {
+          for (let idx = 0; idx < rovingTrack.length; idx++) {
             const dur = durations[idx] ?? 0;
-            track[idx].startTime = cursor;
-            track[idx].time = cursor + dur;
+            rovingTrack[idx].startTime = cursor;
+            rovingTrack[idx].time = cursor + dur;
             cursor += dur;
           }
 
           // Keep timeline duration aligned with last mark
-          timeline.duration = Math.max(timeline.duration, cursor);
+          const prevDuration = Number.isFinite(timeline.duration ?? NaN) ? timeline.duration! : 0;
+          timeline.duration = Math.max(prevDuration, cursor);
           durationDirty = true;
         }
 
@@ -115,7 +121,7 @@ export const RovingResolverSystem: SystemDef = {
           for (const [key, track] of tracks) {
             tracks.set(
               key,
-              [...track].sort((a, b) => (a.time as number) - (b.time as number)),
+              [...track].sort((a, b) => (a.time ?? 0) - (b.time ?? 0)),
             );
           }
         }

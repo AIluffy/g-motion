@@ -17,13 +17,6 @@ export interface MotionStateComponentData extends Record<string, unknown> {
   tickPriority?: number;
 }
 
-export interface TimelineComponentData extends Record<string, unknown> {
-  duration: number;
-  repeat?: number;
-  loop?: boolean;
-  tracks?: Map<string, unknown>;
-}
-
 export interface TransformComponentData extends Record<string, unknown> {
   x?: number;
   y?: number;
