@@ -12,6 +12,7 @@ import {
 } from '@g-motion/core';
 import { createDebugger, hasDomWithQuerySelectorAll } from '@g-motion/utils';
 import { RovingResolverSystem } from './systems/rovingResolver';
+import { TimelineSystem } from './systems/timeline';
 import { motion as builderMotion } from './api/builder';
 import {
   resolveTargets,
@@ -69,6 +70,7 @@ function initEngine(world: World) {
 export function registerAnimationSystems(world: World) {
   debug('Registering animation systems for world');
   world.scheduler.add(TimeSystem);
+  world.scheduler.add(TimelineSystem);
   world.scheduler.add(RovingResolverSystem);
   world.scheduler.add(BatchSamplingSystem);
   world.scheduler.add(WebGPUComputeSystem);
@@ -197,7 +199,8 @@ export * from './api/track';
 export * from './api/adjust';
 export * from './api/mark';
 export * from './api/animate';
-export * from './api/frameSampler';
+export type { FrameRoundingMode } from '@g-motion/utils';
+export { FrameSampler } from '@g-motion/utils';
 export * from './values';
 export { engine } from './engine';
 export * from './api/visualTarget';

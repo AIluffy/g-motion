@@ -31,47 +31,7 @@ export const InertiaComponent: ComponentDef = {
   },
 };
 
-/**
- * Inertia animation options that can be passed to mark()
- * Inspired by GSAP InertiaPlugin with snap-to and advanced controls
- */
-export interface InertiaOptions {
-  // Velocity (can be number, 'auto' for tracked properties, or function)
-  velocity?: number | 'auto' | (() => number);
-  velocitySource?: (track: string, ctx: { target: any }) => number; // Custom getter for 'auto'
-
-  // Boundary constraints
-  min?: number; // Minimum end value
-  max?: number; // Maximum end value
-  bounds?: { min?: number; max?: number };
-  clamp?: boolean; // Clamp instead of bounce
-
-  // End value control (GSAP-inspired snap-to)
-  snap?: number | number[] | ((naturalEnd: number) => number); // Preferred
-  end?: number | number[] | ((naturalEnd: number) => number); // Alias
-  modifyTarget?: (target: number) => number; // Transform natural end before snap/bounds
-
-  // Physics parameters
-  resistance?: number; // Resistance per second (friction) - more intuitive than timeConstant
-  duration?: number | { min: number; max: number }; // Tween duration in seconds or range
-
-  // Legacy parameters (for backward compatibility)
-  power?: number; // Target distance factor (deprecated, use resistance instead)
-  timeConstant?: number; // Decay duration in ms (deprecated, use resistance/duration instead)
-
-  // Bounce parameters (when hitting min/max boundaries)
-  bounce?: false | { stiffness?: number; damping?: number; mass?: number }; // Preferred
-  bounceStiffness?: number; // Legacy stiffness
-  bounceDamping?: number; // Legacy damping
-  bounceMass?: number; // Legacy mass
-
-  // Optional handoff into spring when decay/bounce completes
-  handoff?: { type: 'spring'; to?: number };
-
-  // Completion thresholds
-  restSpeed?: number; // Velocity threshold for completion (default: 0.5 units/sec)
-  restDelta?: number; // Distance threshold for completion (default: 0.5)
-}
+export type { InertiaOptions } from '@g-motion/core';
 
 /**
  * Default inertia parameters

@@ -1,4 +1,4 @@
-import { ComponentDef } from '@g-motion/core';
+import { ComponentDef, type SpringOptions } from '@g-motion/core';
 
 /**
  * SpringComponent stores spring physics parameters and per-track velocity state.
@@ -15,21 +15,12 @@ export const SpringComponent: ComponentDef = {
   },
 };
 
-/**
- * Spring animation options that can be passed to mark()
- */
-export interface SpringOptions {
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  restSpeed?: number;
-  restDelta?: number;
-}
+export type { SpringOptions } from '@g-motion/core';
 
 /**
  * Default spring parameters (matching Popmotion defaults)
  */
-export const DEFAULT_SPRING_CONFIG: Required<SpringOptions> = {
+export const DEFAULT_SPRING_CONFIG: Required<Omit<SpringOptions, 'initialVelocity'>> = {
   stiffness: 100,
   damping: 10,
   mass: 1,

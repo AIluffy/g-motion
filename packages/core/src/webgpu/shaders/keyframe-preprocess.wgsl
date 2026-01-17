@@ -27,14 +27,7 @@ struct ChannelMap {
     keyframeCount: u32, // Number of keyframes for this channel
 }
 
-// Easing type to ID mapping
-const EASING_LINEAR: u32 = 0u;
-const EASING_EASE_IN_QUAD: u32 = 1u;
-const EASING_EASE_OUT_QUAD: u32 = 2u;
-const EASING_EASE_IN_OUT_QUAD: u32 = 3u;
-const EASING_EASE_IN_CUBIC: u32 = 4u;
-const EASING_EASE_OUT_CUBIC: u32 = 5u;
-const EASING_EASE_IN_OUT_CUBIC: u32 = 6u;
+const EASING_BUILTIN_MAX_ID: u32 = 30u;
 const EASING_BEZIER: u32 = 100u;
 const EASING_HOLD: u32 = 101u;
 
@@ -101,16 +94,10 @@ fn packEasingFlags(easingId: u32, easingMode: u32) -> u32 {
 
 // Convert easing type to shader easing ID
 fn easingTypeToId(easingType: u32) -> u32 {
-    switch (easingType) {
-        case EASING_LINEAR: { return 0u; }
-        case EASING_EASE_IN_QUAD: { return 1u; }
-        case EASING_EASE_OUT_QUAD: { return 2u; }
-        case EASING_EASE_IN_OUT_QUAD: { return 3u; }
-        case EASING_EASE_IN_CUBIC: { return 4u; }
-        case EASING_EASE_OUT_CUBIC: { return 5u; }
-        case EASING_EASE_IN_OUT_CUBIC: { return 6u; }
-        default: { return 0u; }
+    if (easingType <= EASING_BUILTIN_MAX_ID) {
+        return easingType;
     }
+    return 0u;
 }
 
 // Get easing mode from type

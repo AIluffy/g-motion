@@ -249,6 +249,37 @@ export interface TimelineComponentData {
   rovingApplied?: number;
 }
 
+export interface SpringComponentData {
+  stiffness?: number;
+  damping?: number;
+  mass?: number;
+  restSpeed?: number;
+  restDelta?: number;
+  velocities?: Map<string, number>;
+}
+
+export interface InertiaComponentData {
+  power?: number;
+  timeConstant?: number;
+  min?: number;
+  max?: number;
+  bounds?: { min?: number; max?: number };
+  clamp?: boolean | number;
+  snap?: unknown;
+  end?: unknown;
+  modifyTarget?: unknown;
+  bounce?: unknown | false;
+  bounceStiffness?: number;
+  bounceDamping?: number;
+  bounceMass?: number;
+  handoff?: unknown;
+  restSpeed?: number;
+  restDelta?: number;
+  velocities?: Map<string, number>;
+  bounceVelocities?: Map<string, number>;
+  inBounce?: Map<string, boolean>;
+}
+
 /**
  * Velocity tracking data for inertia/momentum animations
  */

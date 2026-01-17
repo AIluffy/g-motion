@@ -5,10 +5,12 @@ import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import { SchedulingConstants } from '../../constants/scheduling';
 import { TimelineTracksMap } from '../../types';
 import type {
+  InertiaComponentData,
   Keyframe,
   MotionStateData,
   PreprocessedKeyframes,
   RenderData,
+  SpringComponentData,
   TimelineComponentData,
   TimelineData,
   Track,
@@ -51,33 +53,6 @@ import {
 } from './utils';
 
 import { getPhysicsStateVersionByArchetype, getPhysicsLayoutSigByArchetype } from './physics-state';
-
-type SpringComponentData = {
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  restSpeed?: number;
-  restDelta?: number;
-  velocities?: Map<string, number>;
-};
-
-type InertiaComponentData = {
-  power?: number;
-  velocities?: Map<string, number>;
-  bounceVelocities?: Map<string, number>;
-  inBounce?: Map<string, boolean>;
-  bounds?: { min?: number; max?: number };
-  min?: number;
-  max?: number;
-  timeConstant?: number;
-  restSpeed?: number;
-  restDelta?: number;
-  clamp?: boolean | number;
-  bounce?: unknown | false;
-  bounceStiffness?: number;
-  bounceDamping?: number;
-  bounceMass?: number;
-};
 
 function getFlatTracks(timeline: {
   tracks?: TimelineData;

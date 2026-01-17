@@ -17,7 +17,8 @@
     "test": "turbo run test",
     "test:watch": "turbo run test -- --watch",
     "clean": "turbo clean && rm -rf node_modules",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "flow": "pnpm build && pnpm test && pnpm dev --filter examples"
   },
   "keywords": [],
   "author": "",

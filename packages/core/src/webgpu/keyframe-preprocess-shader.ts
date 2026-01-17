@@ -12,6 +12,7 @@ import keyframeEntryExpandShaderCode from './shaders/keyframe-entry-expand.wgsl?
 import keyframeSearchWindowShaderCode from './shaders/keyframe-search-window.wgsl?raw';
 import keyframeInterpFromSearchShaderCode from './shaders/keyframe-interp-from-search.wgsl?raw';
 import stringSearchShaderCode from './shaders/string-search.wgsl?raw';
+import { getEasingId } from '../systems/easing-registry';
 
 export const KEYFRAME_PREPROCESS_SHADER = keyframePreprocessShaderCode;
 export const KEYFRAME_SEARCH_SHADER = keyframeSearchShaderCode;
@@ -139,19 +140,8 @@ export const PROPERTY_HASHES = {
 
 export function easingStringToType(easing: string | undefined): number {
   if (!easing) return EASING_TYPE.LINEAR;
-
-  const easingMap: Record<string, number> = {
-    linear: EASING_TYPE.LINEAR,
-    easeInQuad: EASING_TYPE.EASE_IN_QUAD,
-    easeOutQuad: EASING_TYPE.EASE_OUT_QUAD,
-    easeInOutQuad: EASING_TYPE.EASE_IN_OUT_QUAD,
-    easeInCubic: EASING_TYPE.EASE_IN_CUBIC,
-    easeOutCubic: EASING_TYPE.EASE_OUT_CUBIC,
-    easeInOutCubic: EASING_TYPE.EASE_IN_OUT_CUBIC,
-    // ... add more as needed
-  };
-
-  return easingMap[easing] ?? EASING_TYPE.LINEAR;
+  if (easing === 'hold') return EASING_TYPE.HOLD;
+  return getEasingId(easing);
 }
 
 export interface RawKeyframeGenerationOptions {

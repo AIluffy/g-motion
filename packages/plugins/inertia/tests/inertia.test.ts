@@ -1,27 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { motion } from '@g-motion/animation';
-import { WorldProvider, app } from '@g-motion/core';
+import { WorldProvider, app, type InertiaComponentData } from '@g-motion/core';
 import { InertiaPlugin } from '../src/index';
-
-type InertiaComponentData = {
-  power: number;
-  timeConstant: number;
-  min?: number;
-  max?: number;
-  bounds?: { min?: number; max?: number };
-  clamp?: number;
-  snap?: unknown;
-  end?: unknown;
-  bounceStiffness: number;
-  bounceDamping: number;
-  restSpeed: number;
-  restDelta: number;
-  velocities: Map<string, number>;
-  bounceVelocities?: Map<string, number>;
-  inBounce?: Map<string, boolean>;
-  handoff?: unknown;
-  bounce?: unknown;
-};
 
 type TimelineComponentData = {
   tracks: Map<string, Array<{ endValue: number }>>;

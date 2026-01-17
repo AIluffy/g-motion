@@ -26,7 +26,6 @@ export const TimeSystem: SystemDef = {
       const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
       const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
       const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
-      const typedIteration = archetype.getTypedBuffer('MotionState', 'iteration');
 
       for (let i = 0; i < archetype.entityCount; i++) {
         const state = stateBuffer[i] as {
@@ -53,41 +52,29 @@ export const TimeSystem: SystemDef = {
         const playbackRate = typedPlaybackRate
           ? typedPlaybackRate[i]
           : Number(state.playbackRate ?? 1);
-        const prevTimelineTime = typedCurrentTime
-          ? typedCurrentTime[i]
-          : Number(state.currentTime ?? 0);
-        const timeline = timelineBuffer[i] as {
-          duration?: number;
-          repeat?: number;
-          loop?: number | boolean;
-        };
+        const timeline = timelineBuffer[i] as { duration?: number };
         const duration = Number(timeline.duration ?? 0);
-        const loop = timeline.loop;
-        const repeat = timeline.repeat;
 
-        const res = evaluateMotionTime({
-          nowMs,
-          startTime,
-          pausedAt,
-          delay,
-          playbackRate,
-          duration,
-          loop,
-          repeat,
-        });
+        const pausedAtNum = Number(pausedAt ?? 0);
+        const effectiveNow = pausedAtNum ? Math.min(nowMs, pausedAtNum) : nowMs;
+        const startTimeNum = Number(startTime ?? 0);
+        const delayNum = Number(delay ?? 0);
+        const playbackRateNum = Number(playbackRate ?? 1);
+        const rateAbs = Math.abs(playbackRateNum);
+        const delta = effectiveNow - startTimeNum - delayNum;
 
-        state.currentTime = res.timelineTime;
-        state.iteration = res.iteration;
-        if (typedCurrentTime) typedCurrentTime[i] = res.timelineTime;
-        if (typedIteration) typedIteration[i] = res.iteration;
-
-        if (
-          status === MotionStatus.Running &&
-          res.finished &&
-          Object.is(prevTimelineTime, res.timelineTime)
-        ) {
-          world.setMotionStatusAt(archetype, i, MotionStatus.Finished);
+        let timelineTime: number;
+        if (!(Number.isFinite(duration) && duration > 0)) {
+          timelineTime = 0;
+        } else if (delta < 0) {
+          timelineTime = delta * rateAbs;
+        } else {
+          const distanceTime = delta * rateAbs;
+          timelineTime = playbackRateNum < 0 ? duration - distanceTime : distanceTime;
         }
+
+        state.currentTime = timelineTime;
+        if (typedCurrentTime) typedCurrentTime[i] = timelineTime;
       }
     }
   },

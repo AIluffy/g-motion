@@ -39,6 +39,8 @@ export interface BatchChannelTable {
   kind?: BatchChannelKind;
 }
 
+export type GPUChannelMappingRegistrationMode = 'primitive' | 'visual';
+
 /**
  * GPU Channel Mapping Registry
  * Manages per-batch channel configurations for result delivery.
@@ -197,6 +199,123 @@ export function getGPUChannelMappingRegistry(): GPUChannelMappingRegistry {
     registryInstance = new GPUChannelMappingRegistry();
   }
   return registryInstance;
+}
+
+function createPrimitiveChannelTable(batchId: string): BatchChannelTable {
+  return {
+    batchId,
+    rawStride: 1,
+    rawChannels: [{ index: 0, property: '__primitive' }],
+    stride: 1,
+    channels: [{ index: 0, property: '__primitive', formatType: OUTPUT_FORMAT.FLOAT }],
+    kind: 'primitive',
+  };
+}
+
+function createPackedStandardTransformChannelTable(batchId: string): BatchChannelTable {
+  const rawChannels: ChannelMapping[] = STANDARD_TRANSFORM_PROPERTIES.map((property, index) => ({
+    index,
+    property,
+  }));
+
+  const channels: ChannelMapping[] = [
+    {
+      index: 0,
+      property: '__packed0',
+      sourceIndex: 0,
+      formatType: OUTPUT_FORMAT.PACKED_HALF2,
+      packedProps: ['x', 'y'],
+    },
+    {
+      index: 1,
+      property: '__packed1',
+      sourceIndex: 2,
+      formatType: OUTPUT_FORMAT.PACKED_HALF2,
+      packedProps: ['rotate', 'scaleX'],
+    },
+    {
+      index: 2,
+      property: '__packed2',
+      sourceIndex: 4,
+      formatType: OUTPUT_FORMAT.PACKED_HALF2,
+      packedProps: ['scaleY', 'opacity'],
+    },
+  ];
+
+  return {
+    batchId,
+    rawStride: rawChannels.length,
+    rawChannels,
+    stride: channels.length,
+    channels,
+    kind: 'custom',
+  };
+}
+
+function isStandardTransformPropertySet(properties: string[]): boolean {
+  if (properties.length !== STANDARD_TRANSFORM_PROPERTIES.length) return false;
+  for (const p of STANDARD_TRANSFORM_PROPERTIES) {
+    if (!properties.includes(p)) return false;
+  }
+  return true;
+}
+
+export function registerGPUChannelMappingForTracks(params: {
+  batchId: string;
+  trackKeys: Iterable<string>;
+  canUseGPU: (property: string) => boolean;
+  mode: GPUChannelMappingRegistrationMode;
+  registry?: GPUChannelMappingRegistry;
+}): void {
+  const registry = params.registry ?? getGPUChannelMappingRegistry();
+
+  if (params.mode === 'primitive') {
+    let hasPrimitiveTrack = false;
+    for (const key of params.trackKeys) {
+      if (key === '__primitive') {
+        hasPrimitiveTrack = true;
+        break;
+      }
+    }
+    if (hasPrimitiveTrack && params.canUseGPU('__primitive')) {
+      registry.registerBatchChannels(createPrimitiveChannelTable(params.batchId));
+    }
+    return;
+  }
+
+  const gpuProps: string[] = [];
+  for (const key of params.trackKeys) {
+    if (key === '__primitive') continue;
+    if (!params.canUseGPU(key)) continue;
+    gpuProps.push(key);
+  }
+  if (!gpuProps.length) return;
+
+  if (isStandardTransformPropertySet(gpuProps)) {
+    registry.registerBatchChannels(createPackedStandardTransformChannelTable(params.batchId));
+    return;
+  }
+
+  const table = createBatchChannelTable(params.batchId, gpuProps.length, gpuProps);
+  for (const ch of table.channels) {
+    switch (ch.property) {
+      case 'rotate':
+      case 'rotateX':
+      case 'rotateY':
+      case 'rotateZ':
+        ch.formatType = OUTPUT_FORMAT.ANGLE_DEG;
+        break;
+      case 'opacity':
+        ch.formatType = OUTPUT_FORMAT.COLOR_NORM;
+        ch.minValue = 0;
+        ch.maxValue = 1;
+        break;
+      default:
+        ch.formatType = OUTPUT_FORMAT.FLOAT;
+        break;
+    }
+  }
+  registry.registerBatchChannels(table);
 }
 
 /**

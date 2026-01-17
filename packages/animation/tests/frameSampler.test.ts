@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FrameSampler } from '../src/api/frameSampler';
+import { FrameSampler } from '@g-motion/utils';
 
 describe('FrameSampler', () => {
   it('supports fractional fps time/frame conversions', () => {

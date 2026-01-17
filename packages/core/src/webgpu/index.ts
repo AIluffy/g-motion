@@ -132,6 +132,7 @@ export type { PendingReadback } from './async-readback';
 
 export {
   GPUChannelMappingRegistry,
+  type GPUChannelMappingRegistrationMode,
   getGPUChannelMappingRegistry,
   createChannelMapping,
   createBatchChannelTable,
@@ -140,6 +141,7 @@ export {
   createMatrix3DTransformChannelTable,
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
+  registerGPUChannelMappingForTracks,
 } from './channel-mapping';
 export type { ChannelMapping, BatchChannelTable } from './channel-mapping';
 
