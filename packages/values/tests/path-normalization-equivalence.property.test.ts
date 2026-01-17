@@ -17,7 +17,7 @@ import {
   normalizePath,
   normalizePaths,
   interpolatePath,
-} from '../../src/values/parsers/path';
+} from '@g-motion/values';
 
 describe('Property 8: Path Normalization Equivalence', () => {
   const parser = new PathParser();

@@ -16,7 +16,7 @@ import {
   PathCommand,
   normalizePath,
   interpolatePath,
-} from '../../src/values/parsers/path';
+} from '@g-motion/values';
 
 describe('Property 2: SVG Path Parsing Round Trip', () => {
   const parser = new PathParser();

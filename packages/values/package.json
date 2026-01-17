@@ -1,5 +1,5 @@
 {
-  "name": "@g-motion/animation",
+  "name": "@g-motion/values",
   "version": "0.0.0",
   "type": "module",
   "exports": {
@@ -11,20 +11,27 @@
   },
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "*": [
+        "dist/*"
+      ]
+    }
+  },
   "files": [
     "dist"
   ],
-  "dependencies": {
-    "@g-motion/core": "workspace:*",
-    "@g-motion/utils": "workspace:*",
-    "@g-motion/values": "workspace:*"
-  },
+  "sideEffects": false,
   "scripts": {
     "build": "rslib build",
     "dev": "rslib build --watch",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@g-motion/utils": "workspace:*"
+  },
   "devDependencies": {
+    "fast-check": "^4.4.0",
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
     "typescript": "workspace:*",

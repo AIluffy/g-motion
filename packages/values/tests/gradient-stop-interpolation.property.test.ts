@@ -18,8 +18,8 @@ import {
   normalizeStops,
   matchStopCounts,
   interpolateStop,
-} from '../../src/values/parsers/gradient';
-import { ColorValue } from '../../src/values/parsers/color';
+} from '@g-motion/values';
+import { ColorValue } from '@g-motion/values';
 
 describe('Property 7: Gradient Stop Interpolation', () => {
   const parser = new GradientParser();

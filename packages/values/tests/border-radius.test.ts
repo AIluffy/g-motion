@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { borderRadiusParser, BorderRadiusValue } from '../../src/values/parsers/border-radius';
+import { borderRadiusParser } from '@g-motion/values';
 
 describe('BorderRadiusParser', () => {
   describe('detect', () => {

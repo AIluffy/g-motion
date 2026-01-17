@@ -201,6 +201,5 @@ export * from './api/mark';
 export * from './api/animate';
 export type { FrameRoundingMode } from '@g-motion/utils';
 export { FrameSampler } from '@g-motion/utils';
-export * from './values';
 export { engine } from './engine';
 export * from './api/visualTarget';

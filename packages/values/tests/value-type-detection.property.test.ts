@@ -10,10 +10,10 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as fc from 'fast-check';
-import { ValueParserRegistry } from '../../src/values/registry';
-import { ValueType } from '../../src/values/types';
-import { NumberParser } from '../../src/values/parsers/number';
-import { StringParser } from '../../src/values/parsers/string';
+import { ValueParserRegistry } from '@g-motion/values';
+import { ValueType } from '@g-motion/values';
+import { NumberParser } from '@g-motion/values';
+import { StringParser } from '@g-motion/values';
 
 describe('Property 6: Value Type Detection Consistency', () => {
   let registry: ValueParserRegistry;

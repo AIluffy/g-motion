@@ -20,7 +20,7 @@ import {
   rgbaToHex,
   interpolateRgb,
   interpolateHsl,
-} from '../../src/values/parsers/color';
+} from '@g-motion/values';
 
 describe('Property 1: Color Parsing Round Trip', () => {
   const parser = new ColorParser();

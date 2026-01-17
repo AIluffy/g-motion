@@ -161,6 +161,9 @@ importers:
       '@g-motion/utils':
         specifier: workspace:*
         version: link:../utils
+      '@g-motion/values':
+        specifier: workspace:*
+        version: link:../values
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -168,9 +171,6 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
-      fast-check:
-        specifier: ^4.4.0
-        version: 4.4.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -289,6 +289,28 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.14
+        version: 4.0.15(@types/node@24.10.1)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/values:
+    dependencies:
+      '@g-motion/utils':
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      '@rslib/core':
+        specifier: ^0.18.3
+        version: 0.18.3(typescript@5.9.3)
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      fast-check:
+        specifier: ^4.4.0
+        version: 4.4.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

@@ -10,12 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import {
-  ShadowParser,
-  ShadowValue,
-  ShadowsValue,
-  normalizeShadowCounts,
-} from '../../src/values/parsers/shadow';
+import { ShadowParser, ShadowValue, ShadowsValue, normalizeShadowCounts } from '@g-motion/values';
 
 describe('Property 3: Shadow Parsing Round Trip', () => {
   const parser = new ShadowParser();

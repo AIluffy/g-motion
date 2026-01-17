@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import { UnitParser, ALL_UNITS } from '../../src/values/parsers/unit';
+import { UnitParser, ALL_UNITS } from '@g-motion/values';
 
 describe('Property 5: Interpolation Bounds', () => {
   const parser = new UnitParser();
