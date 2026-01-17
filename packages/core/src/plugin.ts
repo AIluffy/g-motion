@@ -2,8 +2,6 @@ import type { ComponentDef, ComponentValue } from './types';
 
 export type { ComponentDef, ComponentType, ComponentValue } from './types';
 
-export type GPUComputeMode = 'auto' | 'always' | 'never';
-
 export type TransformTypedBuffers = Record<
   string,
   Float32Array | Float64Array | Int32Array | undefined
@@ -46,21 +44,6 @@ export interface RendererDef {
  * Configuration options for Motion animation engine.
  */
 export interface MotionAppConfig {
-  /**
-   * @deprecated No longer used. GPU is now enabled by default for all animations.
-   * Use gpuCompute='never' to disable GPU acceleration.
-   */
-  webgpuThreshold?: number;
-
-  /**
-   * GPU compute mode for animation calculations.
-   * 'auto': Same as 'always' (GPU-first with automatic CPU fallback)
-   * 'always': Always attempt GPU compute, fall back to CPU if unavailable (default)
-   * 'never': Always use CPU for animations
-   * Default: 'always'
-   */
-  gpuCompute?: GPUComputeMode;
-
   // Engine runtime configuration
   globalSpeed?: number;
   targetFps?: number;
@@ -79,14 +62,6 @@ export interface MotionAppConfig {
     timeInterval?: number;
     maxSubdivisionsPerSegment?: number;
   };
-
-  /**
-   * Whether to enable GPU-accelerated easing functions.
-   * Default: true
-   */
-  gpuEasing?: boolean;
-
-  gpuOnlyInterpolation?: boolean;
 
   keyframeSearchOptimized?: boolean;
 

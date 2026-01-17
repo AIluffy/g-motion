@@ -6,13 +6,12 @@ import type {
 import type {
   BatchEntity,
   BatchKeyframe,
-  BatchResult,
   BatchMetadata,
+  BatchResult,
   GPUBatchConfig,
 } from './types';
 import { DEFAULT_MAX_BATCH_SIZE } from './config';
 import { BatchStatistics } from './batchStatistics';
-import { CPUBatchFallback } from './cpuBatchFallback';
 import { EntityBatchCollector } from './entityBatchCollector';
 import { EntityIdLeasePool } from './entityIdLeasePool';
 import { GPUBatchDispatcher } from './gpuBatchDispatcher';
@@ -20,11 +19,13 @@ import { GPUBatchDispatcher } from './gpuBatchDispatcher';
 export class BatchCoordinator {
   private maxBatchSize: number;
   private enableResultCaching: boolean;
+  private resultCache = new Map<string, BatchResult[]>();
+  private entityBufferCache = new Map<string, Float32Array>();
+  private keyframeBufferCache = new Map<string, Float32Array>();
 
   private stats = new BatchStatistics();
   private leasePool = new EntityIdLeasePool();
   private collector: EntityBatchCollector;
-  private cpuFallback: CPUBatchFallback;
   private gpuDispatcher: GPUBatchDispatcher;
 
   constructor(config: GPUBatchConfig = {}) {
@@ -32,7 +33,6 @@ export class BatchCoordinator {
     this.enableResultCaching = config.enableResultCaching !== false;
 
     this.collector = new EntityBatchCollector(this.maxBatchSize, this.stats);
-    this.cpuFallback = new CPUBatchFallback(this.collector, this.stats, this.enableResultCaching);
     this.gpuDispatcher = new GPUBatchDispatcher(this.leasePool, this.stats);
   }
 
@@ -118,19 +118,60 @@ export class BatchCoordinator {
   }
 
   getEntityBufferData(batchId: string): Float32Array | null {
-    return this.cpuFallback.getEntityBufferData(batchId);
+    const entities = this.collector.getEntities(batchId);
+    if (!entities) return null;
+
+    const size = entities.length * 4;
+    const existing = this.entityBufferCache.get(batchId);
+    const buffer =
+      existing && existing.length >= size ? existing : new Float32Array(Math.max(16, size));
+    if (buffer !== existing) this.entityBufferCache.set(batchId, buffer);
+
+    for (let i = 0; i < entities.length; i++) {
+      const e = entities[i];
+      const base = i * 4;
+      buffer[base] = e.startTime;
+      buffer[base + 1] = e.currentTime;
+      buffer[base + 2] = e.playbackRate;
+      buffer[base + 3] = e.status;
+    }
+
+    return buffer.subarray(0, size);
   }
 
   getKeyframeBufferData(batchId: string): Float32Array | null {
-    return this.cpuFallback.getKeyframeBufferData(batchId);
+    const keyframes = this.collector.getKeyframes(batchId);
+    if (!keyframes) return null;
+
+    const size = keyframes.length * 5;
+    const existing = this.keyframeBufferCache.get(batchId);
+    const buffer =
+      existing && existing.length >= size ? existing : new Float32Array(Math.max(16, size));
+    if (buffer !== existing) this.keyframeBufferCache.set(batchId, buffer);
+
+    for (let i = 0; i < keyframes.length; i++) {
+      const k = keyframes[i];
+      const base = i * 5;
+      buffer[base] = k.startTime;
+      buffer[base + 1] = k.duration;
+      buffer[base + 2] = k.startValue;
+      buffer[base + 3] = k.endValue;
+      buffer[base + 4] = k.easingId;
+    }
+
+    return buffer.subarray(0, size);
   }
 
   storeResults(batchId: string, results: BatchResult[]): boolean {
-    return this.cpuFallback.storeResults(batchId, results);
+    if (!this.enableResultCaching) return false;
+    if (!this.collector.getEntities(batchId)) return false;
+    this.resultCache.set(batchId, results);
+    this.stats.addResultsCached(1);
+    return true;
   }
 
   getResults(batchId: string): BatchResult[] | null {
-    return this.cpuFallback.getResults(batchId);
+    return this.resultCache.get(batchId) ?? null;
   }
 
   getBatchSize(batchId: string): number {
@@ -138,9 +179,10 @@ export class BatchCoordinator {
   }
 
   clearBatch(batchId: string): boolean {
-    const removed = this.collector.clearBatch(batchId);
-    this.cpuFallback.clearBatch(batchId);
-    return removed;
+    return this.collector.clearBatch(batchId);
+    this.resultCache.delete(batchId);
+    this.entityBufferCache.delete(batchId);
+    this.keyframeBufferCache.delete(batchId);
   }
 
   getStats() {
@@ -161,8 +203,10 @@ export class BatchCoordinator {
 
   clear(): void {
     this.collector.clear();
-    this.cpuFallback.clear();
     this.gpuDispatcher.clear();
+    this.resultCache.clear();
+    this.entityBufferCache.clear();
+    this.keyframeBufferCache.clear();
     this.resetStats();
   }
 }

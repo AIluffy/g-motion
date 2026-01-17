@@ -57,7 +57,38 @@ export class SchedulerProcessor {
     for (const system of systems) {
       const systemStart = performance.now();
       try {
-        system.update(dtMs, ctx);
+        const result = system.update(dtMs, ctx) as unknown;
+        if (result && typeof (result as Promise<void>).catch === 'function') {
+          (result as Promise<void>).catch((e) => {
+            const errorHandler = services.errorHandler ?? getErrorHandler();
+            if (e instanceof MotionError) {
+              try {
+                errorHandler.handle(e);
+              } catch {}
+              if (e.isFatal()) {
+                services.scheduler.stop();
+                queueMicrotask(() => {
+                  throw e;
+                });
+              }
+              return;
+            }
+
+            const wrapped = new MotionError(
+              `System '${system.name}' update failed`,
+              ErrorCode.SYSTEM_UPDATE_FAILED,
+              ErrorSeverity.WARNING,
+              {
+                systemName: system.name,
+                originalError: e instanceof Error ? e.message : String(e),
+                dt: dtMs,
+              },
+            );
+            try {
+              errorHandler.handle(wrapped);
+            } catch {}
+          });
+        }
       } catch (e) {
         const error = new MotionError(
           `System '${system.name}' update failed`,
@@ -124,10 +155,14 @@ export class SchedulerProcessor {
       };
     } catch (e) {
       if (!this.persistentBufferStatsFailedLogged) {
-        this.persistentBufferStatsFailedLogged = true;
-        warn('getPersistentGPUBufferManager().getStats failed', {
-          error: e instanceof Error ? e.message : String(e),
-        });
+        const msg = e instanceof Error ? e.message : String(e);
+        // Suppress warning if manager is simply not initialized (expected in non-GPU envs)
+        if (!msg.includes('PersistentGPUBufferManager not initialized')) {
+          this.persistentBufferStatsFailedLogged = true;
+          warn('getPersistentGPUBufferManager().getStats failed', {
+            error: msg,
+          });
+        }
       }
       return;
     }

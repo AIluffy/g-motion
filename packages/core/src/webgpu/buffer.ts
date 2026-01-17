@@ -69,7 +69,7 @@ export class WebGPUBufferManager {
         const error = new MotionError(
           'navigator.gpu not available; WebGPU disabled.',
           ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-          ErrorSeverity.WARNING,
+          ErrorSeverity.FATAL,
           {
             env: typeof navigator === 'undefined' ? 'no-navigator' : 'navigator-no-gpu',
             userAgent,
@@ -77,7 +77,7 @@ export class WebGPUBufferManager {
           },
         );
         getErrorHandler().handle(error);
-        return false;
+        throw error;
       }
 
       try {
@@ -90,14 +90,14 @@ export class WebGPUBufferManager {
           const error = new MotionError(
             'requestAdapter returned null; WebGPU disabled.',
             ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-            ErrorSeverity.WARNING,
+            ErrorSeverity.FATAL,
             {
               stage: 'adapter',
               source: 'WebGPUBufferManager.init',
             },
           );
           getErrorHandler().handle(error);
-          return false;
+          throw error;
         }
 
         const canTimestamp = adapter.features.has('timestamp-query');
@@ -110,14 +110,14 @@ export class WebGPUBufferManager {
           const error = new MotionError(
             'requestDevice returned null; WebGPU disabled.',
             ErrorCode.GPU_DEVICE_UNAVAILABLE,
-            ErrorSeverity.WARNING,
+            ErrorSeverity.FATAL,
             {
               stage: 'device',
               source: 'WebGPUBufferManager.init',
             },
           );
           getErrorHandler().handle(error);
-          return false;
+          throw error;
         }
 
         this.queue = this.device.queue;
@@ -126,7 +126,7 @@ export class WebGPUBufferManager {
         const motionError = new MotionError(
           'Failed to initialize WebGPU device',
           ErrorCode.GPU_INIT_FAILED,
-          ErrorSeverity.WARNING,
+          ErrorSeverity.FATAL,
           {
             stage: 'device',
             source: 'WebGPUBufferManager.init',
@@ -136,7 +136,7 @@ export class WebGPUBufferManager {
         getErrorHandler().handle(motionError);
         this.device = null;
         this.queue = null;
-        return false;
+        throw motionError;
       }
     })();
 
@@ -224,7 +224,7 @@ export class WebGPUBufferManager {
       const motionError = new MotionError(
         'Failed to initialize compute pipeline',
         ErrorCode.GPU_PIPELINE_FAILED,
-        ErrorSeverity.ERROR,
+        ErrorSeverity.FATAL,
         {
           stage: 'pipeline',
           source: 'WebGPUBufferManager.initComputePipeline',
@@ -232,7 +232,7 @@ export class WebGPUBufferManager {
         },
       );
       getErrorHandler().handle(motionError);
-      return false;
+      throw motionError;
     }
   }
 

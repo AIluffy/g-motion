@@ -6,8 +6,6 @@
  *
  * GPU-First Architecture:
  * - All animations attempt GPU compute by default
- * - Automatic CPU fallback when WebGPU is unavailable
- * - config.gpuCompute='never' explicitly disables GPU path
  *
  * Performance optimizations:
  * - Persistent GPU buffers (avoid per-frame allocation)
@@ -23,6 +21,7 @@ import type {
   PhysicsBatchDescriptor,
 } from '../../types';
 import { createDebugger } from '@g-motion/utils';
+import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
 import {
   getPersistentGPUBufferManager,
   resetPersistentGPUBufferManager,
@@ -86,7 +85,6 @@ export function __resetWebGPUComputeSystemForTests(): void {
   runtime.webgpuFrameId = 0;
   runtime.outputFormatStatsCounter = 0;
   runtime.latestAsyncCullingFrameByArchetype.clear();
-  runtime.cpuFallbackLogged = false;
   runtime.physicsParams[0] = 0;
   runtime.physicsParams[1] = 0;
   runtime.physicsParams[2] = 0;
@@ -103,7 +101,6 @@ export function __resetWebGPUComputeSystemForTests(): void {
  *
  * GPU-First Architecture:
  * - Attempts GPU compute for all animations by default
- * - Falls back to CPU (InterpolationSystem) when GPU unavailable
  * - No threshold checks - GPU is always preferred when available
  *
  * This system:
@@ -122,13 +119,24 @@ export const WebGPUComputeSystem: SystemDef = {
 
     const { world, metricsProvider, processor, config } = deps;
 
-    if (shouldForceCPUFallback(metricsProvider, config)) {
+    const debugIOEnabled = isWebGPUIODebugEnabled(config);
+    await ensureWebGPUInitialized({ runtime, metricsProvider, config });
+    if (runtime.mockWebGPU) {
+      metricsProvider.updateStatus({ enabled: true });
+      return;
+    }
+    if (!runtime.deviceAvailable) {
+      clearPhysicsGPUEntities();
+      setPendingReadbackCount(0);
+      metricsProvider.updateStatus({
+        enabled: true,
+        webgpuAvailable: false,
+        gpuInitialized: false,
+      });
       return;
     }
 
-    const debugIOEnabled = isWebGPUIODebugEnabled(config);
-    const device = await ensureRuntimeDevice(metricsProvider, config);
-    if (!device) return;
+    const device = getRuntimeDeviceOrThrow();
 
     try {
       maybeSampleOutputFormatPoolStats({ runtime, metricsProvider, config, device });
@@ -145,7 +153,7 @@ export const WebGPUComputeSystem: SystemDef = {
       debugIOEnabled,
     });
 
-    metricsProvider.updateStatus({ enabled: true, cpuFallbackActive: false });
+    metricsProvider.updateStatus({ enabled: true });
 
     const sp = runtime.stagingPool;
     const archetypeBatches = processor.getArchetypeBatches() as Map<
@@ -195,35 +203,28 @@ function resolveComputeDeps(ctx: SystemContext | undefined): {
   return { world, metricsProvider, processor, config };
 }
 
-function shouldForceCPUFallback(
-  metricsProvider: NonNullable<SystemContext['services']['metrics']>,
-  config: NonNullable<SystemContext['services']['config']>,
-): boolean {
-  const gpuMode = config.gpuCompute ?? 'auto';
-  if (gpuMode !== 'never') return false;
-  metricsProvider.updateStatus({ cpuFallbackActive: true, enabled: false });
-  setPendingReadbackCount(0);
-  return true;
-}
-
-async function ensureRuntimeDevice(
-  metricsProvider: NonNullable<SystemContext['services']['metrics']>,
-  config: NonNullable<SystemContext['services']['config']>,
-): Promise<GPUDevice | null> {
-  await ensureWebGPUInitialized({ runtime, metricsProvider, config });
-
+function getRuntimeDeviceOrThrow(): GPUDevice {
   if (!runtime.bufferManager || !runtime.deviceAvailable) {
     clearPhysicsGPUEntities();
     setPendingReadbackCount(0);
-    return null;
+    throw new MotionError(
+      'WebGPU device not available.',
+      ErrorCode.GPU_DEVICE_UNAVAILABLE,
+      ErrorSeverity.FATAL,
+      { stage: 'runtime', source: 'WebGPUComputeSystem.ensureRuntimeDevice' },
+    );
   }
 
   const device = runtime.bufferManager.getDevice();
   if (!device) {
-    metricsProvider.updateStatus({ cpuFallbackActive: true });
     clearPhysicsGPUEntities();
     setPendingReadbackCount(0);
-    return null;
+    throw new MotionError(
+      'WebGPU device not available.',
+      ErrorCode.GPU_DEVICE_UNAVAILABLE,
+      ErrorSeverity.FATAL,
+      { stage: 'device', source: 'WebGPUComputeSystem.ensureRuntimeDevice' },
+    );
   }
 
   return device;

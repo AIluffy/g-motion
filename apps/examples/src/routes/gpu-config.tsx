@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, type AnimationControl, getGPUMetrics, engine } from '@g-motion/animation';
+import { motion, type AnimationControl, getGPUMetrics } from '@g-motion/animation';
 import { useAtom } from 'jotai';
 import { engineGpuModeAtom, gpuEasingEnabledAtom } from '@/state/engineState';
 import { useGpuThresholdRecommendation } from '@/state/useGpuThresholdRecommendation';
@@ -87,12 +87,6 @@ function GPUConfigPage() {
     setCount(targetCount);
     setRunKey((k) => k + 1);
   };
-
-  useEffect(() => {
-    engine.forceGpu(gpuMode);
-    (engine as any).setGpuEasing?.(gpuEasing);
-    (engine as any).setGpuThreshold?.(threshold);
-  }, [gpuMode, gpuEasing, threshold]);
 
   const stopAll = () => {
     controlsRef.current.forEach((c) => c.stop());

@@ -165,7 +165,6 @@ class ObjectVisualTarget extends BaseVisualTarget {
   }
 
   canUseGPU(prop: string): boolean {
-    if (!super.canUseGPU(prop)) return false;
     const initial = this.getInitial(prop);
     return typeof initial === 'number' && Number.isFinite(initial);
   }

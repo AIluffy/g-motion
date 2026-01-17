@@ -37,9 +37,9 @@ export async function initWebGPUCompute(
   const device = bufferManager.getDevice();
   if (!initOk || !device) {
     const error = new MotionError(
-      'WebGPU not available; GPU batch processing disabled. CPU path will be used.',
+      'WebGPU not available.',
       ErrorCode.GPU_DEVICE_UNAVAILABLE,
-      ErrorSeverity.WARNING,
+      ErrorSeverity.FATAL,
       {
         initOk,
         hasDevice: !!device,
@@ -48,7 +48,7 @@ export async function initWebGPUCompute(
       },
     );
     getErrorHandler().handle(error);
-    return { success: false, deviceAvailable: false, shaderVersion: -1 };
+    throw error;
   }
 
   const success = await precompileWorkgroupPipelines(
@@ -66,12 +66,13 @@ export async function initWebGPUCompute(
     getGPUMetricsProvider().updateStatus({
       gpuInitialized: true,
       webgpuAvailable: true,
+      enabled: true,
     });
   } else {
     const error = new MotionError(
-      'WebGPU compute pipeline initialization failed; GPU batch processing disabled.',
+      'WebGPU compute pipeline initialization failed.',
       ErrorCode.GPU_PIPELINE_FAILED,
-      ErrorSeverity.WARNING,
+      ErrorSeverity.FATAL,
       {
         shaderVersion,
         stage: 'pipeline',
@@ -79,7 +80,8 @@ export async function initWebGPUCompute(
       },
     );
     getErrorHandler().handle(error);
+    throw error;
   }
 
-  return { success, deviceAvailable: success, shaderVersion };
+  return { success: true, deviceAvailable: true, shaderVersion };
 }

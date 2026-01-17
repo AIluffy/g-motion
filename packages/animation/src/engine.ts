@@ -1,7 +1,4 @@
 import { ErrorCode, ErrorSeverity, MotionError, WorldProvider } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
-
-const warn = createDebugger('Engine', 'warn');
 
 /**
  * Global engine configuration object for controlling animation behavior
@@ -81,77 +78,6 @@ class EngineConfig {
     return Number(config.samplingFps ?? config.targetFps ?? 60);
   }
 
-  /**
-   * Force GPU acceleration mode
-   * @param mode - GPU compute mode: 'auto' | 'always' | 'never'
-   *   - 'auto': Same as 'always' (GPU-first with automatic CPU fallback)
-   *   - 'always': Always attempt GPU compute, fall back to CPU if unavailable (default)
-   *   - 'never': Never use GPU, always use CPU
-   * @example
-   * engine.forceGpu('always'); // Always use GPU (default)
-   * engine.forceGpu('never');  // Disable GPU, use CPU only
-   */
-  forceGpu(mode: 'auto' | 'always' | 'never'): void {
-    if (!['auto', 'always', 'never'].includes(mode)) {
-      throw new Error(
-        `[Motion Engine] Invalid GPU mode: ${mode}. Must be 'auto', 'always', or 'never'.`,
-      );
-    }
-
-    const world = this.getWorld();
-    world.config.gpuCompute = mode;
-  }
-
-  /**
-   * Get current GPU mode
-   * @returns GPU compute mode ('auto' | 'always' | 'never')
-   */
-  getGpuMode(): 'auto' | 'always' | 'never' {
-    const world = this.getWorld();
-    return world.config.gpuCompute ?? 'always';
-  }
-
-  /**
-   * @deprecated GPU threshold is no longer used. GPU is enabled by default.
-   * Use forceGpu('never') to disable GPU acceleration.
-   */
-  setGpuThreshold(threshold: number): void {
-    warn(
-      "setGpuThreshold is deprecated. GPU is now enabled by default. Use forceGpu('never') to disable GPU acceleration.",
-    );
-    // Keep for backward compatibility but no-op
-    const world = this.getWorld();
-    world.config.webgpuThreshold = threshold;
-  }
-
-  /**
-   * @deprecated GPU threshold is no longer used.
-   */
-  getGpuThreshold(): number {
-    const world = this.getWorld();
-    return world.config.webgpuThreshold ?? 0;
-  }
-
-  /**
-   * Enable or disable GPU-accelerated easing functions
-   * @param enabled - Whether to use GPU for easing calculations
-   * @example
-   * engine.setGpuEasing(false); // Use CPU for easing
-   */
-  setGpuEasing(enabled: boolean): void {
-    const world = this.getWorld();
-    world.config.gpuEasing = enabled;
-  }
-
-  /**
-   * Check if GPU easing is enabled
-   * @returns True if GPU easing is enabled
-   */
-  getGpuEasing(): boolean {
-    const world = this.getWorld();
-    return world.config.gpuEasing ?? true;
-  }
-
   setMetricsSamplingRate(rate: number): void {
     if (!Number.isFinite(rate) || rate <= 0) {
       throw new Error(`[Motion Engine] metricsSamplingRate must be positive, got: ${rate}`);
@@ -194,17 +120,11 @@ class EngineConfig {
    * engine.configure({
    *   speed: 2,
    *   fps: 30,
-   *   gpuMode: 'always',
-   *   gpuThreshold: 500,
-   *   gpuEasing: true
    * });
    */
   configure(config: {
     speed?: number;
     fps?: number;
-    gpuMode?: 'auto' | 'always' | 'never';
-    gpuThreshold?: number;
-    gpuEasing?: boolean;
     metricsSamplingRate?: number;
     sampling?: { mode?: 'time' | 'frame'; fps?: number };
     workSlicing?: {
@@ -218,15 +138,6 @@ class EngineConfig {
     }
     if (config.fps !== undefined) {
       this.setFps(config.fps);
-    }
-    if (config.gpuMode !== undefined) {
-      this.forceGpu(config.gpuMode);
-    }
-    if (config.gpuThreshold !== undefined) {
-      this.setGpuThreshold(config.gpuThreshold);
-    }
-    if (config.gpuEasing !== undefined) {
-      this.setGpuEasing(config.gpuEasing);
     }
     if (config.metricsSamplingRate !== undefined) {
       this.setMetricsSamplingRate(config.metricsSamplingRate);
@@ -249,8 +160,6 @@ class EngineConfig {
   getConfig(): {
     speed: number;
     fps: number;
-    gpuMode: 'auto' | 'always' | 'never';
-    gpuEasing: boolean;
     metricsSamplingRate: number;
     sampling: { mode: 'time' | 'frame'; fps: number };
     workSlicing: {
@@ -262,8 +171,6 @@ class EngineConfig {
     return {
       speed: this.getSpeed(),
       fps: this.getFps(),
-      gpuMode: this.getGpuMode(),
-      gpuEasing: this.getGpuEasing(),
       metricsSamplingRate: this.getMetricsSamplingRate(),
       sampling: { mode: this.getSamplingMode(), fps: this.getSamplingFps() },
       workSlicing: this.getWorkSlicing(),
@@ -277,8 +184,6 @@ class EngineConfig {
     this.configure({
       speed: 1,
       fps: 60,
-      gpuMode: 'always', // GPU-first by default
-      gpuEasing: true,
       metricsSamplingRate: 1,
       sampling: { mode: 'time', fps: 60 },
       workSlicing: {
@@ -302,15 +207,10 @@ class EngineConfig {
  * // Control FPS
  * engine.setFps(30); // Cap at 30 FPS
  *
- * // Force GPU mode
- * engine.forceGpu('always'); // Always use GPU
- *
  * // Configure multiple settings
  * engine.configure({
  *   speed: 1.5,
  *   fps: 60,
- *   gpuMode: 'auto',
- *   gpuThreshold: 500
  * });
  */
 export const engine = new EngineConfig();

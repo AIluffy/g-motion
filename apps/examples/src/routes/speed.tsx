@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, type AnimationControl, engine as motionEngine } from '@g-motion/animation';
+import { motion, type AnimationControl } from '@g-motion/animation';
 
 export const Route = createFileRoute('/speed')({
   component: SpeedRoute,
@@ -953,14 +953,6 @@ strong { color: #fff; }
   useEffect(() => {
     stateRef.current.tests = buildTests;
   }, [buildTests]);
-
-  useEffect(() => {
-    const prevMode = (motionEngine as any).getGpuMode?.() ?? 'auto';
-    motionEngine.forceGpu('always');
-    return () => {
-      motionEngine.forceGpu(prevMode as any);
-    };
-  }, []);
 
   useEffect(() => {
     const t = window.setTimeout(() => setInstructionsVisible(true), 250);

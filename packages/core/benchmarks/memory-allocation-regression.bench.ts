@@ -229,7 +229,7 @@ describe('Zero Allocation Test', () => {
 
     for (let frame = 0; frame < 10000; frame++) {
       // 使用真实 TimeSystem 逻辑推进 currentTime
-      TimeSystem.update(16, { services, dt: 16 });
+      TimeSystem.update(16, { services, dt: 16, nowMs: frame * 16 } as any);
     }
 
     const finalHeap = process.memoryUsage().heapUsed;
@@ -257,7 +257,6 @@ describe('Timeline System Allocation', () => {
       app: {} as any,
       config: {
         ...world.config,
-        gpuCompute: 'always',
       },
       batchProcessor,
       metrics,
@@ -297,7 +296,7 @@ describe('Timeline System Allocation', () => {
     const initialHeap = process.memoryUsage().heapUsed;
 
     for (let i = 0; i < 1000; i++) {
-      TimeSystem.update(16, { services, dt: 16 });
+      TimeSystem.update(16, { services, dt: 16, nowMs: i * 16 } as any);
       for (const archetype of world.getArchetypes()) {
         const stateBuffer = archetype.getBuffer('MotionState');
         const timelineBuffer = archetype.getBuffer('Timeline');
@@ -375,7 +374,7 @@ describe('Interpolation System Allocation', () => {
     const initialHeap = process.memoryUsage().heapUsed;
 
     for (let frame = 0; frame < 1000; frame++) {
-      TimeSystem.update(16, { services, dt: 16 });
+      TimeSystem.update(16, { services, dt: 16, nowMs: frame * 16 } as any);
       for (const archetype of world.getArchetypes()) {
         const stateBuffer = archetype.getBuffer('MotionState');
         const timelineBuffer = archetype.getBuffer('Timeline');
@@ -423,7 +422,6 @@ describe('Batch Sampling Allocation', () => {
       app: {} as any,
       config: {
         ...world.config,
-        gpuCompute: 'always',
       },
       batchProcessor,
       metrics,
@@ -460,9 +458,10 @@ describe('Batch Sampling Allocation', () => {
 
     const initialHeap = process.memoryUsage().heapUsed;
     for (let i = 0; i < 500; i++) {
-      TimeSystem.update(16, { services, dt: 16 });
-      BatchSamplingSystem.update(16, { services, dt: 16 });
-      await WebGPUComputeSystem.update(16, { services, dt: 16 });
+      const nowMs = i * 16;
+      TimeSystem.update(16, { services, dt: 16, nowMs } as any);
+      BatchSamplingSystem.update(16, { services, dt: 16, nowMs } as any);
+      await WebGPUComputeSystem.update(16, { services, dt: 16, nowMs } as any);
     }
 
     const finalHeap = process.memoryUsage().heapUsed;
@@ -491,7 +490,6 @@ describe('Readback Metrics Baseline', () => {
       app: {} as any,
       config: {
         ...world.config,
-        gpuCompute: 'always',
       },
       batchProcessor,
       metrics,
@@ -558,9 +556,10 @@ describe('Readback Metrics Baseline', () => {
 
     const frames = 20;
     for (let frame = 0; frame < frames; frame++) {
-      TimeSystem.update(16, { services, dt: 16 });
-      BatchSamplingSystem.update(16, { services, dt: 16 });
-      await WebGPUComputeSystem.update(16, { services, dt: 16 });
+      const nowMs = frame * 16;
+      TimeSystem.update(16, { services, dt: 16, nowMs } as any);
+      BatchSamplingSystem.update(16, { services, dt: 16, nowMs } as any);
+      await WebGPUComputeSystem.update(16, { services, dt: 16, nowMs } as any);
     }
 
     await new Promise((resolve) => setTimeout(resolve, 0));

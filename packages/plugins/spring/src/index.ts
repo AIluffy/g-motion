@@ -22,7 +22,6 @@ export const SpringPlugin: MotionPlugin = {
     }
     debugLog('Spring component registered');
 
-    // Register Spring system (runs before InterpolationSystem)
     appInstance.registerSystem(SpringSystem);
     debugLog('SpringSystem registered');
   },

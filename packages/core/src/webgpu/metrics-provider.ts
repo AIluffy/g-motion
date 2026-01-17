@@ -12,7 +12,6 @@ export interface GPUBatchStatus {
   gpuInitialized: boolean;
   frameTimeMs?: number;
   queueDepth?: number;
-  cpuFallbackActive?: boolean;
   memoryUsageBytes?: number;
   peakMemoryUsageBytes?: number;
   memoryUsageThresholdBytes?: number;

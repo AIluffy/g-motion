@@ -7,6 +7,7 @@ export type WebGPUComputeRuntime = {
   bufferManager: WebGPUBufferManager | null;
   isInitialized: boolean;
   deviceAvailable: boolean;
+  mockWebGPU: boolean;
   shaderVersion: number;
   physicsPipelinesReady: boolean;
   timingHelper: TimingHelper | null;
@@ -15,7 +16,6 @@ export type WebGPUComputeRuntime = {
   webgpuFrameId: number;
   outputFormatStatsCounter: number;
   latestAsyncCullingFrameByArchetype: Map<string, number>;
-  cpuFallbackLogged: boolean;
   physicsParams: Float32Array;
 };
 
@@ -24,6 +24,7 @@ export function createWebGPUComputeRuntime(): WebGPUComputeRuntime {
     bufferManager: null,
     isInitialized: false,
     deviceAvailable: false,
+    mockWebGPU: false,
     shaderVersion: -1,
     physicsPipelinesReady: false,
     timingHelper: null,
@@ -32,7 +33,6 @@ export function createWebGPUComputeRuntime(): WebGPUComputeRuntime {
     webgpuFrameId: 0,
     outputFormatStatsCounter: 0,
     latestAsyncCullingFrameByArchetype: new Map(),
-    cpuFallbackLogged: false,
     physicsParams: new Float32Array(4),
   };
 }

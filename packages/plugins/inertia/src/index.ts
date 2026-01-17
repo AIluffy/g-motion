@@ -22,7 +22,6 @@ export const InertiaPlugin: MotionPlugin = {
     }
     debugLog('Inertia component registered');
 
-    // Register Inertia system (runs before InterpolationSystem)
     appInstance.registerSystem(InertiaSystem);
     debugLog('InertiaSystem registered');
   },

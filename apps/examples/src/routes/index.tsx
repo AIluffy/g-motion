@@ -275,12 +275,12 @@ function Hub() {
             <CardHeader>
               <CardTitle>GPU-only interpolation</CardTitle>
               <CardDescription>
-                Skip the CPU InterpolationSystem completely while GPU compute is healthy.
+                Inspect whether the WebGPU interpolation pipeline is active.
               </CardDescription>
             </CardHeader>
             <CardFooter className="justify-between">
               <div className="text-sm text-slate-300">
-                Demonstrates gpuOnlyInterpolation with automatic CPU fallback on GPU errors.
+                Demonstrates interpolation via WebGPU compute.
               </div>
               <Link to="/gpu-only-interpolation" className={linkButtonClass('ghost')}>
                 View demo
@@ -292,12 +292,12 @@ function Hub() {
             <CardHeader>
               <CardTitle>Engine Configuration</CardTitle>
               <CardDescription>
-                Global engine control for animation speed, FPS limiting, and GPU mode configuration.
+                Global engine control for animation speed and FPS limiting.
               </CardDescription>
             </CardHeader>
             <CardFooter className="justify-between">
               <div className="text-sm text-slate-300">
-                Interactive controls for speed multiplier, frame rate, and GPU acceleration.
+                Interactive controls for speed multiplier and frame rate.
               </div>
               <Link to="/engine-config" className={linkButtonClass('ghost')}>
                 View demo

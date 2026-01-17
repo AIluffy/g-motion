@@ -31,7 +31,7 @@ type TransformData = ComponentValue & { [key: string]: number };
 
 /**
  * SpringSystem implements spring physics using semi-implicit Euler integration.
- * Runs before InterpolationSystem (order: 19) and takes over animation for entities with SpringComponent.
+ * Takes over animation for entities with SpringComponent.
  *
  * Physics formula:
  * - force = -stiffness * displacement - damping * velocity
@@ -43,7 +43,7 @@ type TransformData = ComponentValue & { [key: string]: number };
  */
 export const SpringSystem: SystemDef = {
   name: 'SpringSystem',
-  order: 19, // Before InterpolationSystem (20)
+  order: 19,
 
   update(dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;

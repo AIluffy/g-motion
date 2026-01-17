@@ -100,8 +100,6 @@ function getFlatTracks(timeline: {
  *
  * GPU-First Architecture:
  * - All animations are prepared for GPU compute by default
- * - CPU fallback is handled by InterpolationSystem when GPU is unavailable
- * - config.gpuCompute='never' explicitly disables GPU path
  *
  * Performance optimizations:
  * - Reuses Float32Array buffers via BatchBufferCache (eliminates per-frame allocations)
@@ -128,11 +126,10 @@ export const BatchSamplingSystem: SystemDef = {
 
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
-    const metrics = ctx?.services.metrics;
     const processor = ctx?.services.batchProcessor;
     const appContext = ctx?.services.appContext;
 
-    if (!world || !metrics || !processor || !appContext) {
+    if (!world || !processor || !appContext) {
       return;
     }
     const nowMs =
@@ -167,20 +164,8 @@ export const BatchSamplingSystem: SystemDef = {
     };
     const callbackCode = getRendererCode('callback');
     const forcedSync = new Set(consumeForcedGPUStateSyncEntityIds());
-    const gpuStatus = metrics.getStatus?.();
-    const gpuActive =
-      !!gpuStatus?.enabled && !!gpuStatus?.gpuInitialized && !gpuStatus?.cpuFallbackActive;
     const staticReuseEnabled = config.batchSamplingStaticReuse === true;
     const seekInvalidation = consumeBatchSamplingSeekInvalidation();
-
-    // GPU-First: Only skip if explicitly disabled
-    if (config.gpuCompute === 'never') {
-      processor.clearArchetypeBatches();
-      return;
-    }
-
-    // Always prepare batches for GPU (GPU-first architecture)
-    // CPU fallback is handled by InterpolationSystem when GPU unavailable
 
     if (!staticReuseEnabled || seekInvalidation) {
       processor.clearArchetypeBatches();
@@ -618,7 +603,7 @@ export const BatchSamplingSystem: SystemDef = {
                     const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
-                    const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+                    const easingId = getEasingId(kf.easing);
 
                     // Determine easing mode (Phase 1.1: Bezier support)
                     let easingMode = EASING_MODE_STANDARD;
@@ -709,7 +694,7 @@ export const BatchSamplingSystem: SystemDef = {
                     const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
-                    const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+                    const easingId = getEasingId(kf.easing);
 
                     let easingMode = EASING_MODE_STANDARD;
                     if (kf.interp === 'hold') {
@@ -743,7 +728,7 @@ export const BatchSamplingSystem: SystemDef = {
                     const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
-                    const easingId = config.gpuEasing === false ? 0 : getEasingId(kf.easing);
+                    const easingId = getEasingId(kf.easing);
 
                     let easingMode = EASING_MODE_STANDARD;
                     if (kf.interp === 'hold') {
@@ -833,10 +818,6 @@ export const BatchSamplingSystem: SystemDef = {
         totalEntities += entityCount;
       } else if (staticReuseEnabled) {
         processor.removeArchetypeBatch(archetype.id);
-      }
-
-      if (!gpuActive) {
-        continue;
       }
 
       if (!springBuffer && !inertiaBuffer) {

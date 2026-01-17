@@ -6,9 +6,6 @@ import { useAtom } from 'jotai';
 import {
   engineSpeedAtom,
   engineFpsAtom,
-  engineGpuModeAtom,
-  gpuThresholdAtom,
-  gpuEasingEnabledAtom,
   metricsSamplingRateAtom,
   workSlicingEnabledAtom,
   workSlicingInterpolationAtom,
@@ -37,9 +34,6 @@ function EngineConfigDemo() {
   const controlRef = useRef<AnimationControl | null>(null);
   const [speed, setSpeed] = useAtom(engineSpeedAtom);
   const [fps, setFps] = useAtom(engineFpsAtom);
-  const [gpuMode, setGpuMode] = useAtom(engineGpuModeAtom);
-  const [gpuThreshold, setGpuThreshold] = useAtom(gpuThresholdAtom);
-  const [gpuEasingEnabled, setGpuEasingEnabled] = useAtom(gpuEasingEnabledAtom);
   const [metricsSamplingRate, setMetricsSamplingRate] = useAtom(metricsSamplingRateAtom);
   const [workSlicingEnabled, setWorkSlicingEnabled] = useAtom(workSlicingEnabledAtom);
   const [workInterp, setWorkInterp] = useAtom(workSlicingInterpolationAtom);
@@ -51,9 +45,6 @@ function EngineConfigDemo() {
   useEffect(() => {
     engine.setSpeed(speed);
     engine.setFps(fps);
-    engine.forceGpu(gpuMode);
-    engine.setGpuThreshold(gpuThreshold);
-    engine.setGpuEasing(gpuEasingEnabled);
     const world = WorldProvider.useWorld();
     (world.config as any).metricsSamplingRate = Math.floor(metricsSamplingRate);
     (world.config as any).workSlicing = {
@@ -62,15 +53,7 @@ function EngineConfigDemo() {
       interpolationArchetypesPerFrame: workInterp,
       batchSamplingArchetypesPerFrame: workBatch,
     };
-  }, [speed, fps, gpuMode]);
-
-  useEffect(() => {
-    engine.setGpuThreshold(gpuThreshold);
-  }, [gpuThreshold]);
-
-  useEffect(() => {
-    engine.setGpuEasing(gpuEasingEnabled);
-  }, [gpuEasingEnabled]);
+  }, [speed, fps, metricsSamplingRate, workSlicingEnabled, workInterp, workBatch]);
 
   useEffect(() => {
     const world = WorldProvider.useWorld();
@@ -347,71 +330,6 @@ function EngineConfigDemo() {
 
           <Card>
             <CardHeader>
-              <CardTitle>GPU Threshold & Easing</CardTitle>
-              <CardDescription>Control GPU activation threshold and easing mode</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-300">GPU Threshold:</label>
-                    <span className="text-lg font-semibold text-slate-50">{gpuThreshold}</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="5000"
-                    step="100"
-                    value={gpuThreshold}
-                    onChange={(e) => setGpuThreshold(parseInt(e.target.value))}
-                    className="w-full accent-sky-500"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-300">GPU Easing:</label>
-                  <input
-                    type="checkbox"
-                    checked={gpuEasingEnabled}
-                    onChange={(e) => setGpuEasingEnabled(e.target.checked)}
-                    className="h-5 w-5 accent-sky-500"
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="text-sm text-slate-400">
-              Auto mode considers threshold与复杂度；GPU easing加速缓动计算
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>GPU Mode</CardTitle>
-              <CardDescription>Control GPU acceleration behavior for animations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-300">Mode:</label>
-                  <span className="text-lg font-semibold text-slate-50">{gpuMode}</span>
-                </div>
-                <select
-                  value={gpuMode}
-                  onChange={(e) => setGpuMode(e.target.value as any)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-50"
-                >
-                  <option value="auto">Auto (threshold-based)</option>
-                  <option value="always">Always (force GPU)</option>
-                  <option value="never">Never (CPU only)</option>
-                </select>
-              </div>
-            </CardContent>
-            <CardFooter className="text-sm text-slate-400">
-              Auto mode uses GPU when entity count exceeds threshold (default: 1000)
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Work Slicing</CardTitle>
               <CardDescription>
                 Process archetypes across frames to smooth frame time
@@ -528,14 +446,10 @@ engine.setSpeed(2); // 2x faster
 // Limit FPS
 engine.setFps(30); // Cap at 30 FPS
 
-// Force GPU mode
-engine.forceGpu('always');
-
 // Batch configure
 engine.configure({
   speed: 1.5,
-  fps: 60,
-  gpuMode: 'auto'
+  fps: 60
 });
 
 // Reset to defaults

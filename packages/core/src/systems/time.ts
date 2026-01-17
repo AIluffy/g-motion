@@ -53,6 +53,9 @@ export const TimeSystem: SystemDef = {
         const playbackRate = typedPlaybackRate
           ? typedPlaybackRate[i]
           : Number(state.playbackRate ?? 1);
+        const prevTimelineTime = typedCurrentTime
+          ? typedCurrentTime[i]
+          : Number(state.currentTime ?? 0);
         const timeline = timelineBuffer[i] as {
           duration?: number;
           repeat?: number;
@@ -78,7 +81,11 @@ export const TimeSystem: SystemDef = {
         if (typedCurrentTime) typedCurrentTime[i] = res.timelineTime;
         if (typedIteration) typedIteration[i] = res.iteration;
 
-        if (res.finished && status === MotionStatus.Running) {
+        if (
+          status === MotionStatus.Running &&
+          res.finished &&
+          Object.is(prevTimelineTime, res.timelineTime)
+        ) {
           world.setMotionStatusAt(archetype, i, MotionStatus.Finished);
         }
       }

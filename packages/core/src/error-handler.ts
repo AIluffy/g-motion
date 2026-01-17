@@ -154,13 +154,12 @@ export function __resetErrorMonitorForTests(): void {
  * Provides:
  * - Typed error codes and severity levels
  * - Listener pattern for custom error handling
- * - Automatic fallback strategies (e.g., GPU → CPU)
  * - Consistent logging based on severity
  */
 export class ErrorHandler {
   private listeners = new Set<ErrorListener>();
-  private context: AppContext;
   private severityHandlers = new Map<ErrorSeverity, SeverityHandler>();
+  private context: AppContext;
 
   constructor(context: AppContext) {
     this.context = context;
@@ -184,9 +183,8 @@ export class ErrorHandler {
     // Notify all listeners (catch errors to prevent cascading failures)
     this.notifyListeners(error);
 
-    // Apply recovery strategies
     if (error.shouldFallback()) {
-      this.handleGPUFallback(error);
+      this.context.setWebGPUInitialized(false);
     }
 
     // Log based on severity
@@ -256,54 +254,40 @@ export class ErrorHandler {
     });
   }
 
-  /**
-   * Handle GPU fallback by updating AppContext and metrics
-   */
-  private handleGPUFallback(error: MotionError): void {
-    // Disable WebGPU in AppContext
-    this.context.setWebGPUInitialized(false);
-
-    // Update GPU metrics if available
-    // Note: Import is delayed to avoid circular dependencies at module load time
-    try {
-      // Use dynamic import to lazily load metrics provider
-      import('./webgpu/metrics-provider.js')
-        .then(({ getGPUMetricsProvider }) => {
-          getGPUMetricsProvider().updateStatus({
-            webgpuAvailable: false,
-            gpuInitialized: false,
-          });
-        })
-        .catch((e) => {
-          // Metrics provider might not be available in all contexts
-          debug('Could not update GPU metrics:', e);
-        });
-    } catch (e) {
-      // Silently fail if metrics not available
-      debug('Could not update GPU metrics:', e);
-    }
-
-    debug('GPU fallback triggered - switching to CPU path', error.context);
-  }
-
   private registerDefaultSeverityHandlers(): void {
     this.severityHandlers.set(ErrorSeverity.FATAL, {
       handle: (error, context) => {
+        if (context === undefined) {
+          errorLog(error.message);
+          return;
+        }
         errorLog(error.message, context);
       },
     });
     this.severityHandlers.set(ErrorSeverity.ERROR, {
       handle: (error, context) => {
+        if (context === undefined) {
+          errorLog(error.message);
+          return;
+        }
         errorLog(error.message, context);
       },
     });
     this.severityHandlers.set(ErrorSeverity.WARNING, {
       handle: (error, context) => {
+        if (context === undefined) {
+          warn(error.message);
+          return;
+        }
         warn(error.message, context);
       },
     });
     this.severityHandlers.set(ErrorSeverity.INFO, {
       handle: (error, context) => {
+        if (context === undefined) {
+          debug(error.message);
+          return;
+        }
         debug(error.message, context);
       },
     });
@@ -317,6 +301,10 @@ export class ErrorHandler {
     const handler = this.severityHandlers.get(error.severity);
     if (handler) {
       handler.handle(error, logContext);
+      return;
+    }
+    if (logContext === undefined) {
+      warn(error.message);
       return;
     }
     warn(error.message, logContext);

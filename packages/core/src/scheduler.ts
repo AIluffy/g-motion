@@ -108,7 +108,7 @@ export class SystemScheduler {
   }
 
   ensureRunning(): void {
-    if (this.activeEntityCount > 0) this.start();
+    this.start();
   }
 
   stop(): void {

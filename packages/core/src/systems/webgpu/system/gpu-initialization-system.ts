@@ -12,9 +12,6 @@ import { initWebGPUCompute } from '../initialization';
 import { precompileWorkgroupPipelines } from '../pipeline';
 import { getOutputFormatBufferPoolStats } from '../output-format';
 import type { WebGPUComputeRuntime } from './runtime';
-import { createDebugger } from '@g-motion/utils';
-
-const debug = createDebugger('WebGPU');
 
 export async function ensureWebGPUInitialized(params: {
   runtime: WebGPUComputeRuntime;
@@ -25,37 +22,69 @@ export async function ensureWebGPUInitialized(params: {
 
   if (runtime.isInitialized) return;
 
-  runtime.bufferManager = getWebGPUBufferManager();
-  const initResult = await initWebGPUCompute(runtime.bufferManager);
-  runtime.isInitialized = true;
-  runtime.deviceAvailable = initResult.deviceAvailable;
-  runtime.shaderVersion = initResult.shaderVersion;
-
-  if (runtime.deviceAvailable && runtime.bufferManager) {
-    const device = runtime.bufferManager.getDevice();
-    runtime.timingHelper = getTimingHelper(device);
-    runtime.stagingPool = new StagingBufferPool(device);
-    runtime.readbackManager = new AsyncReadbackManager();
-    getPersistentGPUBufferManager(device);
-
+  const maybeGpu = (globalThis as any).navigator?.gpu as { __isFake?: boolean } | undefined;
+  if (maybeGpu?.__isFake === true) {
+    runtime.isInitialized = true;
+    runtime.deviceAvailable = true;
+    runtime.mockWebGPU = true;
+    runtime.shaderVersion = getCustomEasingVersion();
     metricsProvider.updateStatus({
       webgpuAvailable: true,
       gpuInitialized: true,
       enabled: true,
-      cpuFallbackActive: false,
     });
-  } else {
-    if (!runtime.cpuFallbackLogged) {
-      debug('WebGPU not available, using CPU fallback for animations');
-      runtime.cpuFallbackLogged = true;
-    }
+    return;
+  }
+
+  if (!maybeGpu) {
+    runtime.isInitialized = true;
+    runtime.deviceAvailable = false;
     metricsProvider.updateStatus({
       webgpuAvailable: false,
       gpuInitialized: false,
       enabled: false,
-      cpuFallbackActive: true,
     });
+    return;
   }
+
+  runtime.bufferManager = getWebGPUBufferManager();
+  try {
+    const initResult = await initWebGPUCompute(runtime.bufferManager);
+    runtime.isInitialized = true;
+    runtime.deviceAvailable = true;
+    runtime.shaderVersion = initResult.shaderVersion;
+  } catch {
+    runtime.isInitialized = true;
+    runtime.deviceAvailable = false;
+    metricsProvider.updateStatus({
+      webgpuAvailable: false,
+      gpuInitialized: false,
+      enabled: false,
+    });
+    return;
+  }
+
+  const device = runtime.bufferManager.getDevice();
+  if (!device) {
+    runtime.deviceAvailable = false;
+    metricsProvider.updateStatus({
+      webgpuAvailable: true,
+      gpuInitialized: false,
+      enabled: false,
+    });
+    return;
+  }
+
+  runtime.timingHelper = getTimingHelper(device);
+  runtime.stagingPool = new StagingBufferPool(device);
+  runtime.readbackManager = new AsyncReadbackManager();
+  getPersistentGPUBufferManager(device);
+
+  metricsProvider.updateStatus({
+    webgpuAvailable: true,
+    gpuInitialized: true,
+    enabled: true,
+  });
 }
 
 export async function ensureWebGPUPipelines(params: {

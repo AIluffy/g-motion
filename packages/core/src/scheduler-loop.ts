@@ -58,9 +58,12 @@ export class SchedulerLoop {
     const time = getNowMs();
     const dt = time - this.lastTime;
     const frameDuration = this.deps.getFrameDurationMs();
-    if (frameDuration && dt < frameDuration) {
-      this.frameId = requestAnimationFrame(this.loop);
-      return;
+    if (frameDuration) {
+      const threshold = Math.max(0, frameDuration - 1);
+      if (dt < threshold) {
+        this.frameId = requestAnimationFrame(this.loop);
+        return;
+      }
     }
 
     this.lastTime = time;

@@ -64,8 +64,7 @@ function DemoBox() {
         />
       </div>
       <p className="text-sm text-slate-300">
-        When GPU is active and gpuOnlyInterpolation is enabled, this motion is updated purely from
-        the GPU pipeline.
+        When GPU is active, this motion is updated from the GPU interpolation pipeline.
       </p>
       <div className="flex gap-3">
         <button
@@ -85,56 +84,31 @@ function DemoBox() {
 
 function GPUOnlyInterpolationPage() {
   const world = WorldProvider.useWorld();
-  const [gpuOnlyEnabled, setGpuOnlyEnabled] = useState<boolean>(() => {
-    const current = (world.config as any).gpuOnlyInterpolation;
-    return current !== false;
-  });
   const [gpuAvailable, setGpuAvailable] = useState(false);
   const [gpuActive, setGpuActive] = useState(false);
-  const [cpuFallback, setCpuFallback] = useState(false);
 
   useEffect(() => {
-    const previous = (world.config as any).gpuOnlyInterpolation;
     const provider = getGPUMetricsProvider();
     const intervalMs = 500;
     const id = window.setInterval(() => {
       const status = provider.getStatus();
       const available = !!(status.webgpuAvailable && status.gpuInitialized);
-      const active = !!(status.enabled && status.gpuInitialized && !status.cpuFallbackActive);
-      const fallback = !!status.cpuFallbackActive;
+      const active = !!(status.enabled && status.gpuInitialized);
       setGpuAvailable(available);
       setGpuActive(active);
-      setCpuFallback(fallback);
     }, intervalMs);
 
     return () => {
-      (world.config as any).gpuOnlyInterpolation = previous;
       window.clearInterval(id);
     };
   }, [world]);
 
-  useEffect(() => {
-    (world.config as any).gpuOnlyInterpolation = gpuOnlyEnabled;
-  }, [world, gpuOnlyEnabled]);
-
   const config = engine.getConfig();
   let interpolationStatusLabel: React.ReactNode;
-  if (!gpuOnlyEnabled) {
-    interpolationStatusLabel = (
-      <span className="inline-flex items-center rounded-full bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-300">
-        GPU-only disabled (InterpolationSystem running)
-      </span>
-    );
-  } else if (gpuActive && !cpuFallback) {
+  if (gpuActive) {
     interpolationStatusLabel = (
       <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300">
-        InterpolationSystem skipped (GPU-only)
-      </span>
-    );
-  } else if (cpuFallback) {
-    interpolationStatusLabel = (
-      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-300">
-        CPU fallback active (InterpolationSystem running)
+        GPU interpolation active
       </span>
     );
   } else {
@@ -155,8 +129,7 @@ function GPUOnlyInterpolationPage() {
               GPU-Only Interpolation Mode Demo
             </h1>
             <p className="text-sm text-slate-300">
-              Demonstrates skipping the CPU InterpolationSystem entirely when GPU compute is
-              available and healthy.
+              Demonstrates running interpolation via WebGPU compute.
             </p>
           </div>
           <Link to="/" className={linkButtonClass('ghost')}>
@@ -168,8 +141,7 @@ function GPUOnlyInterpolationPage() {
           <CardHeader>
             <CardTitle>GPU-Only Interpolation</CardTitle>
             <CardDescription>
-              Enables gpuOnlyInterpolation on the shared World config so that, while GPU is active,
-              interpolation is computed only on GPU.
+              Shows whether the WebGPU interpolation pipeline is initialized and active.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -182,18 +154,6 @@ function GPUOnlyInterpolationPage() {
               </span>
               {interpolationStatusLabel}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                gpuOnlyInterpolation
-              </span>
-              <button
-                type="button"
-                onClick={() => setGpuOnlyEnabled((prev) => !prev)}
-                className={linkButtonClass(gpuOnlyEnabled ? 'primary' : 'ghost')}
-              >
-                {gpuOnlyEnabled ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
             <div className="grid gap-2 text-xs md:grid-cols-3">
               <div className="flex flex-col gap-1">
                 <span className="text-slate-400">GPU available</span>
@@ -203,10 +163,6 @@ function GPUOnlyInterpolationPage() {
                 <span className="text-slate-400">GPU active</span>
                 <span className="font-mono text-slate-100">{String(gpuActive)}</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-slate-400">CPU fallback</span>
-                <span className="font-mono text-slate-100">{String(cpuFallback)}</span>
-              </div>
             </div>
             <div className="mt-2 rounded-md bg-slate-950/70 p-3 text-xs text-slate-300">
               <div className="mb-1 font-semibold text-slate-100">Configuration snapshot</div>
@@ -215,20 +171,8 @@ function GPUOnlyInterpolationPage() {
               </pre>
             </div>
             <ul className="mt-2 list-disc list-inside space-y-1 text-xs">
-              <li>
-                When <span className="font-mono text-slate-100">gpuOnlyInterpolation</span> is true
-                and GPU is active, the InterpolationSystem returns early and only GPU results are
-                applied.
-              </li>
-              <li>
-                If WebGPU is unavailable or a GPU error triggers fallback,{' '}
-                <span className="font-mono text-slate-100">cpuFallbackActive</span> becomes true and
-                the InterpolationSystem resumes CPU interpolation automatically.
-              </li>
-              <li>
-                This demo updates the shared engine config on mount and restores the previous value
-                on unmount so other routes remain unchanged.
-              </li>
+              <li>WebGPU status is derived from the core GPU metrics provider.</li>
+              <li>This page does not toggle engine behavior; it only reports status.</li>
             </ul>
           </CardFooter>
         </Card>

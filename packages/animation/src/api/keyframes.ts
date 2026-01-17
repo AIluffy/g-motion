@@ -3,6 +3,7 @@ import { createDebugger } from '@g-motion/utils';
 import { ResolvedMarkOptions, TargetType } from './mark';
 import type { VisualTarget } from './visualTarget';
 import { defaultRegistry } from '../values/registry';
+import { ValueType } from '../values/types';
 
 const warn = createDebugger('Keyframes', 'warn');
 
@@ -126,6 +127,26 @@ function addDOMKeyframes(
       continue;
     }
 
+    const parser = defaultRegistry.detect(endVal);
+    if (parser?.type === ValueType.Number) {
+      const initial = visualTarget.getInitial(key);
+      const initialNum = typeof initial === 'number' ? initial : parseFloat(String(initial ?? 0));
+      const { startValue, prevTime } = getTrackContext(
+        track,
+        Number.isFinite(initialNum) ? initialNum : 0,
+      );
+
+      const num = typeof endVal === 'number' ? endVal : Number(String(endVal).trim());
+      if (!Number.isFinite(num)) {
+        warn('Skipping DOM keyframe: invalid end value', key, endVal);
+        continue;
+      }
+
+      const kf = createKeyframe(prevTime, resolved.time, startValue, num, easing, resolved);
+      track.push(kf);
+      continue;
+    }
+
     const prev = track.length > 0 ? (track[track.length - 1] as any) : undefined;
     const prevTime = prev ? prev.time : 0;
 
@@ -137,7 +158,6 @@ function addDOMKeyframes(
       fromRaw = current !== undefined ? current : endVal;
     }
 
-    const parser = defaultRegistry.detect(endVal);
     if (!parser) {
       warn('Skipping DOM keyframe: unsupported value', key, endVal);
       continue;
@@ -177,6 +197,26 @@ function addObjectKeyframes(
       continue;
     }
 
+    const parser = defaultRegistry.detect(endVal);
+    if (parser?.type === ValueType.Number) {
+      const initial = visualTarget.getInitial(key);
+      const initialNum = typeof initial === 'number' ? initial : parseFloat(String(initial ?? 0));
+      const { startValue, prevTime } = getTrackContext(
+        track,
+        Number.isFinite(initialNum) ? initialNum : 0,
+      );
+
+      const num = typeof endVal === 'number' ? endVal : Number(String(endVal).trim());
+      if (!Number.isFinite(num)) {
+        warn('Skipping object keyframe: invalid end value', key, endVal);
+        continue;
+      }
+
+      const kf = createKeyframe(prevTime, resolved.time, startValue, num, easing, resolved);
+      track.push(kf);
+      continue;
+    }
+
     const prev = track.length > 0 ? (track[track.length - 1] as any) : undefined;
     const prevTime = prev ? prev.time : 0;
 
@@ -188,7 +228,6 @@ function addObjectKeyframes(
       fromRaw = current !== undefined ? current : endVal;
     }
 
-    const parser = defaultRegistry.detect(endVal);
     if (!parser) {
       warn('Skipping object keyframe: unsupported value', key, endVal);
       continue;

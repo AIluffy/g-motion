@@ -7,8 +7,6 @@
  * and performance monitoring for compute shader execution.
  */
 
-import { SchedulingConstants } from '../constants/scheduling';
-
 /**
  * GPU-CPU synchronization event
  */
@@ -146,18 +144,6 @@ Performance Report:
   Compute Ratio: ${((metrics.computeTime / metrics.totalTime) * 100).toFixed(1)}%
   Download Ratio: ${((metrics.downloadTime / metrics.totalTime) * 100).toFixed(1)}%
     `.trim();
-  }
-
-  /**
-   * Check if GPU should fallback to CPU based on frame budget
-   * @param frameBudgetMs - Frame time threshold (default 12ms for 60fps with headroom)
-   * @returns true if should fallback to CPU
-   */
-  shouldFallbackToCPU(
-    frameBudgetMs: number = SchedulingConstants.FRAME_BUDGET_MS_DEFAULT,
-  ): boolean {
-    if (this.metrics.totalTime === 0) return false;
-    return this.metrics.totalTime > frameBudgetMs;
   }
 
   /**

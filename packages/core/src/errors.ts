@@ -18,7 +18,7 @@ export enum ErrorCode {
   INVALID_EASING = 'INVALID_EASING',
   INVALID_BEZIER_POINTS = 'INVALID_BEZIER_POINTS',
 
-  // WebGPU Errors (handle gracefully, fallback to CPU)
+  // WebGPU Errors
   GPU_INIT_FAILED = 'GPU_INIT_FAILED',
   GPU_ADAPTER_UNAVAILABLE = 'GPU_ADAPTER_UNAVAILABLE',
   GPU_DEVICE_UNAVAILABLE = 'GPU_DEVICE_UNAVAILABLE',
@@ -46,7 +46,7 @@ export enum ErrorCode {
 export enum ErrorSeverity {
   /** Fatal errors - throw immediately (config/validation errors) */
   FATAL = 'fatal',
-  /** Errors - log + fallback (GPU initialization) */
+  /** Errors - log and continue */
   ERROR = 'error',
   /** Warnings - log + continue (missing renderer) */
   WARNING = 'warning',

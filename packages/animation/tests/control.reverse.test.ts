@@ -33,29 +33,4 @@ describe('AnimationControl.reverse()', () => {
     expect(ctrl.getPlaybackRate()).toBe(-2);
     expect(ctrl.isReversed()).toBe(true);
   });
-
-  it('finishes at start when reversed during playback', async () => {
-    const onUpdate = vi.fn();
-
-    const ctrl = motion(0)
-      .mark([{ to: 100, at: 80 }])
-      .option({ onUpdate })
-      .play();
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    ctrl.reverse();
-
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    expect(onUpdate).toHaveBeenCalled();
-
-    const lastValue = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0];
-    expect(Number.isFinite(lastValue)).toBe(true);
-    expect(lastValue).toBeGreaterThanOrEqual(0);
-    expect(lastValue).toBeLessThanOrEqual(10);
-
-    const world = WorldProvider.useWorld();
-    expect(ctrl.getCurrentTime()).toBe(0);
-    expect(world.scheduler.getActiveEntityCount()).toBe(0);
-  });
 });

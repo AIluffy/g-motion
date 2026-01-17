@@ -1,6 +1,5 @@
 import { describe, bench, expect } from 'vitest';
 import { getGPUMetricsProvider } from '../src/webgpu/metrics-provider';
-import { SyncManager } from '../src/webgpu/sync-manager';
 
 describe('GPU Adaptive Threshold Performance', () => {
   bench('Dynamic threshold calculation - baseline 1000 entities', () => {
@@ -18,25 +17,6 @@ describe('GPU Adaptive Threshold Performance', () => {
 
     // Reset
     provider.updateStatus({ frameTimeMs: 0 });
-  });
-
-  bench('SyncManager frame budget check - 500-5000 entities', () => {
-    const syncManager = new SyncManager();
-
-    // Simulate varying compute times
-    for (let computeTime = 5; computeTime <= 20; computeTime += 5) {
-      syncManager.recordEvent({
-        type: 'compute',
-        duration: computeTime,
-      });
-
-      const shouldFallback = syncManager.shouldFallbackToCPU(12);
-      if (computeTime > 12) {
-        expect(shouldFallback).toBe(true);
-      }
-
-      syncManager.clear();
-    }
   });
 
   bench('Threshold adaptation under load - 1000 iterations', () => {

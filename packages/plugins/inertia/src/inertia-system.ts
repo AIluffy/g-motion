@@ -32,7 +32,6 @@ type InertiaData = ComponentValue & {
 /**
  * InertiaSystem implements momentum-based motion with exponential decay.
  * Supports optional boundary bounce using spring physics.
- * Runs before InterpolationSystem (order: 19).
  *
  * Physics:
  * 1. Decay phase: velocity *= exp(-dt / timeConstant)
@@ -45,7 +44,7 @@ type InertiaData = ComponentValue & {
  */
 export const InertiaSystem: SystemDef = {
   name: 'InertiaSystem',
-  order: 19, // Before InterpolationSystem (20)
+  order: 19,
 
   update(dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;

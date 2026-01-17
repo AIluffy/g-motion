@@ -31,7 +31,7 @@ export const TRANSFORM_FIELDS = [
  * Extract all typed buffers for Transform component fields
  *
  * This eliminates code duplication across multiple systems that need
- * to access Transform typed buffers (InterpolationSystem, RenderSystem, etc.)
+ * to access Transform typed buffers (RenderSystem, etc.)
  *
  * @param archetype - The archetype to extract buffers from
  * @returns Record of field names to their typed buffers (undefined if not available)
