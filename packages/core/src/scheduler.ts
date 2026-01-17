@@ -64,18 +64,6 @@ export class SystemScheduler {
     }
   }
 
-  private capabilities = {
-    webgpu: false,
-  };
-
-  setCapability(cap: 'webgpu', value: boolean) {
-    this.capabilities[cap] = value;
-  }
-
-  getCapability(cap: 'webgpu') {
-    return this.capabilities[cap];
-  }
-
   setActiveEntityCount(count: number): void {
     this.activeEntityCount = count;
 

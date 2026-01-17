@@ -1,29 +1,8 @@
-import { TimelineData, SpringOptions, InertiaOptions } from '@g-motion/core';
+import type { TimelineData, InertiaOptions } from '@g-motion/core';
 
-export function analyzeSpringTracks(tracks: TimelineData) {
-  let hasSpring = false;
-  let springConfig: SpringOptions | undefined;
-  const springVelocities = new Map<string, number>();
-
-  for (const [trackKey, track] of tracks.entries()) {
-    if (!Array.isArray(track) || track.length === 0) continue;
-
-    for (const kf of track) {
-      if (kf.spring) {
-        if (!hasSpring) {
-          hasSpring = true;
-          springConfig = kf.spring;
-        }
-        if (typeof kf.spring.initialVelocity === 'number') {
-          springVelocities.set(trackKey, kf.spring.initialVelocity);
-        }
-      }
-    }
-  }
-
-  return { hasSpring, springConfig, springVelocities };
-}
-
+/**
+ * Resolves inertia velocity from options.
+ */
 function resolveInertiaVelocity(
   inertia: InertiaOptions,
   trackKey: string,
@@ -41,7 +20,18 @@ function resolveInertiaVelocity(
   return inertia.velocity as number | undefined;
 }
 
-export function analyzeInertiaTracks(tracks: TimelineData, target: any) {
+/**
+ * Analyzes timeline tracks for inertia configuration.
+ * Returns inertia config if any track has inertia physics.
+ */
+export function analyzeInertiaTracks(
+  tracks: TimelineData,
+  target: any,
+): {
+  hasInertia: boolean;
+  inertiaConfig: InertiaOptions | undefined;
+  inertiaVelocities: Map<string, number>;
+} {
   let hasInertia = false;
   let inertiaConfig: InertiaOptions | undefined;
   const inertiaVelocities = new Map<string, number>();
@@ -73,10 +63,13 @@ export function analyzeInertiaTracks(tracks: TimelineData, target: any) {
   return { hasInertia, inertiaConfig, inertiaVelocities };
 }
 
+/**
+ * Build Inertia component data from configuration.
+ */
 export function buildInertiaComponent(
   config: InertiaOptions,
   velocities: Map<string, number>,
-): any {
+): Record<string, unknown> {
   const normalizeTimeConstant = (cfg: InertiaOptions) => {
     if (typeof cfg.deceleration === 'number' && cfg.deceleration > 0) {
       return 1000 / cfg.deceleration;

@@ -1,3 +1,18 @@
+/**
+ * Render System - Legacy CPU-only Rendering (Deprecated)
+ *
+ * This system provides CPU-based rendering fallback for entities that cannot
+ * be processed through the GPU pipeline.
+ *
+ * GPU-only Architecture:
+ * - All animations should use GPU compute pipeline (WebGPUComputeSystem)
+ * - This system only handles edge cases not covered by GPU rendering
+ * - Consider migrating to GPU-based rendering if possible
+ *
+ * GPU Path: batch/sampling.ts → WebGPUComputeSystem → GPU result → delivery-system.ts
+ * CPU Path (legacy): This system processes Render component directly
+ */
+
 import { SystemDef, SystemContext } from '../index';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
 import { ErrorCode, ErrorSeverity, MotionError } from '../errors';

@@ -372,6 +372,10 @@ export const GPUResultApplySystem: SystemDef = {
         > = {};
 
         const base = i * stride;
+
+        /**
+         * Handle physics completion - supports Spring→Inertia handoff
+         */
         const maybeFinish = () => {
           if (!finished || stride <= 0) return;
           let allFinished = true;
@@ -382,10 +386,48 @@ export const GPUResultApplySystem: SystemDef = {
             }
           }
           if (!allFinished) return;
+
           const stateBuffer = archetype.getBuffer?.('MotionState');
           const typedStatus = archetype.getTypedBuffer?.('MotionState', 'status') as
             | Int32Array
             | undefined;
+          const springBuffer = archetype.getBuffer?.('Spring');
+          const inertiaBuffer = archetype.getBuffer?.('Inertia');
+
+          // Check for Spring→Inertia handoff
+          if (springBuffer && inertiaBuffer && index !== undefined) {
+            const spring = springBuffer[index] as any;
+            const inertia = inertiaBuffer[index] as any;
+
+            if (spring && inertia) {
+              // Transfer velocities from Spring to Inertia
+              if (spring.velocities instanceof Map) {
+                if (!inertia.velocities || !(inertia.velocities instanceof Map)) {
+                  inertia.velocities = new Map();
+                }
+                for (const [key, v] of spring.velocities) {
+                  (inertia.velocities as Map<string, number>).set(key, v);
+                }
+              }
+
+              // Remove Spring component, let InertiaSystem pick up
+              springBuffer[index] = undefined;
+
+              // Keep entity running for Inertia
+              if (stateBuffer) {
+                const state = stateBuffer[index] as any;
+                state.status = MotionStatus.Running;
+                if (typedStatus) {
+                  typedStatus[index] = MotionStatus.Running as unknown as number;
+                }
+              }
+
+              unmarkPhysicsGPUEntity(id);
+              return;
+            }
+          }
+
+          // No handoff needed - mark as finished
           if (stateBuffer && index !== undefined) {
             const state = stateBuffer[index] as any;
             state.status = MotionStatus.Finished;

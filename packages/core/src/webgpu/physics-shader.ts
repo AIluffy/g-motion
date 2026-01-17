@@ -3,20 +3,15 @@
  *
  * GPU-accelerated physics simulations for Spring and Inertia animations.
  * Provides smooth, physically-based motion with configurable parameters.
+ *
+ * NOTE: Individual spring/inertia shaders have been moved to their respective plugins.
+ * This file contains the combined physics shader and general utility functions.
  */
 
-import springShaderCode from './shaders/physics-spring.wgsl?raw';
-import inertiaShaderCode from './shaders/physics-inertia.wgsl?raw';
 import physicsCombinedShaderCode from './shaders/physics-combined.wgsl?raw';
 import { WebGPUConstants } from '../constants';
 
-// WGSL shader for Spring physics
-export const SPRING_SHADER = springShaderCode;
-
-// WGSL shader for Inertia physics
-export const INERTIA_SHADER = inertiaShaderCode;
-
-// Combined physics shader with both spring and inertia
+// Combined physics shader with both spring and inertia (core infrastructure)
 export const PHYSICS_COMBINED_SHADER = physicsCombinedShaderCode;
 
 /**
@@ -131,29 +126,3 @@ export function unpackSpringStates(data: Float32Array): SpringStateData[] {
   }
   return results;
 }
-
-/**
- * Calculate critical damping for a spring
- * Critical damping = 2 * sqrt(stiffness * mass)
- */
-export function calculateCriticalDamping(stiffness: number, mass: number): number {
-  return 2 * Math.sqrt(stiffness * mass);
-}
-
-/**
- * Create spring preset configurations
- */
-export const SPRING_PRESETS = {
-  // Gentle spring (slow, smooth)
-  gentle: { stiffness: 100, damping: 20, mass: 1 },
-  // Default spring (balanced)
-  default: { stiffness: 170, damping: 26, mass: 1 },
-  // Wobbly spring (bouncy)
-  wobbly: { stiffness: 180, damping: 12, mass: 1 },
-  // Stiff spring (fast, snappy)
-  stiff: { stiffness: 210, damping: 20, mass: 1 },
-  // Slow spring (very smooth)
-  slow: { stiffness: 280, damping: 60, mass: 1 },
-  // Molasses (very slow)
-  molasses: { stiffness: 280, damping: 120, mass: 1 },
-} as const;

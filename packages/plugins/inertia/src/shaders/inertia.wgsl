@@ -1,3 +1,8 @@
+// Inertia Physics GPU Shader
+// GPU-accelerated inertia/momentum simulations with optional boundary bounce.
+// This shader provides smooth deceleration with configurable friction and
+// optional spring-based bounce when hitting boundaries.
+
 // Inertia state per entity per channel
 struct InertiaState {
     position: f32,
@@ -45,10 +50,12 @@ fn updateInertia(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var isStopped = false;
     if (state.inBounce < 0.5) {
+        // Decay phase - exponential velocity decay
         let decayFactor = exp(-dtMs / max(state.timeConstantMs, 0.001));
         state.velocity = state.velocity * decayFactor;
         state.position = state.position + state.velocity * dt;
 
+        // Check for boundary hits
         var hitBoundary = false;
         var boundaryValue = 0.0;
         if (state.minBound < state.maxBound) {
@@ -66,17 +73,20 @@ fn updateInertia(@builtin(global_invocation_id) global_id: vec3<u32>) {
             state.boundTarget = boundaryValue;
 
             if (state.clamp >= 0.5 || state.bounceEnabled < 0.5) {
+                // Clamp mode - stop at boundary
                 state.velocity = 0.0;
                 state.bounceVelocity = 0.0;
                 state.inBounce = 0.0;
                 isStopped = true;
             } else {
+                // Bounce mode - switch to spring physics
                 state.inBounce = 1.0;
                 state.bounceVelocity = state.velocity;
                 state.velocity = 0.0;
             }
         }
     } else {
+        // Bounce phase - spring physics at boundary
         let displacement = state.position - state.boundTarget;
         let force = -state.bounceStiffness * displacement - state.bounceDamping * state.bounceVelocity;
         let acceleration = force / max(state.bounceMass, 0.001);
@@ -84,6 +94,7 @@ fn updateInertia(@builtin(global_invocation_id) global_id: vec3<u32>) {
         state.bounceVelocity = state.bounceVelocity + acceleration * dt;
         state.position = state.position + state.bounceVelocity * dt;
 
+        // Check if bounce has settled
         if (abs(state.bounceVelocity) < state.restSpeed && abs(displacement) < state.restDelta) {
             state.inBounce = 0.0;
             state.bounceVelocity = 0.0;

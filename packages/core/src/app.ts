@@ -1,4 +1,4 @@
-import type { ComponentDef, SystemDef, RendererDef } from './plugin';
+import type { ComponentDef, SystemDef, RendererDef, ShaderDef } from './plugin';
 import { registerEasingWithWGSL } from './systems/easing-registry';
 import { createDebugger } from '@g-motion/utils';
 import { MotionApp, MotionAppConfig } from './plugin';
@@ -91,6 +91,14 @@ export class App implements MotionApp {
     this.easings.set(name, fn);
     registerEasingWithWGSL(name, fn, wgslFn);
     debug('Registered GPU easing', name);
+  }
+
+  registerShader(shader: ShaderDef): void {
+    // Store shader in global registry for WebGPU system to pick up
+    const globalRegistry = (globalThis as any).__shaderRegistry ?? new Map();
+    globalRegistry.set(shader.name, shader);
+    (globalThis as any).__shaderRegistry = globalRegistry;
+    debug('Registered shader', shader.name);
   }
 
   getConfig(): MotionAppConfig {

@@ -18,7 +18,6 @@
     "test": "vitest run --pool=threads --maxWorkers=1"
   },
   "dependencies": {
-    "@g-motion/animation": "workspace:*",
     "@g-motion/core": "workspace:*",
     "@g-motion/utils": "workspace:*"
   },

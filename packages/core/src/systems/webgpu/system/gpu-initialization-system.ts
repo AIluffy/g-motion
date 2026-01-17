@@ -1,5 +1,6 @@
 import type { MotionAppConfig } from '../../../plugin';
 import type { GPUMetricsProvider } from '../../../webgpu/metrics-provider';
+import { MotionError, ErrorCode, ErrorSeverity } from '../../../errors';
 import { getWebGPUBufferManager } from '../../../webgpu/buffer';
 import { getTimingHelper } from '../../../webgpu/timing-helper';
 import { StagingBufferPool } from '../../../webgpu/staging-pool';
@@ -13,6 +14,9 @@ import { precompileWorkgroupPipelines } from '../pipeline';
 import { getOutputFormatBufferPoolStats } from '../output-format';
 import type { WebGPUComputeRuntime } from './runtime';
 
+/**
+ * GPU-only initialization: WebGPU must be available
+ */
 export async function ensureWebGPUInitialized(params: {
   runtime: WebGPUComputeRuntime;
   metricsProvider: GPUMetricsProvider;
@@ -36,15 +40,13 @@ export async function ensureWebGPUInitialized(params: {
     return;
   }
 
+  // GPU-only architecture: WebGPU must be available
   if (!maybeGpu) {
-    runtime.isInitialized = true;
-    runtime.deviceAvailable = false;
-    metricsProvider.updateStatus({
-      webgpuAvailable: false,
-      gpuInitialized: false,
-      enabled: false,
-    });
-    return;
+    throw new MotionError(
+      'WebGPU is not supported in this environment.',
+      ErrorCode.GPU_ADAPTER_UNAVAILABLE,
+      ErrorSeverity.FATAL,
+    );
   }
 
   runtime.bufferManager = getWebGPUBufferManager();
@@ -54,25 +56,20 @@ export async function ensureWebGPUInitialized(params: {
     runtime.deviceAvailable = true;
     runtime.shaderVersion = initResult.shaderVersion;
   } catch {
-    runtime.isInitialized = true;
-    runtime.deviceAvailable = false;
-    metricsProvider.updateStatus({
-      webgpuAvailable: false,
-      gpuInitialized: false,
-      enabled: false,
-    });
-    return;
+    throw new MotionError(
+      'Failed to initialize WebGPU. GPU may be unavailable or blocked.',
+      ErrorCode.GPU_INIT_FAILED,
+      ErrorSeverity.FATAL,
+    );
   }
 
   const device = runtime.bufferManager.getDevice();
   if (!device) {
-    runtime.deviceAvailable = false;
-    metricsProvider.updateStatus({
-      webgpuAvailable: true,
-      gpuInitialized: false,
-      enabled: false,
-    });
-    return;
+    throw new MotionError(
+      'WebGPU device is not available.',
+      ErrorCode.GPU_DEVICE_UNAVAILABLE,
+      ErrorSeverity.FATAL,
+    );
   }
 
   runtime.timingHelper = getTimingHelper(device);

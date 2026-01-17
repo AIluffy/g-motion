@@ -1,7 +1,7 @@
 import { WorldProvider, createEngine, type MotionEngine } from '@g-motion/core';
 import { DOMPlugin } from '@g-motion/plugin-dom';
-import { InertiaPlugin } from '@g-motion/plugin-inertia';
-import { SpringPlugin } from '@g-motion/plugin-spring';
+import { inertiaPlugin } from '@g-motion/plugin-inertia';
+import { springPlugin } from '@g-motion/plugin-spring';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -32,8 +32,8 @@ if (existingEngine && !existingEngine.disposed) {
   });
 } else {
   engine.use(DOMPlugin);
-  engine.use(SpringPlugin);
-  engine.use(InertiaPlugin);
+  engine.use(springPlugin);
+  engine.use(inertiaPlugin);
   (globalThis as any)[globalKey] = engine;
 }
 

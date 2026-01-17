@@ -1,3 +1,7 @@
+// Spring Physics GPU Shader
+// GPU-accelerated spring physics simulations with semi-implicit Euler integration.
+// Provides stable, accurate physics for spring-based animations.
+
 // Spring state per entity per channel
 struct SpringState {
     position: f32,      // Current position
@@ -8,6 +12,8 @@ struct SpringState {
     mass: f32,          // Mass (m)
     restDelta: f32,
     restSpeed: f32,
+    _pad0: f32,
+    _pad1: f32,
 }
 
 // Simulation parameters
@@ -66,51 +72,6 @@ fn updateSprings(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     // Write back state
-    springs[index] = spring;
-    outputs[index] = spring.position;
-}
-
-// Verlet integration variant (more stable for very stiff springs)
-@compute @workgroup_size(64)
-fn updateSpringsVerlet(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let index = global_id.x;
-    let springCount = arrayLength(&springs);
-
-    if (index >= springCount) {
-        return;
-    }
-
-    var spring = springs[index];
-    let dt = params.deltaTime;
-    let dt2 = dt * dt;
-
-    // Calculate spring force
-    let displacement = spring.position - spring.targetValue;
-    let springForce = -spring.stiffness * displacement;
-    let dampingForce = -spring.damping * spring.velocity;
-    let totalForce = springForce + dampingForce;
-    let acceleration = totalForce / max(spring.mass, 0.001);
-
-    // Verlet integration
-    let newPosition = spring.position + spring.velocity * dt + 0.5 * acceleration * dt2;
-
-    // Calculate new velocity from position change
-    let newVelocity = (newPosition - spring.position) / dt;
-
-    spring.position = newPosition;
-    spring.velocity = clamp(newVelocity, -params.maxVelocity, params.maxVelocity);
-
-    // Check settlement
-    let isSettled = abs(displacement) < spring.restDelta && abs(spring.velocity) < spring.restSpeed;
-
-    if (isSettled) {
-        spring.position = spring.targetValue;
-        spring.velocity = 0.0;
-        settled[index] = 1u;
-    } else {
-        settled[index] = 0u;
-    }
-
     springs[index] = spring;
     outputs[index] = spring.position;
 }

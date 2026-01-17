@@ -75,9 +75,8 @@ export {
 export type { RenderStateData, RenderStateExData, CullResultData } from './culling-shader';
 
 // Physics shaders (Phase 2.1)
+// Individual physics shaders are registered by their respective plugins
 export {
-  SPRING_SHADER,
-  INERTIA_SHADER,
   PHYSICS_COMBINED_SHADER,
   SPRING_STATE_STRIDE,
   INERTIA_STATE_STRIDE,
@@ -86,8 +85,6 @@ export {
   packInertiaStates,
   packSimParams,
   unpackSpringStates,
-  calculateCriticalDamping,
-  SPRING_PRESETS,
 } from './physics-shader';
 export type { SpringStateData, InertiaStateData, PhysicsSimParams } from './physics-shader';
 
@@ -144,6 +141,9 @@ export {
   registerGPUChannelMappingForTracks,
 } from './channel-mapping';
 export type { ChannelMapping, BatchChannelTable } from './channel-mapping';
+
+// Shader registry utilities for plugin shader auto-registration
+export { getRegisteredShaders, getRegisteredShader, clearShaderRegistry } from './shader-interface';
 
 // Re-export batch processor for convenience
 export { ComputeBatchProcessor } from '../systems/batch';

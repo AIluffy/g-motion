@@ -125,6 +125,8 @@ export const WebGPUComputeSystem: SystemDef = {
       metricsProvider.updateStatus({ enabled: true });
       return;
     }
+
+    // GPU-only architecture: WebGPU must be available
     if (!runtime.deviceAvailable) {
       clearPhysicsGPUEntities();
       setPendingReadbackCount(0);
@@ -133,7 +135,11 @@ export const WebGPUComputeSystem: SystemDef = {
         webgpuAvailable: false,
         gpuInitialized: false,
       });
-      return;
+      throw new MotionError(
+        'WebGPU is not available. This application requires WebGPU.',
+        ErrorCode.GPU_ADAPTER_UNAVAILABLE,
+        ErrorSeverity.FATAL,
+      );
     }
 
     const device = getRuntimeDeviceOrThrow();

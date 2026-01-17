@@ -26,9 +26,8 @@ export interface RendererBatchContext {
 export interface RendererDef {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   update(entity: number, target: any, components: any): void;
-  preFrame?(): void; // Optional: called before batch processing begins
-  postFrame?(): void; // Optional: called after all entities processed
-  // Optional fast-path: avoid per-entity object allocation in RenderSystem
+  preFrame?(): void;
+  postFrame?(): void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateWithAccessor?(
     entity: number,
@@ -36,7 +35,6 @@ export interface RendererDef {
     getComponent: (name: string) => any,
     getTransformTyped?: () => any,
   ): void;
-  // Optional batch interface: process a whole archetype at once
   updateBatch?(ctx: RendererBatchContext): void;
 }
 
@@ -44,7 +42,6 @@ export interface RendererDef {
  * Configuration options for Motion animation engine.
  */
 export interface MotionAppConfig {
-  // Engine runtime configuration
   globalSpeed?: number;
   targetFps?: number;
   frameDuration?: number;
@@ -64,14 +61,10 @@ export interface MotionAppConfig {
   };
 
   keyframeSearchOptimized?: boolean;
-
   keyframeEntryExpandOnGPU?: boolean;
-
   keyframeSearchIndexed?: boolean;
   keyframeSearchIndexedMinKeyframes?: number;
-
   timelineFlat?: boolean;
-
   metricsSamplingRate?: number;
 
   debugWebGPUIO?: boolean;
@@ -87,17 +80,11 @@ export interface MotionAppConfig {
   };
 
   webgpuStatesConditionalUpload?: boolean;
-
   webgpuForceStatesUpload?: boolean;
-
   webgpuBatchedSubmit?: boolean;
-
   webgpuReadbackMode?: 'full' | 'visible';
-
   webgpuOutputBufferReuse?: boolean;
-
   batchSamplingStaticReuse?: boolean;
-
   physicsMaxVelocity?: number;
   physicsValidation?: boolean;
 }
@@ -135,12 +122,144 @@ export interface MotionApp {
   registerRenderer(name: string, renderer: RendererDef): void;
   registerEasing(name: string, fn: (t: number) => number): void;
   registerGpuEasing(name: string, fn: (t: number) => number, wgslFn: string): void;
+  registerShader(shader: ShaderDef): void;
   getConfig(): MotionAppConfig;
   getRenderer(name: string): RendererDef | undefined;
 }
 
+/**
+ * Plugin component definition
+ */
+export interface PluginComponentDef {
+  schema: Record<string, 'float32' | 'float64' | 'int32' | 'string' | 'object'>;
+}
+
+/**
+ * Plugin system definition
+ */
+export interface PluginSystemDef {
+  name: string;
+  order: number;
+  update(dt: number, ctx?: SystemContext): void;
+}
+
+/**
+ * GPU Shader binding definition
+ */
+export interface ShaderBindingDef {
+  name: string;
+  type: 'storage' | 'uniform' | 'sampler' | 'texture';
+  access?: 'read' | 'write' | 'read_write';
+}
+
+/**
+ * GPU Shader module definition
+ */
+export interface ShaderModuleDef {
+  code: string;
+  entryPoint?: string;
+  bindings?: ShaderBindingDef[];
+}
+
+/**
+ * Plugin configuration
+ */
+export interface PluginConfig {
+  [key: string]: unknown;
+}
+
+/**
+ * Plugin manifest - self-contained plugin definition
+ */
+export interface PluginManifest {
+  components?: Record<string, PluginComponentDef>;
+  systems?: PluginSystemDef[];
+  shaders?: Record<string, ShaderModuleDef>;
+  config?: PluginConfig;
+  setup?(app: MotionApp, services?: EngineServices): void;
+}
+
+/**
+ * Shader registration options
+ */
+export interface ShaderDef {
+  name: string;
+  code: string;
+  entryPoint?: string;
+  bindings?: ShaderBindingDef[];
+}
+
+/**
+ * Motion Plugin interface
+ * Supports both legacy setup() pattern and new manifest pattern
+ */
 export interface MotionPlugin {
   name: string;
   version?: string;
-  setup(app: MotionApp, services?: EngineServices): void;
+
+  /**
+   * Legacy setup pattern (backward compatible)
+   */
+  setup?(app: MotionApp, services?: EngineServices): void;
+
+  /**
+   * New manifest pattern for self-contained plugins
+   */
+  manifest?: PluginManifest;
+}
+
+/**
+ * Global plugin registry for auto-discovery
+ */
+const PLUGIN_REGISTRY: MotionPlugin[] = [];
+
+/**
+ * Registered plugin names for idempotency checking
+ */
+const REGISTERED_PLUGIN_NAMES = new Set<string>();
+
+/**
+ * Register a plugin in the global registry for auto-discovery
+ *
+ * @param plugin - The plugin to register
+ * @returns true if registered successfully, false if already registered (idempotent)
+ */
+export function registerPlugin(plugin: MotionPlugin): boolean {
+  // Idempotent registration - don't register twice
+  if (REGISTERED_PLUGIN_NAMES.has(plugin.name)) {
+    return false;
+  }
+
+  PLUGIN_REGISTRY.push(plugin);
+  REGISTERED_PLUGIN_NAMES.add(plugin.name);
+  return true;
+}
+
+/**
+ * Get all registered plugins
+ *
+ * @returns Array of registered plugins
+ */
+export function getRegisteredPlugins(): readonly MotionPlugin[] {
+  return PLUGIN_REGISTRY;
+}
+
+/**
+ * Clear the plugin registry (for test isolation)
+ *
+ * @warning This will remove all registered plugins. Use with caution.
+ */
+export function clearPluginRegistry(): void {
+  PLUGIN_REGISTRY.length = 0;
+  REGISTERED_PLUGIN_NAMES.clear();
+}
+
+/**
+ * Check if a plugin is already registered
+ *
+ * @param pluginName - Name of the plugin to check
+ * @returns true if the plugin is registered
+ */
+export function isPluginRegistered(pluginName: string): boolean {
+  return REGISTERED_PLUGIN_NAMES.has(pluginName);
 }

@@ -181,4 +181,73 @@ export class ComputeShaderManager {
       compilationMetrics: Object.fromEntries(this.compilationTimes),
     };
   }
+
+  /**
+   * Register a shader from plugin manifest
+   */
+  registerShader(config: {
+    name: string;
+    code: string;
+    entryPoint?: string;
+    bindings?: { name: string; type: string; access?: string }[];
+  }): void {
+    const bindings: ShaderBinding[] = (config.bindings ?? []).map((b, i) => ({
+      binding: i,
+      visibility: 4, // GPUShaderStage.COMPUTE
+      buffer:
+        b.type === 'storage'
+          ? { type: 'storage' }
+          : b.type === 'uniform'
+            ? { type: 'uniform' }
+            : undefined,
+    }));
+
+    this.compileShader({
+      name: config.name,
+      code: config.code,
+      entryPoint: config.entryPoint ?? 'main',
+      bindings,
+    });
+  }
+}
+
+// ============================================================================
+// Shader Registry Utilities
+// ============================================================================
+
+/**
+ * Get all registered shaders from the global shader registry
+ */
+export function getRegisteredShaders(): Map<
+  string,
+  {
+    code: string;
+    entryPoint?: string;
+    bindings?: { name: string; type: string; access?: string }[];
+  }
+> {
+  return (globalThis as any).__shaderRegistry ?? new Map();
+}
+
+/**
+ * Get a specific shader from the global registry
+ */
+export function getRegisteredShader(
+  name: string,
+):
+  | {
+      code: string;
+      entryPoint?: string;
+      bindings?: { name: string; type: string; access?: string }[];
+    }
+  | undefined {
+  const registry = getRegisteredShaders();
+  return registry.get(name);
+}
+
+/**
+ * Clear the shader registry (useful for testing)
+ */
+export function clearShaderRegistry(): void {
+  (globalThis as any).__shaderRegistry = new Map();
 }

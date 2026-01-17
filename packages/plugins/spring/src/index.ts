@@ -1,31 +1,61 @@
-import { MotionPlugin, MotionApp } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
-import { SpringComponent } from './component';
-import { SpringSystem } from './spring-system';
+import type { MotionApp, MotionPlugin } from '@g-motion/core';
+import { registerPlugin } from '@g-motion/core';
+import { SpringComponentSchema } from './component';
+import springShaderCode from './shaders/spring.wgsl?raw';
 
-const debugLog = createDebugger('Spring');
+// Shader definition for plugin manifest
+const springShader = {
+  code: springShaderCode,
+  entryPoint: 'updateSprings',
+  bindings: [
+    { name: 'springs', type: 'storage' as const, access: 'read_write' as const },
+    { name: 'params', type: 'uniform' as const },
+    { name: 'outputs', type: 'storage' as const, access: 'read_write' as const },
+    { name: 'settled', type: 'storage' as const, access: 'read_write' as const },
+  ],
+};
 
-export const SpringPlugin: MotionPlugin = {
-  name: 'SpringPlugin',
+/**
+ * Spring Plugin - GPU-only spring physics plugin
+ *
+ * All spring physics are handled by the GPU through the batch processing pipeline:
+ * batch/sampling.ts → physics-dispatch-system.ts → GPU Shader → readback → delivery
+ *
+ * No CPU fallback is provided. WebGPU must be available.
+ */
+export const springPlugin: MotionPlugin = {
+  name: 'spring',
   version: '0.0.0',
-  setup(appInstance: MotionApp, _services?: unknown) {
-    // Register Spring component
-    try {
-      appInstance.registerComponent('Spring', SpringComponent);
-    } catch (err) {
-      if (
-        !(err instanceof Error) ||
-        !err.message.includes("Component 'Spring' is already registered")
-      ) {
-        throw err;
-      }
-    }
-    debugLog('Spring component registered');
 
-    appInstance.registerSystem(SpringSystem);
-    debugLog('SpringSystem registered');
+  setup(app: MotionApp) {
+    app.registerComponent('Spring', {
+      schema: SpringComponentSchema,
+    });
+  },
+
+  manifest: {
+    components: {
+      Spring: { schema: SpringComponentSchema },
+    },
+    shaders: {
+      spring: springShader,
+    },
   },
 };
 
-export * from './component';
-export * from './spring-system';
+// Auto-register plugin for auto-discovery
+registerPlugin(springPlugin);
+
+// Re-export all exports from sub-modules
+export { SpringComponentSchema } from './component';
+export { analyzeSpringTracks, buildSpringComponent } from './analyzer';
+export type { SpringOptions } from '@g-motion/core';
+
+// Re-export shader code for external use
+export { default as SPRING_GPU_SHADER } from './shaders/spring.wgsl?raw';
+
+// Re-export spring utilities
+export { SPRING_PRESETS, calculateCriticalDamping } from './component';
+
+// Legacy export for backward compatibility
+export const SpringPlugin = springPlugin;

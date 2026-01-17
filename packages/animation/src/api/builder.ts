@@ -14,7 +14,9 @@ import {
   TargetType,
 } from './mark';
 import { addKeyframesForTarget } from './keyframes';
-import { analyzeSpringTracks, analyzeInertiaTracks, buildInertiaComponent } from './physics';
+// Import physics analyzers from plugins
+import { analyzeSpringTracks } from '@g-motion/plugin-spring';
+import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
 import { buildRenderComponent } from './render';
 import { AnimationValidator } from './animationValidator';
 import { ComponentRegistrar } from '../registery';
