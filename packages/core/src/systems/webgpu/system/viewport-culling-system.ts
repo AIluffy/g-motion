@@ -7,7 +7,7 @@ import {
   runViewportCullingCompactionPassAsync,
 } from '../viewport';
 import { setPendingReadbackCount } from '../../../webgpu/sync-manager';
-import type { WebGPUComputeRuntime } from './runtime';
+import type { WebGPUEngine } from '../../../webgpu/engine';
 import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
 import type { WebGPUFrameEncoder } from '../frame-encoder';
 
@@ -35,7 +35,7 @@ export type ViewportCullingResult =
     };
 
 export async function maybeRunViewportCulling(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   device: GPUDevice;
   queue: GPUQueue;
   world: World;
@@ -56,7 +56,7 @@ export async function maybeRunViewportCulling(params: {
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<ViewportCullingResult> {
   const {
-    runtime,
+    engine,
     device,
     queue,
     world,
@@ -89,7 +89,7 @@ export async function maybeRunViewportCulling(params: {
     };
   }
 
-  const readbackManager = runtime.readbackManager;
+  const readbackManager = engine.readbackManager;
 
   if (entityCount <= 0) {
     return {
@@ -114,7 +114,7 @@ export async function maybeRunViewportCulling(params: {
       submit,
     );
     if (pending) {
-      runtime.latestAsyncCullingFrameByArchetype.set(archetypeId, runtime.webgpuFrameId);
+      engine.latestAsyncCullingFrameByArchetype.set(archetypeId, engine.webgpuFrameId);
 
       if (typeof leaseId === 'number') {
         processor.releaseEntityIds(leaseId);
@@ -127,7 +127,7 @@ export async function maybeRunViewportCulling(params: {
 
       const cullingTag: CullingReadbackTag = {
         kind: 'culling',
-        frameId: runtime.webgpuFrameId,
+        frameId: engine.webgpuFrameId,
         outputBuffer: pending.outputBuffer,
         sourceOutputBufferTag,
         rawStride,

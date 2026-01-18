@@ -7,7 +7,7 @@ import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer
 import { markPhysicsGPUEntity, setPendingReadbackCount } from '../../../webgpu/sync-manager';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';
-import type { WebGPUComputeRuntime } from './runtime';
+import type { WebGPUEngine } from '../../../webgpu/engine';
 import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export type PhysicsReadbackTag = {
@@ -20,7 +20,7 @@ export type PhysicsReadbackTag = {
 };
 
 export async function dispatchPhysicsBatchForArchetype(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   device: GPUDevice;
   processor: ComputeBatchProcessor;
   config: MotionAppConfig;
@@ -31,11 +31,11 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<void> {
-  const { runtime, device, processor, config, batch, dtMs, dtSec, maxVelocity, frame, submit } =
+  const { engine, device, processor, config, batch, dtMs, dtSec, maxVelocity, frame, submit } =
     params;
 
-  const sp = runtime.stagingPool;
-  const readbackManager = runtime.readbackManager;
+  const sp = engine.stagingPool;
+  const readbackManager = engine.readbackManager;
   const queue = device.queue;
 
   if (!sp) return;
@@ -58,14 +58,14 @@ export async function dispatchPhysicsBatchForArchetype(params: {
 
   const persistentBufferManager = getPersistentGPUBufferManager(device);
 
-  runtime.physicsParams[0] = dtMs;
-  runtime.physicsParams[1] = dtSec;
-  runtime.physicsParams[2] = maxVelocity;
-  runtime.physicsParams[3] = 0;
+  engine.physicsParams[0] = dtMs;
+  engine.physicsParams[1] = dtSec;
+  engine.physicsParams[2] = maxVelocity;
+  engine.physicsParams[3] = 0;
 
   const physicsParamsBuffer = persistentBufferManager.getOrCreateBuffer(
     'physics:params',
-    runtime.physicsParams,
+    engine.physicsParams,
     GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     { label: 'physics-params', skipChangeDetection: true },
   );
@@ -122,7 +122,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   await dispatchPhysicsBatch({
     device,
     queue,
-    timingHelper: runtime.timingHelper,
+    timingHelper: engine.timingHelper,
     archetypeId: baseArchetypeId,
     slotCount,
     workgroupHint: batch.workgroupHint,

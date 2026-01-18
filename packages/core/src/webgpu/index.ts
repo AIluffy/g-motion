@@ -6,6 +6,10 @@
  * and performance monitoring.
  */
 
+// Unified WebGPU Engine (consolidates buffer management, pipeline caching, runtime state)
+export { WebGPUEngine, getWebGPUEngine, resetWebGPUEngine } from './engine';
+export type { WebGPUEngineConfig } from './engine';
+
 export { WebGPUBufferManager, getWebGPUBufferManager } from './buffer';
 export type { ComputeMetrics, BufferAllocation } from './buffer';
 

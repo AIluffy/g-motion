@@ -7,7 +7,7 @@ import { WebGPUConstants } from '../../../constants/webgpu';
 import { createDebugger } from '@g-motion/utils';
 import { stepPhysicsShadow, physicsValidationShadow } from '../physics-validation';
 import { processOutputBuffer } from '../output-buffer-processing';
-import type { WebGPUComputeRuntime } from './runtime';
+import type { WebGPUEngine } from '../../../webgpu/engine';
 import type { CullingReadbackTag } from './viewport-culling-system';
 import type { PhysicsReadbackTag } from './physics-dispatch-system';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
@@ -16,17 +16,17 @@ import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
 export function processCompletedReadbacks(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   device: GPUDevice;
   metricsProvider: GPUMetricsProvider;
   processor: ComputeBatchProcessor;
   config: MotionAppConfig;
   debugIOEnabled: boolean;
 }): void {
-  const { runtime, device, metricsProvider, processor, config, debugIOEnabled } = params;
+  const { engine, device, metricsProvider, processor, config, debugIOEnabled } = params;
 
-  const readbackManager = runtime.readbackManager;
-  const sp = runtime.stagingPool;
+  const readbackManager = engine.readbackManager;
+  const sp = engine.stagingPool;
   if (!readbackManager || !sp) {
     return;
   }
@@ -42,7 +42,7 @@ export function processCompletedReadbacks(params: {
       if (kind === 'culling') {
         const cullingTag = tag as CullingReadbackTag;
         const sourceOutputBufferTag = cullingTag.sourceOutputBufferTag;
-        const latestFrame = runtime.latestAsyncCullingFrameByArchetype.get(res.archetypeId);
+        const latestFrame = engine.latestAsyncCullingFrameByArchetype.get(res.archetypeId);
         const isStale =
           typeof latestFrame === 'number' &&
           typeof cullingTag.frameId === 'number' &&
@@ -145,8 +145,8 @@ export function processCompletedReadbacks(params: {
             }
             const threshold = WebGPUConstants.GPU.PHYSICS_SETTLE_THRESHOLD_DEFAULT;
             if (maxAbs > threshold) {
-              if (runtime.webgpuFrameId - shadow.lastWarnFrame >= 60) {
-                shadow.lastWarnFrame = runtime.webgpuFrameId;
+              if (engine.webgpuFrameId - shadow.lastWarnFrame >= 60) {
+                shadow.lastWarnFrame = engine.webgpuFrameId;
                 try {
                   warn('physics GPU validation mismatch', {
                     archetypeId: res.archetypeId,

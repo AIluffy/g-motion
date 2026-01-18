@@ -22,10 +22,7 @@ import type {
 } from '../../types';
 import { createDebugger } from '@g-motion/utils';
 import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
-import {
-  getPersistentGPUBufferManager,
-  resetPersistentGPUBufferManager,
-} from '../../webgpu/persistent-buffer-manager';
+import { getWebGPUEngine, resetWebGPUEngine } from '../../webgpu/engine';
 import { clearPhysicsGPUEntities, setPendingReadbackCount } from '../../webgpu/sync-manager';
 import {
   isWebGPUIODebugEnabled,
@@ -46,7 +43,6 @@ import { __resetViewportCullingPassForTests } from './viewport';
 import { __resetKeyframePassesForTests } from './keyframe';
 import { createWebGPUFrameEncoder } from './frame-encoder';
 
-import { createWebGPUComputeRuntime } from './system/runtime';
 import {
   ensureWebGPUInitialized,
   ensureWebGPUPipelines,
@@ -70,29 +66,15 @@ export {
 export { processOutputBuffer, ProcessOutputBufferInput } from './output-buffer-processing';
 export { getPhysicsValidationShadow } from './physics-validation';
 
-const runtime = createWebGPUComputeRuntime();
+const engine = getWebGPUEngine();
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
 export function __resetWebGPUComputeSystemForTests(): void {
-  runtime.bufferManager = null;
-  runtime.isInitialized = false;
-  runtime.deviceAvailable = false;
-  runtime.shaderVersion = -1;
-  runtime.physicsPipelinesReady = false;
-  runtime.timingHelper = null;
-  runtime.stagingPool = null;
-  runtime.readbackManager = null;
-  runtime.webgpuFrameId = 0;
-  runtime.outputFormatStatsCounter = 0;
-  runtime.latestAsyncCullingFrameByArchetype.clear();
-  runtime.physicsParams[0] = 0;
-  runtime.physicsParams[1] = 0;
-  runtime.physicsParams[2] = 0;
-  runtime.physicsParams[3] = 0;
+  engine.resetForTests();
   __resetOutputFormatPassForTests();
   __resetViewportCullingPassForTests();
   __resetKeyframePassesForTests();
-  resetPersistentGPUBufferManager();
+  resetWebGPUEngine();
   setPendingReadbackCount(0);
 }
 
@@ -111,7 +93,7 @@ export function __resetWebGPUComputeSystemForTests(): void {
  */
 export const WebGPUComputeSystem: SystemDef = {
   name: 'WebGPUComputeSystem',
-  order: 6, // Run after BatchSamplingSystem (order 5)
+  order: 6,
 
   async update(_dt: number, ctx?: SystemContext) {
     const deps = resolveComputeDeps(ctx);
@@ -120,14 +102,13 @@ export const WebGPUComputeSystem: SystemDef = {
     const { world, metricsProvider, processor, config } = deps;
 
     const debugIOEnabled = isWebGPUIODebugEnabled(config);
-    await ensureWebGPUInitialized({ runtime, metricsProvider, config });
-    if (runtime.mockWebGPU) {
+    await ensureWebGPUInitialized({ engine, metricsProvider, config });
+    if (engine.mockWebGPU) {
       metricsProvider.updateStatus({ enabled: true });
       return;
     }
 
-    // GPU-only architecture: WebGPU must be available
-    if (!runtime.deviceAvailable) {
+    if (!engine.deviceAvailable) {
       clearPhysicsGPUEntities();
       setPendingReadbackCount(0);
       metricsProvider.updateStatus({
@@ -142,16 +123,24 @@ export const WebGPUComputeSystem: SystemDef = {
       );
     }
 
-    const device = getRuntimeDeviceOrThrow();
+    const device = engine.getGPUDevice();
+    if (!device) {
+      throw new MotionError(
+        'WebGPU device not available.',
+        ErrorCode.GPU_DEVICE_UNAVAILABLE,
+        ErrorSeverity.FATAL,
+        { stage: 'device', source: 'WebGPUComputeSystem' },
+      );
+    }
 
     try {
-      maybeSampleOutputFormatPoolStats({ runtime, metricsProvider, config, device });
+      maybeSampleOutputFormatPoolStats({ engine, metricsProvider, config, device });
     } catch {}
 
-    await ensureWebGPUPipelines({ runtime, device });
+    await ensureWebGPUPipelines({ engine, device });
 
     processCompletedReadbacks({
-      runtime,
+      engine,
       device,
       metricsProvider,
       processor,
@@ -161,15 +150,14 @@ export const WebGPUComputeSystem: SystemDef = {
 
     metricsProvider.updateStatus({ enabled: true });
 
-    const sp = runtime.stagingPool;
+    const sp = engine.stagingPool;
     const archetypeBatches = processor.getArchetypeBatches() as Map<
       string,
       ArchetypeBatchDescriptor
     >;
     if (!sp || archetypeBatches.size === 0) return;
 
-    runtime.webgpuFrameId++;
-    runtime.timingHelper?.beginFrame?.();
+    engine.beginFrame();
 
     const { dtMs, dtSec, maxVelocity } = resolvePhysicsTiming(_dt, ctx, config);
     const flags = resolveProcessingFlags(world, config);
@@ -188,10 +176,7 @@ export const WebGPUComputeSystem: SystemDef = {
     });
 
     sp.nextFrame();
-
-    try {
-      getPersistentGPUBufferManager().nextFrame();
-    } catch {}
+    engine.nextFrame();
   },
 };
 
@@ -207,33 +192,6 @@ function resolveComputeDeps(ctx: SystemContext | undefined): {
   const config = ctx?.services.config;
   if (!metricsProvider || !processor || !config) return null;
   return { world, metricsProvider, processor, config };
-}
-
-function getRuntimeDeviceOrThrow(): GPUDevice {
-  if (!runtime.bufferManager || !runtime.deviceAvailable) {
-    clearPhysicsGPUEntities();
-    setPendingReadbackCount(0);
-    throw new MotionError(
-      'WebGPU device not available.',
-      ErrorCode.GPU_DEVICE_UNAVAILABLE,
-      ErrorSeverity.FATAL,
-      { stage: 'runtime', source: 'WebGPUComputeSystem.ensureRuntimeDevice' },
-    );
-  }
-
-  const device = runtime.bufferManager.getDevice();
-  if (!device) {
-    clearPhysicsGPUEntities();
-    setPendingReadbackCount(0);
-    throw new MotionError(
-      'WebGPU device not available.',
-      ErrorCode.GPU_DEVICE_UNAVAILABLE,
-      ErrorSeverity.FATAL,
-      { stage: 'device', source: 'WebGPUComputeSystem.ensureRuntimeDevice' },
-    );
-  }
-
-  return device;
 }
 
 function resolvePhysicsTiming(
@@ -342,8 +300,8 @@ async function processArchetypeBatches(params: {
   const frame = batchedSubmitEnabled
     ? createWebGPUFrameEncoder({
         device,
-        timingHelper: runtime.timingHelper,
-        label: `motion-frame-${runtime.webgpuFrameId}`,
+        timingHelper: engine.timingHelper,
+        label: `motion-frame-${engine.webgpuFrameId}`,
       })
     : undefined;
   const pendingCommandBuffers: GPUCommandBuffer[] = [];
@@ -385,7 +343,7 @@ async function processArchetypeBatches(params: {
       try {
         if (batch.kind === 'physics') {
           await dispatchPhysicsBatchForArchetype({
-            runtime,
+            engine,
             device,
             processor,
             config,
@@ -400,7 +358,7 @@ async function processArchetypeBatches(params: {
         }
 
         await processInterpolationArchetype({
-          runtime,
+          engine,
           device,
           world,
           processor,

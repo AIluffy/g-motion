@@ -4,7 +4,7 @@
  * Handles asynchronous GPU device creation, validation, and pipeline setup.
  */
 
-import { WebGPUBufferManager } from '../../webgpu/buffer';
+import type { WebGPUEngine } from '../../webgpu/engine';
 import { buildInterpolationShader } from '../../webgpu/shader';
 import { getCustomEasingVersion, getCustomGpuEasings } from '../../systems/easing-registry';
 import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
@@ -15,26 +15,26 @@ import { precompileWorkgroupPipelines } from './pipeline';
 const bindGroupLayoutEntries = [
   {
     binding: 0,
-    visibility: 4, // GPUShaderStage.COMPUTE = 4
-    buffer: { type: 'storage' as const }, // states
+    visibility: 4,
+    buffer: { type: 'storage' as const },
   },
   {
     binding: 1,
-    visibility: 4, // GPUShaderStage.COMPUTE = 4
-    buffer: { type: 'read-only-storage' as const }, // keyframes
+    visibility: 4,
+    buffer: { type: 'read-only-storage' as const },
   },
   {
     binding: 2,
-    visibility: 4, // GPUShaderStage.COMPUTE = 4
-    buffer: { type: 'storage' as const }, // outputs
+    visibility: 4,
+    buffer: { type: 'storage' as const },
   },
 ];
 
 export async function initWebGPUCompute(
-  bufferManager: WebGPUBufferManager,
+  engine: WebGPUEngine,
 ): Promise<{ success: boolean; deviceAvailable: boolean; shaderVersion: number }> {
-  const initOk = await bufferManager.init();
-  const device = bufferManager.getDevice();
+  const initOk = await engine.initialize();
+  const device = engine.getGPUDevice();
   if (!initOk || !device) {
     const error = new MotionError(
       'WebGPU not available.',

@@ -1,7 +1,7 @@
+import { getOutputFormatBufferPoolStats } from '../output-format/pass';
 import type { MotionAppConfig } from '../../../plugin';
 import type { GPUMetricsProvider } from '../../../webgpu/metrics-provider';
 import { MotionError, ErrorCode, ErrorSeverity } from '../../../errors';
-import { getWebGPUBufferManager } from '../../../webgpu/buffer';
 import { getTimingHelper } from '../../../webgpu/timing-helper';
 import { StagingBufferPool } from '../../../webgpu/staging-pool';
 import { AsyncReadbackManager } from '../../../webgpu/async-readback';
@@ -10,28 +10,23 @@ import { getCustomEasingVersion, getCustomGpuEasings } from '../../../systems/ea
 import { buildInterpolationShader } from '../../../webgpu/shader';
 import { PHYSICS_COMBINED_SHADER } from '../../../webgpu/physics-shader';
 import { initWebGPUCompute } from '../initialization';
-import { precompileWorkgroupPipelines } from '../pipeline';
-import { getOutputFormatBufferPoolStats } from '../output-format';
-import type { WebGPUComputeRuntime } from './runtime';
+import { precompileWorkgroupPipelines, clearPipelineCache } from '../pipeline';
+import type { WebGPUEngine } from '../../../webgpu/engine';
 
-/**
- * GPU-only initialization: WebGPU must be available
- */
 export async function ensureWebGPUInitialized(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   metricsProvider: GPUMetricsProvider;
   config: MotionAppConfig;
 }): Promise<void> {
-  const { runtime, metricsProvider } = params;
+  const { engine, metricsProvider } = params;
 
-  if (runtime.isInitialized) return;
+  if (engine.isInitialized) return;
 
   const maybeGpu = (globalThis as any).navigator?.gpu as { __isFake?: boolean } | undefined;
   if (maybeGpu?.__isFake === true) {
-    runtime.isInitialized = true;
-    runtime.deviceAvailable = true;
-    runtime.mockWebGPU = true;
-    runtime.shaderVersion = getCustomEasingVersion();
+    engine.setMockWebGPU(true);
+    engine.setDeviceAvailable(true);
+    engine.setShaderVersion(getCustomEasingVersion());
     metricsProvider.updateStatus({
       webgpuAvailable: true,
       gpuInitialized: true,
@@ -40,7 +35,6 @@ export async function ensureWebGPUInitialized(params: {
     return;
   }
 
-  // GPU-only architecture: WebGPU must be available
   if (!maybeGpu) {
     throw new MotionError(
       'WebGPU is not supported in this environment.',
@@ -49,12 +43,10 @@ export async function ensureWebGPUInitialized(params: {
     );
   }
 
-  runtime.bufferManager = getWebGPUBufferManager();
   try {
-    const initResult = await initWebGPUCompute(runtime.bufferManager);
-    runtime.isInitialized = true;
-    runtime.deviceAvailable = true;
-    runtime.shaderVersion = initResult.shaderVersion;
+    const initResult = await initWebGPUCompute(engine);
+    engine.setDeviceAvailable(true);
+    engine.setShaderVersion(initResult.shaderVersion);
   } catch {
     throw new MotionError(
       'Failed to initialize WebGPU. GPU may be unavailable or blocked.',
@@ -63,7 +55,7 @@ export async function ensureWebGPUInitialized(params: {
     );
   }
 
-  const device = runtime.bufferManager.getDevice();
+  const device = engine.getGPUDevice();
   if (!device) {
     throw new MotionError(
       'WebGPU device is not available.',
@@ -72,10 +64,11 @@ export async function ensureWebGPUInitialized(params: {
     );
   }
 
-  runtime.timingHelper = getTimingHelper(device);
-  runtime.stagingPool = new StagingBufferPool(device);
-  runtime.readbackManager = new AsyncReadbackManager();
+  engine.setTimingHelper(getTimingHelper(device));
+  engine.setStagingPool(new StagingBufferPool(device));
+  engine.setReadbackManager(new AsyncReadbackManager());
   getPersistentGPUBufferManager(device);
+  engine.setPersistentBufferManager(getPersistentGPUBufferManager(device));
 
   metricsProvider.updateStatus({
     webgpuAvailable: true,
@@ -85,19 +78,20 @@ export async function ensureWebGPUInitialized(params: {
 }
 
 export async function ensureWebGPUPipelines(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   device: GPUDevice;
 }): Promise<void> {
-  const { runtime, device } = params;
+  const { engine, device } = params;
 
   const currentVersion = getCustomEasingVersion();
-  if (currentVersion !== runtime.shaderVersion) {
+  if (currentVersion !== engine.shaderVersion) {
     const bindGroupLayoutEntries = [
       { binding: 0, visibility: 4, buffer: { type: 'storage' as const } },
       { binding: 1, visibility: 4, buffer: { type: 'read-only-storage' as const } },
       { binding: 2, visibility: 4, buffer: { type: 'storage' as const } },
     ];
 
+    clearPipelineCache();
     const success = await precompileWorkgroupPipelines(
       device,
       buildInterpolationShader(getCustomGpuEasings()),
@@ -107,11 +101,11 @@ export async function ensureWebGPUPipelines(params: {
     );
 
     if (success) {
-      runtime.shaderVersion = currentVersion;
+      engine.setShaderVersion(currentVersion);
     }
   }
 
-  if (!runtime.physicsPipelinesReady) {
+  if (!engine.physicsPipelinesReady) {
     const bindGroupLayoutEntries = [
       { binding: 0, visibility: 4, buffer: { type: 'storage' as const } },
       { binding: 1, visibility: 4, buffer: { type: 'uniform' as const } },
@@ -127,24 +121,25 @@ export async function ensureWebGPUPipelines(params: {
       'physics',
     );
 
-    if (ok) runtime.physicsPipelinesReady = true;
+    if (ok) engine.setPhysicsPipelinesReady(true);
   }
 }
 
 export function maybeSampleOutputFormatPoolStats(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   metricsProvider: GPUMetricsProvider;
   config: MotionAppConfig;
   device: GPUDevice;
 }): void {
-  const { runtime, metricsProvider, config, device } = params;
-  runtime.outputFormatStatsCounter++;
+  const { engine, metricsProvider, config, device } = params;
+  engine.incrementOutputFormatStatsCounter();
   const samplingRate =
     typeof config.metricsSamplingRate === 'number' ? config.metricsSamplingRate : 1;
   const shouldSample =
     samplingRate <= 1 ||
-    runtime.outputFormatStatsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
+    engine.outputFormatStatsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
   if (!shouldSample) return;
+
   metricsProvider.updateStatus({
     outputFormatPoolStats: getOutputFormatBufferPoolStats(device),
   });

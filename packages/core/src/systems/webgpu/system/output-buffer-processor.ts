@@ -8,11 +8,11 @@ import { debugIO, float32Preview, firstEntityChannelPreview } from '../debug';
 import { processOutputBuffer } from '../output-buffer-processing';
 import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../keyframe';
 import { maybeRunViewportCulling } from './viewport-culling-system';
-import type { WebGPUComputeRuntime } from './runtime';
+import type { WebGPUEngine } from '../../../webgpu/engine';
 import type { WebGPUFrameEncoder } from '../frame-encoder';
 
 export async function processInterpolationArchetype(params: {
-  runtime: WebGPUComputeRuntime;
+  engine: WebGPUEngine;
   device: GPUDevice;
   world: World | null;
   processor: ComputeBatchProcessor;
@@ -33,7 +33,7 @@ export async function processInterpolationArchetype(params: {
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<void> {
   const {
-    runtime,
+    engine,
     device,
     world,
     processor,
@@ -54,7 +54,7 @@ export async function processInterpolationArchetype(params: {
     submit,
   } = params;
 
-  const sp = runtime.stagingPool;
+  const sp = engine.stagingPool;
   if (!sp) return;
 
   const queue = device.queue;
@@ -132,7 +132,7 @@ export async function processInterpolationArchetype(params: {
           statesVersion: gpuBatch.statesVersion,
           statesConditionalUploadEnabled,
           forceStatesUploadEnabled,
-          reuseOutputBuffer: outputBufferReuseEnabled && runtime.readbackManager !== null,
+          reuseOutputBuffer: outputBufferReuseEnabled && engine.readbackManager !== null,
         },
       );
       if (interpOutput) {
@@ -147,13 +147,13 @@ export async function processInterpolationArchetype(params: {
       device,
       queue,
       gpuBatch,
-      runtime.timingHelper,
+      engine.timingHelper,
       archetypeId,
       rawStride,
       {
         statesConditionalUploadEnabled,
         forceStatesUploadEnabled,
-        reuseOutputBuffer: outputBufferReuseEnabled && runtime.readbackManager !== null,
+        reuseOutputBuffer: outputBufferReuseEnabled && engine.readbackManager !== null,
       },
       frame,
       submit,
@@ -174,7 +174,7 @@ export async function processInterpolationArchetype(params: {
     const sourceOutputBuffer = outputBuffer;
     const sourceOutputBufferTag = outputBufferTag;
     const cullRes = await maybeRunViewportCulling({
-      runtime,
+      engine,
       device,
       queue,
       world,
@@ -219,7 +219,7 @@ export async function processInterpolationArchetype(params: {
     device,
     queue,
     sp,
-    runtime.readbackManager,
+    engine.readbackManager,
     processor,
     {
       archetypeId,
