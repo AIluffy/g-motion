@@ -165,7 +165,8 @@ export class TimingHelper {
 
     const nextPairs = Math.max(2, Math.pow(2, Math.ceil(Math.log2(pairs))));
     const queryCount = nextPairs * 2;
-    const resolveSize = nextPairs * 16;
+    const resolveStrideBytes = 256;
+    const resolveSize = nextPairs * resolveStrideBytes;
 
     try {
       (this.querySet as any)?.destroy?.();
@@ -222,7 +223,8 @@ export class TimingHelper {
     const originalEnd = pass.end.bind(pass);
     pass.end = () => {
       originalEnd();
-      const offset = queryPairIndex * 16;
+      const resolveStrideBytes = 256;
+      const offset = queryPairIndex * resolveStrideBytes;
       encoder.resolveQuerySet(this.querySet!, queryPairIndex * 2, 2, this.resolveBuffer!, offset);
       encoder.copyBufferToBuffer(this.resolveBuffer!, offset, resultBuffer, 0, 16);
     };

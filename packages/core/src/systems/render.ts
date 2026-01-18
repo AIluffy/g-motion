@@ -13,15 +13,15 @@
  * CPU Path (legacy): This system processes Render component directly
  */
 
-import { SystemDef, SystemContext } from '../index';
-import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
-import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
-import { getRendererName } from '../renderer-code';
-import { getRendererGroupCache } from './renderer-group-cache';
 import { isDev } from '@g-motion/utils';
+import { ErrorCode, ErrorSeverity } from '../errors';
+import { SystemContext, SystemDef } from '../index';
+import { getRendererName } from '../renderer-code';
+import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
+import { getRendererGroupCache } from './renderer-group-cache';
 
-import type { RendererBatchContext } from '../plugin';
 import type { Archetype, ComponentValue } from '../archetype';
+import type { RendererBatchContext } from '../plugin';
 
 type TransformTypedBuffers = ReturnType<typeof extractTransformTypedBuffers>;
 type TransformTypedPayload = { index: number; buffers: TransformTypedBuffers };
@@ -78,18 +78,16 @@ function handleGroupUpdateError(
   archetypeId: string,
   e: unknown,
 ): void {
-  errorHandler.handle(
-    new MotionError(
-      `Renderer '${String(groupKey)}' update failed; skipping group.`,
-      ErrorCode.SYSTEM_UPDATE_FAILED,
-      isDev() ? ErrorSeverity.ERROR : ErrorSeverity.WARNING,
-      {
-        systemName: 'RenderSystem',
-        rendererId: String(groupKey),
-        archetypeId,
-        originalError: e instanceof Error ? e.message : String(e),
-      },
-    ),
+  errorHandler.create(
+    `Renderer '${String(groupKey)}' update failed; skipping group.`,
+    ErrorCode.SYSTEM_UPDATE_FAILED,
+    isDev() ? ErrorSeverity.ERROR : ErrorSeverity.WARNING,
+    {
+      systemName: 'RenderSystem',
+      rendererId: String(groupKey),
+      archetypeId,
+      originalError: e instanceof Error ? e.message : String(e),
+    },
   );
 }
 
@@ -116,13 +114,12 @@ function collectActiveGroups(
       const warnKey = `${archetype.id}:${rendererName}`;
       if (!missingRendererWarned.has(warnKey)) {
         missingRendererWarned.add(warnKey);
-        const error = new MotionError(
+        errorHandler.create(
           `Renderer '${rendererName}' not found; skipping updates.`,
           ErrorCode.RENDERER_NOT_FOUND,
           isDev() ? ErrorSeverity.ERROR : ErrorSeverity.WARNING,
           { rendererId: rendererName, archetypeId: archetype.id },
         );
-        errorHandler.handle(error);
       }
       render.renderedVersion = version;
       continue;

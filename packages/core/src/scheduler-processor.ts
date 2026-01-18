@@ -29,6 +29,28 @@ export class SchedulerProcessor {
   }): void {
     const { dtMs, services, systems, getWorld } = params;
 
+    const reportSystemUpdateFailed = (
+      errorHandler: ReturnType<typeof getErrorHandler>,
+      systemName: string,
+      originalError: unknown,
+    ): void => {
+      try {
+        errorHandler.create(
+          `System '${systemName}' update failed`,
+          ErrorCode.SYSTEM_UPDATE_FAILED,
+          ErrorSeverity.WARNING,
+          {
+            systemName,
+            originalError:
+              originalError instanceof Error ? originalError.message : String(originalError),
+            dt: dtMs,
+          },
+        );
+      } catch (handlerError) {
+        warn('Error handler failed for system update:', handlerError);
+      }
+    };
+
     this.engineFrame++;
     this.elapsedMs += dtMs;
 
@@ -64,7 +86,9 @@ export class SchedulerProcessor {
             if (e instanceof MotionError) {
               try {
                 errorHandler.handle(e);
-              } catch {}
+              } catch (handlerError) {
+                warn('Error handler failed:', handlerError);
+              }
               if (e.isFatal()) {
                 services.scheduler.stop();
                 queueMicrotask(() => {
@@ -74,33 +98,11 @@ export class SchedulerProcessor {
               return;
             }
 
-            const wrapped = new MotionError(
-              `System '${system.name}' update failed`,
-              ErrorCode.SYSTEM_UPDATE_FAILED,
-              ErrorSeverity.WARNING,
-              {
-                systemName: system.name,
-                originalError: e instanceof Error ? e.message : String(e),
-                dt: dtMs,
-              },
-            );
-            try {
-              errorHandler.handle(wrapped);
-            } catch {}
+            reportSystemUpdateFailed(errorHandler, system.name, e);
           });
         }
       } catch (e) {
-        const error = new MotionError(
-          `System '${system.name}' update failed`,
-          ErrorCode.SYSTEM_UPDATE_FAILED,
-          ErrorSeverity.WARNING,
-          {
-            systemName: system.name,
-            originalError: e instanceof Error ? e.message : String(e),
-            dt: dtMs,
-          },
-        );
-        (services.errorHandler ?? getErrorHandler()).handle(error);
+        reportSystemUpdateFailed(services.errorHandler ?? getErrorHandler(), system.name, e);
       } finally {
         const systemDuration = performance.now() - systemStart;
         this.metricsCounter++;
@@ -170,7 +172,7 @@ export class SchedulerProcessor {
     if (!managerStats) return;
     const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
     try {
-      recordMemorySnapshot({
+      recordMemorySnapshot.call(services.metrics, {
         bytesSkipped: managerStats.bytesSkipped,
         totalBytesProcessed: managerStats.totalBytesProcessed,
         currentMemoryUsage: managerStats.currentMemoryUsage,

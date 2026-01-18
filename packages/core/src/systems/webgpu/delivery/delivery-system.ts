@@ -76,7 +76,6 @@ export const GPUResultApplySystem: SystemDef = {
       if (channelsResolved && channelsResolved.length) {
         const isPrimitiveChannels =
           channelsResolved.length === 1 && channelsResolved[0].property === '__primitive';
-        const hasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
         const isStandardTransform = isStandardTransformChannels(channelsResolved);
         const isMatrix2D = isMatrix2DTransformChannels(channelsResolved);
         const isMatrix3D = isMatrix3DTransformChannels(channelsResolved);
@@ -95,16 +94,20 @@ export const GPUResultApplySystem: SystemDef = {
           errorHandler.handle(error);
         }
 
-        if (hasNonPrimitiveProp && stride === 1 && errorHandler) {
+        if (
+          stride === 1 &&
+          (channelsResolved.length !== 1 || channelsResolved[0]!.index !== 0) &&
+          errorHandler
+        ) {
           const error = new MotionError(
-            'GPU result packet uses stride=1 but channel mapping includes non-primitive properties.',
+            'GPU result packet uses stride=1 but channel mapping is not a single channel at index 0.',
             ErrorCode.BATCH_VALIDATION_FAILED,
             ErrorSeverity.WARNING,
             {
               archetypeId: p.archetypeId,
               stride,
               channelCount: channelsResolved.length,
-              properties: channelsResolved.map((c) => c.property),
+              channels: channelsResolved,
             },
           );
           errorHandler.handle(error);
@@ -193,6 +196,7 @@ export const GPUResultApplySystem: SystemDef = {
 
       const isMatrix2DChannels = isMatrix2DTransformChannels(channelsResolved);
       const isMatrix3DChannels = isMatrix3DTransformChannels(channelsResolved);
+      const packetHasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
       const matrix2dChannelIndices = isMatrix2DChannels
         ? channelsResolved.map((c) => c.index)
         : undefined;
@@ -219,8 +223,10 @@ export const GPUResultApplySystem: SystemDef = {
           const isPrimitiveRenderer =
             rendererCode === primitiveCode || render.rendererId === 'primitive';
           const isPrimitivePacket = p.archetypeId.includes('::primitive');
-          const hasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
-          if (isPrimitiveRenderer || (isPrimitivePacket && stride === 1 && !hasNonPrimitiveProp)) {
+          if (
+            isPrimitiveRenderer ||
+            (isPrimitivePacket && stride === 1 && !packetHasNonPrimitiveProp)
+          ) {
             const next = values[base];
             if (!Object.is(render.props.__primitive, next)) {
               render.props.__primitive = next;

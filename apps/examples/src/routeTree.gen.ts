@@ -8,178 +8,168 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as WebgpuRouteImport } from './routes/webgpu'
-import { Route as SpringRouteImport } from './routes/spring'
-import { Route as SpeedRouteImport } from './routes/speed'
-import { Route as ParticlesFpsRouteImport } from './routes/particles-fps'
-import { Route as ObjectRouteImport } from './routes/object'
-import { Route as GpuOnlyInterpolationRouteImport } from './routes/gpu-only-interpolation'
-import { Route as GpuDeliveryDemoRouteImport } from './routes/gpu-delivery-demo'
-import { Route as GpuConfigRouteImport } from './routes/gpu-config'
-import { Route as EngineConfigRouteImport } from './routes/engine-config'
-import { Route as Dom3dRouteImport } from './routes/dom-3d'
-import { Route as DomRouteImport } from './routes/dom'
-import { Route as DevDebugRouteImport } from './routes/dev-debug'
-import { Route as CustomEasingRouteImport } from './routes/custom-easing'
-import { Route as BenchmarkRouteImport } from './routes/benchmark'
-import { Route as AnimationControllerDemoRouteImport } from './routes/animation-controller-demo'
-import { Route as AnimateRouteImport } from './routes/animate'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as rootRouteImport } from './routes/__root';
+import { Route as WebgpuRouteImport } from './routes/webgpu';
+import { Route as SpringRouteImport } from './routes/spring';
+import { Route as SpeedRouteImport } from './routes/speed';
+import { Route as ParticlesFpsRouteImport } from './routes/particles-fps';
+import { Route as ObjectRouteImport } from './routes/object';
+import { Route as GpuOnlyInterpolationRouteImport } from './routes/gpu-only-interpolation';
+import { Route as GpuDeliveryDemoRouteImport } from './routes/gpu-delivery-demo';
+import { Route as GpuConfigRouteImport } from './routes/gpu-config';
+import { Route as EngineConfigRouteImport } from './routes/engine-config';
+import { Route as Dom3dRouteImport } from './routes/dom-3d';
+import { Route as DomRouteImport } from './routes/dom';
+import { Route as CustomEasingRouteImport } from './routes/custom-easing';
+import { Route as BenchmarkRouteImport } from './routes/benchmark';
+import { Route as AnimationControllerDemoRouteImport } from './routes/animation-controller-demo';
+import { Route as AnimateRouteImport } from './routes/animate';
+import { Route as IndexRouteImport } from './routes/index';
 
 const WebgpuRoute = WebgpuRouteImport.update({
   id: '/webgpu',
   path: '/webgpu',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SpringRoute = SpringRouteImport.update({
   id: '/spring',
   path: '/spring',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const SpeedRoute = SpeedRouteImport.update({
   id: '/speed',
   path: '/speed',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ParticlesFpsRoute = ParticlesFpsRouteImport.update({
   id: '/particles-fps',
   path: '/particles-fps',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const ObjectRoute = ObjectRouteImport.update({
   id: '/object',
   path: '/object',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GpuOnlyInterpolationRoute = GpuOnlyInterpolationRouteImport.update({
   id: '/gpu-only-interpolation',
   path: '/gpu-only-interpolation',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GpuDeliveryDemoRoute = GpuDeliveryDemoRouteImport.update({
   id: '/gpu-delivery-demo',
   path: '/gpu-delivery-demo',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const GpuConfigRoute = GpuConfigRouteImport.update({
   id: '/gpu-config',
   path: '/gpu-config',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const EngineConfigRoute = EngineConfigRouteImport.update({
   id: '/engine-config',
   path: '/engine-config',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const Dom3dRoute = Dom3dRouteImport.update({
   id: '/dom-3d',
   path: '/dom-3d',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const DomRoute = DomRouteImport.update({
   id: '/dom',
   path: '/dom',
   getParentRoute: () => rootRouteImport,
-} as any)
-const DevDebugRoute = DevDebugRouteImport.update({
-  id: '/dev-debug',
-  path: '/dev-debug',
-  getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const CustomEasingRoute = CustomEasingRouteImport.update({
   id: '/custom-easing',
   path: '/custom-easing',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const BenchmarkRoute = BenchmarkRouteImport.update({
   id: '/benchmark',
   path: '/benchmark',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AnimationControllerDemoRoute = AnimationControllerDemoRouteImport.update({
   id: '/animation-controller-demo',
   path: '/animation-controller-demo',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const AnimateRoute = AnimateRouteImport.update({
   id: '/animate',
   path: '/animate',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/animate': typeof AnimateRoute
-  '/animation-controller-demo': typeof AnimationControllerDemoRoute
-  '/benchmark': typeof BenchmarkRoute
-  '/custom-easing': typeof CustomEasingRoute
-  '/dev-debug': typeof DevDebugRoute
-  '/dom': typeof DomRoute
-  '/dom-3d': typeof Dom3dRoute
-  '/engine-config': typeof EngineConfigRoute
-  '/gpu-config': typeof GpuConfigRoute
-  '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute
-  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute
-  '/object': typeof ObjectRoute
-  '/particles-fps': typeof ParticlesFpsRoute
-  '/speed': typeof SpeedRoute
-  '/spring': typeof SpringRoute
-  '/webgpu': typeof WebgpuRoute
+  '/': typeof IndexRoute;
+  '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
+  '/benchmark': typeof BenchmarkRoute;
+  '/custom-easing': typeof CustomEasingRoute;
+  '/dom': typeof DomRoute;
+  '/dom-3d': typeof Dom3dRoute;
+  '/engine-config': typeof EngineConfigRoute;
+  '/gpu-config': typeof GpuConfigRoute;
+  '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute;
+  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute;
+  '/object': typeof ObjectRoute;
+  '/particles-fps': typeof ParticlesFpsRoute;
+  '/speed': typeof SpeedRoute;
+  '/spring': typeof SpringRoute;
+  '/webgpu': typeof WebgpuRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/animate': typeof AnimateRoute
-  '/animation-controller-demo': typeof AnimationControllerDemoRoute
-  '/benchmark': typeof BenchmarkRoute
-  '/custom-easing': typeof CustomEasingRoute
-  '/dev-debug': typeof DevDebugRoute
-  '/dom': typeof DomRoute
-  '/dom-3d': typeof Dom3dRoute
-  '/engine-config': typeof EngineConfigRoute
-  '/gpu-config': typeof GpuConfigRoute
-  '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute
-  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute
-  '/object': typeof ObjectRoute
-  '/particles-fps': typeof ParticlesFpsRoute
-  '/speed': typeof SpeedRoute
-  '/spring': typeof SpringRoute
-  '/webgpu': typeof WebgpuRoute
+  '/': typeof IndexRoute;
+  '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
+  '/benchmark': typeof BenchmarkRoute;
+  '/custom-easing': typeof CustomEasingRoute;
+  '/dom': typeof DomRoute;
+  '/dom-3d': typeof Dom3dRoute;
+  '/engine-config': typeof EngineConfigRoute;
+  '/gpu-config': typeof GpuConfigRoute;
+  '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute;
+  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute;
+  '/object': typeof ObjectRoute;
+  '/particles-fps': typeof ParticlesFpsRoute;
+  '/speed': typeof SpeedRoute;
+  '/spring': typeof SpringRoute;
+  '/webgpu': typeof WebgpuRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/animate': typeof AnimateRoute
-  '/animation-controller-demo': typeof AnimationControllerDemoRoute
-  '/benchmark': typeof BenchmarkRoute
-  '/custom-easing': typeof CustomEasingRoute
-  '/dev-debug': typeof DevDebugRoute
-  '/dom': typeof DomRoute
-  '/dom-3d': typeof Dom3dRoute
-  '/engine-config': typeof EngineConfigRoute
-  '/gpu-config': typeof GpuConfigRoute
-  '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute
-  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute
-  '/object': typeof ObjectRoute
-  '/particles-fps': typeof ParticlesFpsRoute
-  '/speed': typeof SpeedRoute
-  '/spring': typeof SpringRoute
-  '/webgpu': typeof WebgpuRoute
+  __root__: typeof rootRouteImport;
+  '/': typeof IndexRoute;
+  '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
+  '/benchmark': typeof BenchmarkRoute;
+  '/custom-easing': typeof CustomEasingRoute;
+  '/dom': typeof DomRoute;
+  '/dom-3d': typeof Dom3dRoute;
+  '/engine-config': typeof EngineConfigRoute;
+  '/gpu-config': typeof GpuConfigRoute;
+  '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute;
+  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute;
+  '/object': typeof ObjectRoute;
+  '/particles-fps': typeof ParticlesFpsRoute;
+  '/speed': typeof SpeedRoute;
+  '/spring': typeof SpringRoute;
+  '/webgpu': typeof WebgpuRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
+  fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | '/'
     | '/animate'
     | '/animation-controller-demo'
     | '/benchmark'
     | '/custom-easing'
-    | '/dev-debug'
     | '/dom'
     | '/dom-3d'
     | '/engine-config'
@@ -190,15 +180,14 @@ export interface FileRouteTypes {
     | '/particles-fps'
     | '/speed'
     | '/spring'
-    | '/webgpu'
-  fileRoutesByTo: FileRoutesByTo
+    | '/webgpu';
+  fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/animate'
     | '/animation-controller-demo'
     | '/benchmark'
     | '/custom-easing'
-    | '/dev-debug'
     | '/dom'
     | '/dom-3d'
     | '/engine-config'
@@ -209,7 +198,7 @@ export interface FileRouteTypes {
     | '/particles-fps'
     | '/speed'
     | '/spring'
-    | '/webgpu'
+    | '/webgpu';
   id:
     | '__root__'
     | '/'
@@ -217,7 +206,6 @@ export interface FileRouteTypes {
     | '/animation-controller-demo'
     | '/benchmark'
     | '/custom-easing'
-    | '/dev-debug'
     | '/dom'
     | '/dom-3d'
     | '/engine-config'
@@ -228,150 +216,142 @@ export interface FileRouteTypes {
     | '/particles-fps'
     | '/speed'
     | '/spring'
-    | '/webgpu'
-  fileRoutesById: FileRoutesById
+    | '/webgpu';
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AnimateRoute: typeof AnimateRoute
-  AnimationControllerDemoRoute: typeof AnimationControllerDemoRoute
-  BenchmarkRoute: typeof BenchmarkRoute
-  CustomEasingRoute: typeof CustomEasingRoute
-  DevDebugRoute: typeof DevDebugRoute
-  DomRoute: typeof DomRoute
-  Dom3dRoute: typeof Dom3dRoute
-  EngineConfigRoute: typeof EngineConfigRoute
-  GpuConfigRoute: typeof GpuConfigRoute
-  GpuDeliveryDemoRoute: typeof GpuDeliveryDemoRoute
-  GpuOnlyInterpolationRoute: typeof GpuOnlyInterpolationRoute
-  ObjectRoute: typeof ObjectRoute
-  ParticlesFpsRoute: typeof ParticlesFpsRoute
-  SpeedRoute: typeof SpeedRoute
-  SpringRoute: typeof SpringRoute
-  WebgpuRoute: typeof WebgpuRoute
+  IndexRoute: typeof IndexRoute;
+  AnimateRoute: typeof AnimateRoute;
+  AnimationControllerDemoRoute: typeof AnimationControllerDemoRoute;
+  BenchmarkRoute: typeof BenchmarkRoute;
+  CustomEasingRoute: typeof CustomEasingRoute;
+  DomRoute: typeof DomRoute;
+  Dom3dRoute: typeof Dom3dRoute;
+  EngineConfigRoute: typeof EngineConfigRoute;
+  GpuConfigRoute: typeof GpuConfigRoute;
+  GpuDeliveryDemoRoute: typeof GpuDeliveryDemoRoute;
+  GpuOnlyInterpolationRoute: typeof GpuOnlyInterpolationRoute;
+  ObjectRoute: typeof ObjectRoute;
+  ParticlesFpsRoute: typeof ParticlesFpsRoute;
+  SpeedRoute: typeof SpeedRoute;
+  SpringRoute: typeof SpringRoute;
+  WebgpuRoute: typeof WebgpuRoute;
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/webgpu': {
-      id: '/webgpu'
-      path: '/webgpu'
-      fullPath: '/webgpu'
-      preLoaderRoute: typeof WebgpuRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/webgpu';
+      path: '/webgpu';
+      fullPath: '/webgpu';
+      preLoaderRoute: typeof WebgpuRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/spring': {
-      id: '/spring'
-      path: '/spring'
-      fullPath: '/spring'
-      preLoaderRoute: typeof SpringRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/spring';
+      path: '/spring';
+      fullPath: '/spring';
+      preLoaderRoute: typeof SpringRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/speed': {
-      id: '/speed'
-      path: '/speed'
-      fullPath: '/speed'
-      preLoaderRoute: typeof SpeedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/speed';
+      path: '/speed';
+      fullPath: '/speed';
+      preLoaderRoute: typeof SpeedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/particles-fps': {
-      id: '/particles-fps'
-      path: '/particles-fps'
-      fullPath: '/particles-fps'
-      preLoaderRoute: typeof ParticlesFpsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/particles-fps';
+      path: '/particles-fps';
+      fullPath: '/particles-fps';
+      preLoaderRoute: typeof ParticlesFpsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/object': {
-      id: '/object'
-      path: '/object'
-      fullPath: '/object'
-      preLoaderRoute: typeof ObjectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/object';
+      path: '/object';
+      fullPath: '/object';
+      preLoaderRoute: typeof ObjectRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/gpu-only-interpolation': {
-      id: '/gpu-only-interpolation'
-      path: '/gpu-only-interpolation'
-      fullPath: '/gpu-only-interpolation'
-      preLoaderRoute: typeof GpuOnlyInterpolationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/gpu-only-interpolation';
+      path: '/gpu-only-interpolation';
+      fullPath: '/gpu-only-interpolation';
+      preLoaderRoute: typeof GpuOnlyInterpolationRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/gpu-delivery-demo': {
-      id: '/gpu-delivery-demo'
-      path: '/gpu-delivery-demo'
-      fullPath: '/gpu-delivery-demo'
-      preLoaderRoute: typeof GpuDeliveryDemoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/gpu-delivery-demo';
+      path: '/gpu-delivery-demo';
+      fullPath: '/gpu-delivery-demo';
+      preLoaderRoute: typeof GpuDeliveryDemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/gpu-config': {
-      id: '/gpu-config'
-      path: '/gpu-config'
-      fullPath: '/gpu-config'
-      preLoaderRoute: typeof GpuConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/gpu-config';
+      path: '/gpu-config';
+      fullPath: '/gpu-config';
+      preLoaderRoute: typeof GpuConfigRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/engine-config': {
-      id: '/engine-config'
-      path: '/engine-config'
-      fullPath: '/engine-config'
-      preLoaderRoute: typeof EngineConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/engine-config';
+      path: '/engine-config';
+      fullPath: '/engine-config';
+      preLoaderRoute: typeof EngineConfigRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/dom-3d': {
-      id: '/dom-3d'
-      path: '/dom-3d'
-      fullPath: '/dom-3d'
-      preLoaderRoute: typeof Dom3dRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/dom-3d';
+      path: '/dom-3d';
+      fullPath: '/dom-3d';
+      preLoaderRoute: typeof Dom3dRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/dom': {
-      id: '/dom'
-      path: '/dom'
-      fullPath: '/dom'
-      preLoaderRoute: typeof DomRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dev-debug': {
-      id: '/dev-debug'
-      path: '/dev-debug'
-      fullPath: '/dev-debug'
-      preLoaderRoute: typeof DevDebugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/dom';
+      path: '/dom';
+      fullPath: '/dom';
+      preLoaderRoute: typeof DomRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/custom-easing': {
-      id: '/custom-easing'
-      path: '/custom-easing'
-      fullPath: '/custom-easing'
-      preLoaderRoute: typeof CustomEasingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/custom-easing';
+      path: '/custom-easing';
+      fullPath: '/custom-easing';
+      preLoaderRoute: typeof CustomEasingRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/benchmark': {
-      id: '/benchmark'
-      path: '/benchmark'
-      fullPath: '/benchmark'
-      preLoaderRoute: typeof BenchmarkRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/benchmark';
+      path: '/benchmark';
+      fullPath: '/benchmark';
+      preLoaderRoute: typeof BenchmarkRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/animation-controller-demo': {
-      id: '/animation-controller-demo'
-      path: '/animation-controller-demo'
-      fullPath: '/animation-controller-demo'
-      preLoaderRoute: typeof AnimationControllerDemoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/animation-controller-demo';
+      path: '/animation-controller-demo';
+      fullPath: '/animation-controller-demo';
+      preLoaderRoute: typeof AnimationControllerDemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/animate': {
-      id: '/animate'
-      path: '/animate'
-      fullPath: '/animate'
-      preLoaderRoute: typeof AnimateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/animate';
+      path: '/animate';
+      fullPath: '/animate';
+      preLoaderRoute: typeof AnimateRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+      id: '/';
+      path: '/';
+      fullPath: '/';
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -381,7 +361,6 @@ const rootRouteChildren: RootRouteChildren = {
   AnimationControllerDemoRoute: AnimationControllerDemoRoute,
   BenchmarkRoute: BenchmarkRoute,
   CustomEasingRoute: CustomEasingRoute,
-  DevDebugRoute: DevDebugRoute,
   DomRoute: DomRoute,
   Dom3dRoute: Dom3dRoute,
   EngineConfigRoute: EngineConfigRoute,
@@ -393,7 +372,7 @@ const rootRouteChildren: RootRouteChildren = {
   SpeedRoute: SpeedRoute,
   SpringRoute: SpringRoute,
   WebgpuRoute: WebgpuRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();

@@ -1,9 +1,12 @@
 import { MotionStatus } from '@g-motion/core';
+import { createDebugger } from '@g-motion/utils';
 import type { World } from '@g-motion/core';
 import { BatchCoordinator } from './control/batchCoordinator';
 import { AnimationCoordinator } from './control/completionHandler';
 import { FrameNavigator } from './control/frameNavigator';
 import { PlaybackController } from './control/playbackController';
+
+const warn = createDebugger('AnimationControl', 'warn');
 
 type WorldWithAnimationCoordinator = World & {
   __motionAnimationCoordinator?: AnimationCoordinator;
@@ -171,7 +174,9 @@ export class AnimationControl {
     detachControlFromScopes(completed.control);
     try {
       completed.onComplete();
-    } catch {}
+    } catch (e) {
+      warn('onComplete callback failed:', e);
+    }
   }
 }
 

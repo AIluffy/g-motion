@@ -35,13 +35,12 @@ export class EntityBatchCollector {
   addKeyframes(batchId: string, keyframes: BatchKeyframe[]): boolean {
     if (!this.entityBatches.has(batchId)) {
       try {
-        const error = new MotionError(
+        getErrorHandler().create(
           `Batch '${batchId}' not found`,
           ErrorCode.BATCH_NOT_FOUND,
           ErrorSeverity.WARNING,
           { batchId },
         );
-        getErrorHandler().handle(error);
       } catch {}
       return false;
     }
@@ -72,10 +71,9 @@ export class EntityBatchCollector {
       const message = `Batch '${batchId}' not found`;
       errors.push(message);
       try {
-        const error = new MotionError(message, ErrorCode.BATCH_NOT_FOUND, ErrorSeverity.FATAL, {
+        getErrorHandler().create(message, ErrorCode.BATCH_NOT_FOUND, ErrorSeverity.FATAL, {
           batchId,
         });
-        getErrorHandler().handle(error);
       } catch {}
       return { valid: false, errors };
     }
@@ -91,7 +89,7 @@ export class EntityBatchCollector {
 
     if (errors.length > 0) {
       try {
-        const error = new MotionError(
+        getErrorHandler().create(
           'Batch validation failed',
           ErrorCode.BATCH_VALIDATION_FAILED,
           ErrorSeverity.FATAL,
@@ -103,7 +101,6 @@ export class EntityBatchCollector {
             errors: [...errors],
           },
         );
-        getErrorHandler().handle(error);
       } catch {}
     }
 

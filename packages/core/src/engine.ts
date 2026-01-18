@@ -1,4 +1,5 @@
 import { App, app as globalApp, appWorld, registerBuiltInRenderers } from './app';
+import { createDebugger } from '@g-motion/utils';
 import { getAppContext } from './context';
 import { getGPUMetricsProvider } from './webgpu/metrics-provider';
 import { getWebGPUBufferManager } from './webgpu/buffer';
@@ -8,6 +9,8 @@ import { WorldProvider } from './worldProvider';
 import type { SystemScheduler } from './scheduler';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
+
+const warn = createDebugger('MotionEngine', 'warn');
 
 export interface MotionEngine {
   readonly services: EngineServices;
@@ -115,23 +118,33 @@ class MotionEngineImpl implements MotionEngine {
 
     try {
       this.services.batchProcessor.clear();
-    } catch {}
+    } catch (e) {
+      warn('Batch processor cleanup failed:', e);
+    }
 
     try {
       getWebGPUBufferManager().clear();
-    } catch {}
+    } catch (e) {
+      warn('WebGPU buffer manager cleanup failed:', e);
+    }
 
     try {
       getGPUMetricsProvider().clear();
-    } catch {}
+    } catch (e) {
+      warn('GPU metrics provider cleanup failed:', e);
+    }
 
     try {
       clearPipelineCache();
-    } catch {}
+    } catch (e) {
+      warn('Pipeline cache cleanup failed:', e);
+    }
 
     try {
       this.services.appContext.dispose();
-    } catch {}
+    } catch (e) {
+      warn('App context dispose failed:', e);
+    }
   }
 
   reset(options?: EngineResetOptions): void {

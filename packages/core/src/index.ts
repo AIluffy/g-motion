@@ -9,6 +9,7 @@ export * from './data';
 export * from './engine';
 export * from './entity';
 export * from './error-handler';
+export * from './error-monitor';
 export * from './errors';
 export * from './plugin';
 export * from './registry';

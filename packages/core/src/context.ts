@@ -1,13 +1,19 @@
 import { ComputeBatchProcessor } from './systems/batch';
+import { createDebugger } from '@g-motion/utils';
 import { BatchContext } from './types';
 import { ErrorHandler } from './error-handler.js';
+import { ErrorMonitor } from './error-monitor.js';
+
+const warn = createDebugger('AppContext', 'warn');
 
 export type BatchProcessorFactory = (options?: { maxBatchSize?: number }) => ComputeBatchProcessor;
 export type ErrorHandlerFactory = (context: AppContext) => ErrorHandler;
+export type ErrorMonitorFactory = (context: AppContext) => ErrorMonitor;
 
 export interface AppContextFactories {
   createBatchProcessor?: BatchProcessorFactory;
   createErrorHandler?: ErrorHandlerFactory;
+  createErrorMonitor?: ErrorMonitorFactory;
 }
 
 /**
@@ -23,6 +29,7 @@ export class AppContext {
   private batchContext: BatchContext = {};
   private webgpuInitialized = false;
   private errorHandler: ErrorHandler | null = null;
+  private errorMonitor: ErrorMonitor | null = null;
 
   private factories: Required<AppContextFactories>;
 
@@ -37,6 +44,7 @@ export class AppContext {
           maxBatchSize: options?.maxBatchSize ?? 1024,
         }),
       createErrorHandler: (context) => new ErrorHandler(context),
+      createErrorMonitor: (_context) => new ErrorMonitor(),
     };
   }
 
@@ -130,6 +138,17 @@ export class AppContext {
     this.errorHandler = handler;
   }
 
+  getErrorMonitor(): ErrorMonitor {
+    if (!this.errorMonitor) {
+      this.errorMonitor = this.factories.createErrorMonitor(this);
+    }
+    return this.errorMonitor;
+  }
+
+  setErrorMonitor(monitor: ErrorMonitor | null): void {
+    this.errorMonitor = monitor;
+  }
+
   /**
    * Reset the singleton (useful for testing)
    */
@@ -141,11 +160,14 @@ export class AppContext {
   dispose(): void {
     try {
       this.batchProcessor?.clear();
-    } catch {}
+    } catch (e) {
+      warn('Context cleanup failed:', e);
+    }
     this.batchProcessor = null;
     this.batchContext = {};
     this.webgpuInitialized = false;
     this.errorHandler = null;
+    this.errorMonitor = null;
   }
 }
 
@@ -161,4 +183,8 @@ export function getAppContext(): AppContext {
  */
 export function getErrorHandler(): ErrorHandler {
   return AppContext.getInstance().getErrorHandler();
+}
+
+export function getErrorMonitor(): ErrorMonitor {
+  return AppContext.getInstance().getErrorMonitor();
 }
