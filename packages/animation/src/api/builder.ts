@@ -1,6 +1,5 @@
 import { World, TimelineData, MotionStatus, WorldProvider, getNowMs } from '@g-motion/core';
 import { AnimationControl } from './control';
-import { TrackBuilder } from './track';
 import { applyAdjust } from './adjust';
 import { runBatchAnimation, BatchTemplate } from '../batch-runner';
 export type { MarkOptions, ResolvedMarkOptions } from './mark';
@@ -30,6 +29,11 @@ type PlayOptions = {
   repeat?: number;
   onComplete?: () => void;
 };
+
+type TrackMarkOptions = Pick<
+  MarkOptions,
+  'duration' | 'ease' | 'interp' | 'bezier' | 'spring' | 'inertia'
+>;
 
 /**
  * Creates a new animation builder for the given target.
@@ -86,8 +90,34 @@ export class MotionBuilder {
     return vt;
   }
 
-  track(prop: string): TrackBuilder {
-    return new TrackBuilder(this, prop);
+  track(prop: string): this {
+    // For chaining: builder.track('x').mark({...})
+    // The property is stored for the next mark() call
+    (this as any)._pendingTrackProperty = prop;
+    return this;
+  }
+
+  /**
+   * Shorthand to set a property value at a specific time or duration.
+   * @param prop - The property to set
+   * @param timeOrDuration - Time in ms (if options.duration set) or absolute time
+   * @param to - The target value
+   * @param options - Optional mark settings (duration, easing, etc.)
+   */
+  set(prop: string, timeOrDuration: number, to: number, options: TrackMarkOptions = {}): this {
+    const payload: MarkOptions & { to: Record<string, number> } = {
+      ...options,
+      to: { [prop]: to },
+    };
+
+    if (options.duration !== undefined) {
+      payload.duration = options.duration ?? timeOrDuration;
+    } else {
+      payload.at = timeOrDuration;
+    }
+
+    this.mark([payload as MarkOptions]);
+    return this;
   }
 
   adjust(params: { offset?: number; scale?: number }): MotionBuilder {

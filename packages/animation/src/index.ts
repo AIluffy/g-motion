@@ -166,6 +166,5 @@ export * from './api/builder';
 export * from './api/control';
 export * from './api/gpu-status';
 export * from './api/mark';
-export * from './api/track';
 export * from './api/visualTarget';
 export { engine } from './engine';
