@@ -2,7 +2,7 @@ import { App, app as globalApp, appWorld, registerBuiltInRenderers } from './app
 import { createDebugger } from '@g-motion/utils';
 import { getAppContext } from './context';
 import { getGPUMetricsProvider } from './webgpu/metrics-provider';
-import { getWebGPUBufferManager } from './webgpu/buffer';
+import { resetWebGPUEngine } from './webgpu/engine';
 import { clearPipelineCache } from './systems/webgpu';
 import { World } from './world';
 import { WorldProvider } from './worldProvider';
@@ -123,9 +123,9 @@ class MotionEngineImpl implements MotionEngine {
     }
 
     try {
-      getWebGPUBufferManager().clear();
+      resetWebGPUEngine();
     } catch (e) {
-      warn('WebGPU buffer manager cleanup failed:', e);
+      warn('WebGPU engine cleanup failed:', e);
     }
 
     try {
@@ -173,7 +173,7 @@ class MotionEngineImpl implements MotionEngine {
     } catch {}
 
     try {
-      getWebGPUBufferManager().clear();
+      resetWebGPUEngine();
     } catch {}
 
     try {

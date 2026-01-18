@@ -114,7 +114,7 @@ export async function maybeRunViewportCulling(params: {
       submit,
     );
     if (pending) {
-      engine.latestAsyncCullingFrameByArchetype.set(archetypeId, engine.webgpuFrameId);
+      engine.latestAsyncCullingFrameByArchetype.set(archetypeId, engine.frameId);
 
       if (typeof leaseId === 'number') {
         processor.releaseEntityIds(leaseId);
@@ -127,7 +127,7 @@ export async function maybeRunViewportCulling(params: {
 
       const cullingTag: CullingReadbackTag = {
         kind: 'culling',
-        frameId: engine.webgpuFrameId,
+        frameId: engine.frameId,
         outputBuffer: pending.outputBuffer,
         sourceOutputBufferTag,
         rawStride,

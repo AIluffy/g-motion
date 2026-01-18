@@ -176,7 +176,7 @@ export const WebGPUComputeSystem: SystemDef = {
     });
 
     sp.nextFrame();
-    engine.nextFrame();
+    engine.endFrame();
   },
 };
 
@@ -301,7 +301,7 @@ async function processArchetypeBatches(params: {
     ? createWebGPUFrameEncoder({
         device,
         timingHelper: engine.timingHelper,
-        label: `motion-frame-${engine.webgpuFrameId}`,
+        label: `motion-frame-${engine.frameId}`,
       })
     : undefined;
   const pendingCommandBuffers: GPUCommandBuffer[] = [];

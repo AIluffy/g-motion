@@ -145,8 +145,8 @@ export function processCompletedReadbacks(params: {
             }
             const threshold = WebGPUConstants.GPU.PHYSICS_SETTLE_THRESHOLD_DEFAULT;
             if (maxAbs > threshold) {
-              if (engine.webgpuFrameId - shadow.lastWarnFrame >= 60) {
-                shadow.lastWarnFrame = engine.webgpuFrameId;
+              if (engine.frameId - shadow.lastWarnFrame >= 60) {
+                shadow.lastWarnFrame = engine.frameId;
                 try {
                   warn('physics GPU validation mismatch', {
                     archetypeId: res.archetypeId,

@@ -81,7 +81,7 @@ export class WebGPUEngine {
   private _mockWebGPU = false;
   private _shaderVersion = -1;
   private _physicsPipelinesReady = false;
-  private _webgpuFrameId = 0;
+  private _frameId = 0;
   private _outputFormatStatsCounter = 0;
   private _latestAsyncCullingFrameByArchetype = new Map<string, number>();
   private _physicsParams = new Float32Array(4);
@@ -467,8 +467,8 @@ export class WebGPUEngine {
   get physicsPipelinesReady() {
     return this._physicsPipelinesReady;
   }
-  get webgpuFrameId() {
-    return this._webgpuFrameId;
+  get frameId() {
+    return this._frameId;
   }
   get outputFormatStatsCounter() {
     return this._outputFormatStatsCounter;
@@ -491,9 +491,6 @@ export class WebGPUEngine {
   }
   setPhysicsPipelinesReady(value: boolean) {
     this._physicsPipelinesReady = value;
-  }
-  incrementFrameId() {
-    this._webgpuFrameId++;
   }
   incrementOutputFormatStatsCounter() {
     this._outputFormatStatsCounter++;
@@ -534,12 +531,11 @@ export class WebGPUEngine {
   // ============================================================================
 
   beginFrame(): void {
-    this._webgpuFrameId++;
+    this._frameId++;
     this._timingHelper?.beginFrame?.();
   }
 
-  nextFrame(): void {
-    this._webgpuFrameId++;
+  endFrame(): void {
     this._persistentBufferManager?.nextFrame();
   }
 
@@ -568,7 +564,7 @@ export class WebGPUEngine {
     this._mockWebGPU = false;
     this._shaderVersion = -1;
     this._physicsPipelinesReady = false;
-    this._webgpuFrameId = 0;
+    this._frameId = 0;
     this._outputFormatStatsCounter = 0;
     this._latestAsyncCullingFrameByArchetype.clear();
     this._physicsParams.fill(0);
@@ -610,7 +606,7 @@ export class WebGPUEngine {
     this._mockWebGPU = false;
     this._shaderVersion = -1;
     this._physicsPipelinesReady = false;
-    this._webgpuFrameId = 0;
+    this._frameId = 0;
     this._outputFormatStatsCounter = 0;
     this._latestAsyncCullingFrameByArchetype.clear();
     this._physicsParams.fill(0);

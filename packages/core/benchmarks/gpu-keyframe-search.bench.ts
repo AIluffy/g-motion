@@ -1,5 +1,4 @@
 import { describe, bench, expect, afterAll } from 'vitest';
-import { ComputeShaderManager } from '../src/webgpu/shader-interface';
 import {
   KEYFRAME_SEARCH_SHADER,
   KEYFRAME_SEARCH_SHADER_OPT,
@@ -7,6 +6,87 @@ import {
 } from '../src/webgpu/keyframe-preprocess-shader';
 import { ComputeBenchmark } from '../src/webgpu/benchmark';
 import { ensureMockWebGPU } from './memory-allocation-regression.bench';
+
+type ShaderBinding = {
+  binding: number;
+  visibility: number;
+  buffer?: {
+    type: 'storage' | 'read-only-storage' | 'uniform';
+  };
+  sampler?: {
+    type: 'filtering' | 'non-filtering' | 'comparison';
+  };
+  texture?: {
+    sampleType?: 'float' | 'unfilterable-float' | 'sint' | 'uint';
+    viewDimension?: '1d' | '2d' | '2d-array' | 'cube' | 'cube-array' | '3d';
+  };
+};
+
+type ComputeShaderConfig = {
+  name: string;
+  code: string;
+  entryPoint?: string;
+  bindings: ShaderBinding[];
+};
+
+type ComputeShaderMetadata = {
+  name: string;
+  compiledAt: number;
+  entryPoint: string;
+  bindingCount: number;
+  workgroupSize: [number, number, number];
+};
+
+type ComputeShader = {
+  metadata: ComputeShaderMetadata;
+  bindGroupLayout: any;
+  pipelineLayout: any;
+  pipeline: any;
+};
+
+function parseWorkgroupSize(code: string): [number, number, number] {
+  const m = /@workgroup_size\s*\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?(?:,\s*(\d+)\s*)?\)/.exec(code);
+  if (!m) return [64, 1, 1];
+  const x = Number(m[1]);
+  const y = m[2] ? Number(m[2]) : 1;
+  const z = m[3] ? Number(m[3]) : 1;
+  return [x || 64, y || 1, z || 1];
+}
+
+async function compileComputeShader(
+  device: any,
+  config: ComputeShaderConfig,
+): Promise<ComputeShader> {
+  const entryPoint = config.entryPoint || 'main';
+  const bindGroupLayout = device.createBindGroupLayout({
+    entries: config.bindings,
+  });
+  const pipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [bindGroupLayout],
+  });
+  const module = device.createShaderModule({
+    code: config.code,
+  });
+  const pipeline = device.createComputePipeline({
+    layout: pipelineLayout,
+    compute: {
+      module,
+      entryPoint,
+    },
+  });
+  return {
+    metadata: {
+      name: config.name,
+      compiledAt: Date.now(),
+      entryPoint,
+      bindingCount: config.bindings.length,
+      workgroupSize: parseWorkgroupSize(config.code),
+    },
+    bindGroupLayout,
+    pipelineLayout,
+    pipeline,
+  };
+}
 
 type PackedTrackItem = {
   startTime: number;
@@ -250,8 +330,7 @@ async function createKeyframeSearchResources(
     throw new Error('WebGPU adapter unavailable');
   }
   const device = await adapter.requestDevice();
-  const manager = new ComputeShaderManager(device);
-  const shader = await manager.compileShader({
+  const shader = await compileComputeShader(device, {
     name: 'keyframe-search',
     code: KEYFRAME_SEARCH_SHADER,
     entryPoint: 'findActiveKeyframes',
@@ -263,9 +342,6 @@ async function createKeyframeSearchResources(
       { binding: 4, visibility: 4, buffer: { type: 'storage' } },
     ],
   });
-  if (!shader) {
-    throw new Error('Failed to compile KEYFRAME_SEARCH_SHADER');
-  }
   const usage = g.GPUBufferUsage;
   const keyframeCount = entityCount * keyframesPerEntity;
   const keyframesBufferSize = keyframeCount * PACKED_KEYFRAME_STRIDE * 4;
@@ -351,8 +427,7 @@ async function createKeyframeSearchResourcesOptimized(
     throw new Error('WebGPU adapter unavailable');
   }
   const device = await adapter.requestDevice();
-  const manager = new ComputeShaderManager(device);
-  const shader = await manager.compileShader({
+  const shader = await compileComputeShader(device, {
     name: 'keyframe-search-opt',
     code: KEYFRAME_SEARCH_SHADER_OPT,
     entryPoint: 'findActiveKeyframes',
@@ -364,9 +439,6 @@ async function createKeyframeSearchResourcesOptimized(
       { binding: 4, visibility: 4, buffer: { type: 'storage' } },
     ],
   });
-  if (!shader) {
-    throw new Error('Failed to compile KEYFRAME_SEARCH_SHADER_OPT');
-  }
   const usage = g.GPUBufferUsage;
   const keyframeCount = entityCount * keyframesPerEntity;
   const keyframesBufferSize = keyframeCount * PACKED_KEYFRAME_STRIDE * 4;

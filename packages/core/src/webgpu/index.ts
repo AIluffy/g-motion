@@ -10,19 +10,7 @@
 export { WebGPUEngine, getWebGPUEngine, resetWebGPUEngine } from './engine';
 export type { WebGPUEngineConfig } from './engine';
 
-export { WebGPUBufferManager, getWebGPUBufferManager } from './buffer';
-export type { ComputeMetrics, BufferAllocation } from './buffer';
-
 export {
-  ComputeShaderManager,
-  type IComputeShader,
-  type ComputeShaderConfig,
-} from './shader-interface';
-
-export {
-  SyncManager,
-  DataTransferOptimizer,
-  ComputeOrchestrator,
   enqueueGPUResults,
   drainGPUResults,
   isPhysicsGPUEntity,
@@ -32,7 +20,7 @@ export {
   forceGPUStateSync,
   consumeForcedGPUStateSyncEntityIds,
 } from './sync-manager';
-export type { SyncEvent, PerformanceMetrics, GPUResultPacket } from './sync-manager';
+export type { GPUResultPacket } from './sync-manager';
 
 // Development tools (benchmark, profiler) are not exported for production use
 // Import directly from './benchmark' in benchmark files if needed
@@ -145,9 +133,6 @@ export {
   registerGPUChannelMappingForTracks,
 } from './channel-mapping';
 export type { ChannelMapping, BatchChannelTable } from './channel-mapping';
-
-// Shader registry utilities for plugin shader auto-registration
-export { getRegisteredShaders, getRegisteredShader, clearShaderRegistry } from './shader-interface';
 
 // Re-export batch processor for convenience
 export { ComputeBatchProcessor } from '../systems/batch';
