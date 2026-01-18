@@ -19,34 +19,15 @@ export const Route = createFileRoute('/gpu-config')({
   component: GPUConfigPage,
 });
 
-// Easing function implementations
-const easingFunctions = {
-  easeInQuad: (t: number) => t * t,
-  easeOutCubic: (t: number) => 1 - Math.pow(1 - t, 3),
-  easeInElastic: (t: number) => {
-    const c4 = (2 * Math.PI) / 3;
-    return t === 0 ? 0 : t === 1 ? 1 : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
-  },
-  easeOutBounce: (t: number) => {
-    const n1 = 7.5625;
-    const d1 = 2.75;
-    if (t < 1 / d1) {
-      return n1 * t * t;
-    } else if (t < 2 / d1) {
-      return n1 * (t -= 1.5 / d1) * t + 0.75;
-    } else if (t < 2.5 / d1) {
-      return n1 * (t -= 2.25 / d1) * t + 0.9375;
-    } else {
-      return n1 * (t -= 2.625 / d1) * t + 0.984375;
-    }
-  },
-  easeInOutSine: (t: number) => -(Math.cos(Math.PI * t) - 1) / 2,
-  easeInBack: (t: number) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return c3 * t * t * t - c1 * t * t;
-  },
-};
+// Easing names for GPU-based animations
+const easingNames = [
+  'easeInQuad',
+  'easeOutCubic',
+  'easeInElastic',
+  'easeOutBounce',
+  'easeInOutSine',
+  'easeInBack',
+] as const;
 
 function GPUConfigPage() {
   const controlsRef = useRef<AnimationControl[]>([]);
@@ -70,7 +51,8 @@ function GPUConfigPage() {
   // For this demo, we show the configuration UI but the actual engine is already initialized
   // with default settings.
 
-  const easingMap = easingFunctions;
+  // For demo purposes, selectedEasing holds the easing name directly
+  // In a real app with per-entity easing, you'd store this on each entity
 
   const boxes = useMemo(() => Array.from({ length: count }, (_, i) => i), [count]);
   const positions = useMemo(
@@ -105,7 +87,8 @@ function GPUConfigPage() {
       controlsRef.current = [];
       setIsRunning(true);
 
-      const easing = easingMap[selectedEasing as keyof typeof easingMap] || easingMap.easeInQuad;
+      controlsRef.current = [];
+      setIsRunning(true);
 
       for (let i = 0; i < count; i++) {
         const dx = (Math.random() - 0.5) * width * 0.6;
@@ -118,7 +101,7 @@ function GPUConfigPage() {
             {
               to: { x: dx, y: dy, rotate },
               at: duration,
-              ease: easing,
+              ease: selectedEasing,
             },
           ])
           .option({ repeat: 1 })
@@ -280,7 +263,7 @@ function GPUConfigPage() {
             <div className="space-y-3">
               <label className="block text-sm font-medium text-slate-200">Easing Function</label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {Object.keys(easingMap).map((name) => (
+                {easingNames.map((name) => (
                   <button
                     key={name}
                     onClick={() => setSelectedEasing(name)}

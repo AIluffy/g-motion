@@ -1,11 +1,16 @@
-import { getCustomGpuEasings, registerCustomGpuEasing } from '../webgpu/custom-easing';
 /**
- * Easing function registry and ID system for GPU compute.
- * Each easing function is assigned a unique ID (0-30) for use in shaders.
+ * GPU-Only Easing Registry
+ *
+ * Easing functions are identified by string names and assigned integer IDs (0-30)
+ * for use in GPU shaders. Custom easings get IDs starting from 31.
  */
 
-export const EASING_IDS = {
-  easeLinear: 0,
+import { getErrorHandler } from '../context';
+import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
+
+// Built-in easings: name → id (0-30)
+const BUILTIN_EASINGS = {
+  linear: 0,
   easeInQuad: 1,
   easeOutQuad: 2,
   easeInOutQuad: 3,
@@ -38,215 +43,135 @@ export const EASING_IDS = {
   easeInOutBounce: 30,
 } as const;
 
-// Custom GPU easings are assigned IDs starting at 31 via registerCustomGpuEasing.
+// Combined lookup: built-in names + aliases → id
+// Aliases map to built-in easing IDs
+const EASING_TO_ID = {
+  ...BUILTIN_EASINGS,
+  easeIn: 1,
+  easeOut: 2,
+  easeInOut: 3,
+} as const;
 
-/**
- * Standard easing function implementations.
- * These are used as reference implementations and for CPU-based easing.
- * Exported for string-to-function conversion.
- */
-export const EASING_FUNCTIONS: Record<string, (t: number) => number> = {
-  easeLinear: (t) => t,
-  linear: (t) => t,
-  easeInQuad: (t) => t * t,
-  easeIn: (t) => t * t,
-  easeOutQuad: (t) => 1 - (1 - t) * (1 - t),
-  easeOut: (t) => 1 - (1 - t) * (1 - t),
-  easeInOutQuad: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-  easeInOut: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-  easeInCubic: (t) => t * t * t,
-  easeOutCubic: (t) => 1 - Math.pow(1 - t, 3),
-  easeInOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
-  easeInQuart: (t) => t * t * t * t,
-  easeOutQuart: (t) => 1 - Math.pow(1 - t, 4),
-  easeInOutQuart: (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2),
-  easeInQuint: (t) => t * t * t * t * t,
-  easeOutQuint: (t) => 1 - Math.pow(1 - t, 5),
-  easeInOutQuint: (t) => (t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2),
-  easeInSine: (t) => 1 - Math.cos((t * Math.PI) / 2),
-  easeOutSine: (t) => Math.sin((t * Math.PI) / 2),
-  easeInOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
-  easeInExpo: (t) => (t === 0 ? 0 : Math.pow(2, 10 * t - 10)),
-  easeOutExpo: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
-  easeInOutExpo: (t) =>
-    t === 0
-      ? 0
-      : t === 1
-        ? 1
-        : t < 0.5
-          ? Math.pow(2, 20 * t - 10) / 2
-          : (2 - Math.pow(2, -20 * t + 10)) / 2,
-  easeInCirc: (t) => 1 - Math.sqrt(1 - Math.pow(t, 2)),
-  easeOutCirc: (t) => Math.sqrt(1 - Math.pow(t - 1, 2)),
-  easeInOutCirc: (t) =>
-    t < 0.5
-      ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
-      : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2,
-  easeInBack: (t) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return c3 * t * t * t - c1 * t * t;
-  },
-  easeOutBack: (t) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-  },
-  easeInOutBack: (t) => {
-    const c1 = 1.70158;
-    const c2 = c1 * 1.525;
-    return t < 0.5
-      ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
-      : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
-  },
-  easeInElastic: (t) => {
-    const c4 = (2 * Math.PI) / 3;
-    return t === 0 ? 0 : t === 1 ? 1 : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
-  },
-  easeOutElastic: (t) => {
-    const c4 = (2 * Math.PI) / 3;
-    return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
-  },
-  easeInOutElastic: (t) => {
-    const c5 = (2 * Math.PI) / 4.5;
-    return t === 0
-      ? 0
-      : t === 1
-        ? 1
-        : t < 0.5
-          ? -(Math.pow(2, 20 * t - 10) * Math.sin((20 * t - 11.125) * c5)) / 2
-          : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
-  },
-  easeInBounce: (t) => 1 - easeOutBounceImpl(1 - t),
-  easeOutBounce: easeOutBounceImpl,
-  easeInOutBounce: (t) =>
-    t < 0.5 ? (1 - easeOutBounceImpl(1 - 2 * t)) / 2 : (1 + easeOutBounceImpl(2 * t - 1)) / 2,
-};
+// Custom easings storage
+type CustomEasing = { wgslFn: string; id: number };
+const customEasings = new Map<string, CustomEasing>();
 
-function easeOutBounceImpl(t: number): number {
-  const n1 = 7.5625;
-  const d1 = 2.75;
+// ID allocation and versioning
+let _nextEasingId = 31; // 0-30 reserved for built-in
+let _version = 0;
 
-  if (t < 1 / d1) {
-    return n1 * t * t;
-  } else if (t < 2 / d1) {
-    return n1 * (t -= 1.5 / d1) * t + 0.75;
-  } else if (t < 2.5 / d1) {
-    return n1 * (t -= 2.25 / d1) * t + 0.9375;
-  } else {
-    return n1 * (t -= 2.625 / d1) * t + 0.984375;
-  }
+// Track unknown easings that have been logged (avoid spam)
+const _loggedUnknownEasings = new Set<string>();
+
+function _allocateEasingId(): number {
+  return _nextEasingId++;
+}
+
+function _bumpVersion(): void {
+  _version++;
+}
+
+function _logUnknownEasingOnce(name: string): void {
+  if (_loggedUnknownEasings.has(name)) return;
+  _loggedUnknownEasings.add(name);
+
+  const errorHandler = getErrorHandler();
+  errorHandler?.handle(
+    new MotionError(
+      `Unknown easing: '${name}'`,
+      ErrorCode.INVALID_EASING,
+      ErrorSeverity.INFO, // INFO for diagnostic messages (logged once per name)
+      { easingName: name },
+    ),
+  );
 }
 
 /**
- * Resolve easing to a function (converts string names to functions)
- * @param easing - String name or function
- * @returns Easing function implementation
+ * Get all registered custom easings for shader injection.
  */
-export function resolveEasing(easing?: string | ((t: number) => number)): (t: number) => number {
-  if (!easing) return EASING_FUNCTIONS.easeLinear;
-
-  // If already a function, return as-is
-  if (typeof easing === 'function') return easing;
-
-  // If string, look up in registry
-  if (typeof easing === 'string') {
-    return EASING_FUNCTIONS[easing] || EASING_FUNCTIONS.easeLinear;
+export function getCustomGpuEasings(): ReadonlyArray<{ name: string; wgslFn: string; id: number }> {
+  const result: Array<{ name: string; wgslFn: string; id: number }> = [];
+  for (const [name, { wgslFn, id }] of customEasings) {
+    result.push({ name, wgslFn, id });
   }
-
-  return EASING_FUNCTIONS.easeLinear;
+  return result;
 }
 
 /**
- * Get the easing ID for a given easing (string name or function).
- * Attempts to match the function by name using toString() introspection.
+ * Get the current version of custom easings (increments on each registration).
+ */
+export function getCustomEasingVersion(): number {
+  return _version;
+}
+
+/**
+ * Get the easing ID for a given easing name.
  *
- * @param easing - Easing string name or function to look up
- * @returns Easing ID (0-30) or 0 (easeLinear) if not found
+ * @param name - Easing name (built-in, alias, or custom)
+ * @returns Easing ID (0-30 for built-in, 31+ for custom)
  */
-export function getEasingId(easing?: string | ((t: number) => number)): number {
-  if (!easing) return EASING_IDS.easeLinear;
+export function getEasingId(name?: string): number {
+  if (!name) return 0; // linear
 
-  // If string, map simplified names to internal IDs
-  if (typeof easing === 'string') {
-    // Map simplified names to internal EASING_IDS keys
-    const nameMap: Record<string, keyof typeof EASING_IDS> = {
-      linear: 'easeLinear',
-      easeIn: 'easeInQuad',
-      easeOut: 'easeOutQuad',
-      easeInOut: 'easeInOutQuad',
-    };
+  // Check built-in/alias first (O(1) lookup)
+  const builtinId = EASING_TO_ID[name as keyof typeof EASING_TO_ID];
+  if (builtinId !== undefined) return builtinId;
 
-    const internalName = nameMap[easing] || (easing as keyof typeof EASING_IDS);
-    return EASING_IDS[internalName] ?? EASING_IDS.easeLinear;
-  }
+  // Check custom easings
+  const custom = customEasings.get(name);
+  if (custom) return custom.id;
 
-  // Try to extract function name from the function
-  const funcName = easing.name;
-  if (funcName && funcName in EASING_IDS) {
-    return EASING_IDS[funcName as keyof typeof EASING_IDS];
-  }
+  // Unknown easing - log warning once and fallback to linear
+  _logUnknownEasingOnce(name);
 
-  // Check custom GPU easings registered with matching name
-  if (funcName) {
-    const custom = getCustomGpuEasings().find((e) => e.name === funcName);
-    if (custom) return custom.id;
-  }
-
-  // Fallback to linear if function not found
-  return EASING_IDS.easeLinear;
+  return 0; // Fallback to linear
 }
 
 /**
- * Check if an easing function is supported on the GPU.
- * All easing functions from EASING_IDS are supported.
+ * Register a custom WGSL easing function.
  *
- * @param easing - Easing function to check
- * @returns true if the easing can be computed on GPU, false otherwise
+ * @param wgslFn - Full WGSL function definition (e.g., 'fn myEase(t: f32) -> f32 { return t * t; }')
+ * @returns The registered easing name (extracted from WGSL)
  */
-export function isEasingGPUSupported(easing?: (t: number) => number): boolean {
-  if (!easing) return true; // Linear is always supported
+export function registerGpuEasing(wgslFn: string): string {
+  const match = wgslFn.match(/fn\s+(\w+)\s*\(/);
+  if (!match) {
+    throw new MotionError(
+      'Invalid WGSL easing: missing function declaration (expected: fn name(t: f32) -> f32 { ... })',
+      ErrorCode.INVALID_PARAMETER,
+      ErrorSeverity.ERROR,
+      { wgslFn },
+    );
+  }
 
-  const funcName = easing.name;
-  if (!funcName) return false;
-  if (funcName in EASING_IDS) return true;
-  return getCustomGpuEasings().some((e) => e.name === funcName);
+  const name = match[1];
+  const existed = customEasings.has(name);
+
+  customEasings.set(name, { wgslFn, id: _allocateEasingId() });
+
+  if (existed) {
+    // Log at INFO level - overwriting custom easing may be intentional
+    const errorHandler = getErrorHandler();
+    errorHandler?.handle(
+      new MotionError(
+        `Custom easing '${name}' was overwritten`,
+        ErrorCode.INVALID_EASING,
+        ErrorSeverity.INFO,
+        { easingName: name, wgslFn },
+      ),
+    );
+  }
+
+  _bumpVersion();
+  return name;
 }
 
 /**
- * Get the CPU implementation of an easing function by ID.
- * Used as fallback when GPU compute is not available.
- *
- * @param easingId - Easing ID (0-30)
- * @returns Easing function implementation
+ * Reset custom easings for testing purposes.
  */
-export function getEasingFunctionById(easingId: number): (t: number) => number {
-  const entry = Object.entries(EASING_IDS).find(([, id]) => id === easingId);
-  if (entry) {
-    const funcName = entry[0];
-    return EASING_FUNCTIONS[funcName] || EASING_FUNCTIONS.easeLinear;
-  }
-
-  const custom = getCustomGpuEasings().find((e) => e.id === easingId);
-  if (custom) {
-    // Custom easings registered for GPU do not have CPU impl here; default to linear.
-    return EASING_FUNCTIONS.easeLinear;
-  }
-  return EASING_FUNCTIONS.easeLinear;
-}
-
-/**
- * Register a custom easing for GPU by providing both the JS easing (for CPU) and WGSL body.
- * The easing function name must match the WGSL function name.
- */
-export function registerEasingWithWGSL(
-  name: string,
-  fn: (t: number) => number,
-  wgslFn: string,
-): void {
-  // Register CPU easing under the given name
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (EASING_FUNCTIONS as any)[name] = fn;
-  // Allocate a GPU ID and store WGSL for shader generation
-  registerCustomGpuEasing(name, wgslFn);
+export function __resetCustomEasings(): void {
+  customEasings.clear();
+  _nextEasingId = 31;
+  _version = 0;
+  _loggedUnknownEasings.clear();
 }

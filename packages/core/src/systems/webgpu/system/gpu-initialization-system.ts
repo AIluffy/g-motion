@@ -6,7 +6,7 @@ import { getTimingHelper } from '../../../webgpu/timing-helper';
 import { StagingBufferPool } from '../../../webgpu/staging-pool';
 import { AsyncReadbackManager } from '../../../webgpu/async-readback';
 import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
-import { getCustomEasingVersion, getCustomGpuEasings } from '../../../webgpu/custom-easing';
+import { getCustomEasingVersion, getCustomGpuEasings } from '../../../systems/easing-registry';
 import { buildInterpolationShader } from '../../../webgpu/shader';
 import { PHYSICS_COMBINED_SHADER } from '../../../webgpu/physics-shader';
 import { initWebGPUCompute } from '../initialization';

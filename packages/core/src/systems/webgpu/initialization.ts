@@ -6,7 +6,7 @@
 
 import { WebGPUBufferManager } from '../../webgpu/buffer';
 import { buildInterpolationShader } from '../../webgpu/shader';
-import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
+import { getCustomEasingVersion, getCustomGpuEasings } from '../../systems/easing-registry';
 import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
 import { getAppContext, getErrorHandler } from '../../context';
 import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';

@@ -1,13 +1,17 @@
-import { CustomGpuEasing } from './custom-easing';
 import interpolationShaderCode from './shaders/interpolation.wgsl?raw';
 import { WebGPUConstants } from '../constants';
 
 // T031: Built-in WGSL Shader for Interpolation
 // Extended with Bezier curve support (Phase 1.1)
 
+type CustomGpuEasing = { name: string; wgslFn: string; id: number };
+
 const BASE_INTERPOLATION_SHADER = interpolationShaderCode;
 
-function injectCustomEasings(shader: string, customEasings: CustomGpuEasing[]): string {
+function injectCustomEasings(
+  shader: string,
+  customEasings: ReadonlyArray<CustomGpuEasing>,
+): string {
   if (!customEasings.length) return shader;
 
   const fnBlob = customEasings
@@ -24,7 +28,7 @@ function injectCustomEasings(shader: string, customEasings: CustomGpuEasing[]): 
     .replace('// CUSTOM_EASING_SWITCH_CASES', caseBlob);
 }
 
-export function buildInterpolationShader(customEasings: CustomGpuEasing[]): string {
+export function buildInterpolationShader(customEasings: ReadonlyArray<CustomGpuEasing>): string {
   return injectCustomEasings(BASE_INTERPOLATION_SHADER, customEasings);
 }
 

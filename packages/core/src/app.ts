@@ -1,5 +1,5 @@
 import type { ComponentDef, SystemDef, RendererDef, ShaderDef } from './plugin';
-import { registerEasingWithWGSL } from './systems/easing-registry';
+import { registerGpuEasing } from './systems/easing-registry';
 import { createDebugger } from '@g-motion/utils';
 import { MotionApp, MotionAppConfig } from './plugin';
 import { WorldProvider } from './worldProvider';
@@ -14,7 +14,6 @@ export { getRendererCode, getRendererName } from './renderer-code';
 // App facade implementing MotionApp interface
 export class App implements MotionApp {
   private renderers = new Map<string, RendererDef>();
-  private easings = new Map<string, (t: number) => number>();
 
   constructor(
     private world: World,
@@ -82,15 +81,17 @@ export class App implements MotionApp {
     debug('Registered renderer', name);
   }
 
-  registerEasing(name: string, fn: (t: number) => number): void {
-    this.easings.set(name, fn);
-    debug('Registered easing', name);
-  }
-
-  registerGpuEasing(name: string, fn: (t: number) => number, wgslFn: string): void {
-    this.easings.set(name, fn);
-    registerEasingWithWGSL(name, fn, wgslFn);
+  /**
+   * Register a custom easing for GPU computation.
+   * The function name is extracted from the WGSL.
+   *
+   * @param wgslFn - Full WGSL function definition (e.g., 'fn myEase(t: f32) -> f32 { return t * t; }')
+   * @returns The registered easing name
+   */
+  registerGpuEasing(wgslFn: string): string {
+    const name = registerGpuEasing(wgslFn);
     debug('Registered GPU easing', name);
+    return name;
   }
 
   registerShader(shader: ShaderDef): void {
@@ -107,10 +108,6 @@ export class App implements MotionApp {
 
   getRenderer(name: string): RendererDef | undefined {
     return this.renderers.get(name);
-  }
-
-  getEasing(name: string): ((t: number) => number) | undefined {
-    return this.easings.get(name);
   }
 }
 

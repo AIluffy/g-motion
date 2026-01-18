@@ -4,6 +4,7 @@ import { getEasingId } from '../easing-registry';
 import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
 import { SchedulingConstants } from '../../constants/scheduling';
 import { TimelineTracksMap } from '../../types';
+import type { Easing } from '../../types';
 import type {
   InertiaComponentData,
   Keyframe,
@@ -53,6 +54,12 @@ import {
 } from './utils';
 
 import { getPhysicsStateVersionByArchetype, getPhysicsLayoutSigByArchetype } from './physics-state';
+
+// Extract easing name from Easing type
+function getEasingName(easing?: Easing): string {
+  if (!easing) return 'linear';
+  return easing;
+}
 
 function getFlatTracks(timeline: {
   tracks?: TimelineData;
@@ -578,7 +585,7 @@ export const BatchSamplingSystem: SystemDef = {
                     const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
-                    const easingId = getEasingId(kf.easing);
+                    const easingId = getEasingId(getEasingName(kf.easing));
 
                     // Determine easing mode (Phase 1.1: Bezier support)
                     let easingMode = EASING_MODE_STANDARD;
@@ -669,7 +676,7 @@ export const BatchSamplingSystem: SystemDef = {
                     const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
-                    const easingId = getEasingId(kf.easing);
+                    const easingId = getEasingId(getEasingName(kf.easing));
 
                     let easingMode = EASING_MODE_STANDARD;
                     if (kf.interp === 'hold') {
@@ -703,7 +710,7 @@ export const BatchSamplingSystem: SystemDef = {
                     const kf = track[kIndex] as unknown as Keyframe & {
                       bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
                     };
-                    const easingId = getEasingId(kf.easing);
+                    const easingId = getEasingId(getEasingName(kf.easing));
 
                     let easingMode = EASING_MODE_STANDARD;
                     if (kf.interp === 'hold') {

@@ -22,43 +22,11 @@ export interface BatchContext {
 }
 
 /**
- * Built-in easing function names for type-safe string-based easing
+ * Easing for mark options.
+ * - Built-in names (e.g., 'easeInOut', 'linear')
+ * - Custom easings registered via app.registerGpuEasing()
  */
-export type EasingName =
-  | 'linear'
-  | 'easeIn'
-  | 'easeOut'
-  | 'easeInOut'
-  | 'easeInSine'
-  | 'easeOutSine'
-  | 'easeInOutSine'
-  | 'easeInExpo'
-  | 'easeOutExpo'
-  | 'easeInOutExpo'
-  | 'easeInCirc'
-  | 'easeOutCirc'
-  | 'easeInOutCirc'
-  | 'easeInBack'
-  | 'easeOutBack'
-  | 'easeInOutBack'
-  | 'easeInElastic'
-  | 'easeOutElastic'
-  | 'easeInOutElastic'
-  | 'easeInBounce'
-  | 'easeOutBounce'
-  | 'easeInOutBounce';
-
-/**
- * Easing function type: accepts progress [0,1] and returns eased value [0,1]
- */
-export type EasingFunction = (t: number) => number;
-
-/**
- * Easing can be specified as:
- * - A string name (type-safe with autocomplete)
- * - A custom function
- */
-export type Easing = EasingName | EasingFunction;
+export type Easing = string;
 
 /**
  * Physics parameters for spring-based animations

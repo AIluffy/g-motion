@@ -120,8 +120,7 @@ export interface MotionApp {
   registerComponent(name: string, def: ComponentDef): void;
   registerSystem(system: SystemDef): void;
   registerRenderer(name: string, renderer: RendererDef): void;
-  registerEasing(name: string, fn: (t: number) => number): void;
-  registerGpuEasing(name: string, fn: (t: number) => number, wgslFn: string): void;
+  registerGpuEasing(wgslFn: string): string;
   registerShader(shader: ShaderDef): void;
   getConfig(): MotionAppConfig;
   getRenderer(name: string): RendererDef | undefined;
