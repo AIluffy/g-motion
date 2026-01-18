@@ -1,5 +1,10 @@
-import { expect, test, vi } from 'vitest';
-import { createDebugger } from '../src/index';
+import { expect, test, vi, beforeEach } from 'vitest';
+import { createDebugger, _clearDebuggerCache } from '../src/index';
+
+beforeEach(() => {
+  // Clear caches before each test to ensure isolation
+  _clearDebuggerCache();
+});
 
 test('logs in non-production by default', () => {
   const logger = createDebugger('Test');
@@ -21,6 +26,8 @@ test('does not log in production unless __MOTION_DEBUG__ is set', () => {
   // Force-enable via global flag
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).__MOTION_DEBUG__ = true;
+  // Clear cache to pick up the new flag
+  _clearDebuggerCache();
   logger('should-log');
   expect(spy).toHaveBeenCalledWith('[Motion][ProdTest]', 'should-log');
 

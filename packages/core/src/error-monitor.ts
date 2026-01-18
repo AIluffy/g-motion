@@ -52,61 +52,81 @@ function inferErrorScope(code: string): ErrorScope {
   return 'unknown';
 }
 
+/**
+ * Key for aggregating errors: scope:code:severity
+ */
+function getAggregateKey(event: ErrorMonitorEvent): string {
+  return `${event.scope}:${event.code}:${event.severity}`;
+}
+
 export class ErrorMonitor {
-  private readonly maxEvents: number;
+  private readonly bufferSize: number;
   private readonly events: ErrorMonitorEvent[];
+  private readonly aggregates: Map<string, ErrorAggregate>;
+  private head = 0;
+  private count = 0;
 
   constructor(options?: { maxEvents?: number }) {
-    this.maxEvents = Math.max(0, options?.maxEvents ?? 500);
-    this.events = [];
+    this.bufferSize = Math.max(1, options?.maxEvents ?? 500);
+    this.events = new Array(this.bufferSize);
+    this.aggregates = new Map();
   }
 
   record(error: MotionError): void {
-    if (this.maxEvents === 0) return;
-
     const scope = inferErrorScope(String(error.code));
-    this.events.push({
+    const event: ErrorMonitorEvent = {
       timestamp: Date.now(),
       scope,
       code: error.code,
       severity: error.severity,
       message: error.message,
       context: error.context,
-    });
+    };
 
-    const overflow = this.events.length - this.maxEvents;
-    if (overflow > 0) {
-      this.events.splice(0, overflow);
+    // Circular buffer insert - O(1)
+    this.events[this.head] = event;
+    this.head = (this.head + 1) % this.bufferSize;
+    this.count = Math.min(this.count + 1, this.bufferSize);
+
+    // Incremental aggregate update - O(1)
+    const key = getAggregateKey(event);
+    const existing = this.aggregates.get(key);
+    if (existing) {
+      existing.count++;
+      existing.lastTimestamp = event.timestamp;
+    } else {
+      this.aggregates.set(key, {
+        scope: event.scope,
+        code: event.code,
+        severity: event.severity,
+        count: 1,
+        firstTimestamp: event.timestamp,
+        lastTimestamp: event.timestamp,
+      });
     }
   }
 
   getEvents(): ReadonlyArray<ErrorMonitorEvent> {
-    return this.events;
+    if (this.count === 0) {
+      return [];
+    }
+
+    if (this.count < this.bufferSize) {
+      return Array.from(this.events.slice(0, this.count));
+    }
+
+    // Buffer is full: return from head to end, then from 0 to head
+    return Array.from([...this.events.slice(this.head), ...this.events.slice(0, this.head)]);
   }
 
-  getAggregates(): ErrorAggregate[] {
-    const out = new Map<string, ErrorAggregate>();
-    for (const e of this.events) {
-      const key = `${e.scope}:${e.code}:${e.severity}`;
-      const existing = out.get(key);
-      if (existing) {
-        existing.count += 1;
-        existing.lastTimestamp = e.timestamp;
-      } else {
-        out.set(key, {
-          scope: e.scope,
-          code: e.code,
-          severity: e.severity,
-          count: 1,
-          firstTimestamp: e.timestamp,
-          lastTimestamp: e.timestamp,
-        });
-      }
-    }
-    return Array.from(out.values());
+  getAggregates(): ReadonlyArray<ErrorAggregate> {
+    return Array.from(this.aggregates.values());
   }
 
   clear(): void {
-    this.events.length = 0;
+    // Just reset pointers - circular buffer doesn't need element clearing
+    this.head = 0;
+    this.count = 0;
+    this.aggregates.clear();
   }
 }

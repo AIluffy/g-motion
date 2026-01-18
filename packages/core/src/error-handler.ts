@@ -7,18 +7,6 @@ const debug = createDebugger('ErrorHandler');
 const warn = createDebugger('ErrorHandler', 'warn');
 const errorLog = createDebugger('ErrorHandler', 'error');
 
-function logWithSeverity(
-  logger: (...args: unknown[]) => void,
-  message: string,
-  context?: Record<string, unknown>,
-): void {
-  if (context) {
-    logger(message, context);
-  } else {
-    logger(message);
-  }
-}
-
 export class ErrorHandler {
   private context: AppContext;
 
@@ -52,16 +40,18 @@ export class ErrorHandler {
   }
 
   private logError(error: MotionError): void {
+    const { message, context } = error;
+    // Direct call - console methods support variadic arguments
     switch (error.severity) {
       case ErrorSeverity.FATAL:
       case ErrorSeverity.ERROR:
-        logWithSeverity(errorLog, error.message, error.context);
+        errorLog(message, context);
         break;
       case ErrorSeverity.WARNING:
-        logWithSeverity(warn, error.message, error.context);
+        warn(message, context);
         break;
       case ErrorSeverity.INFO:
-        logWithSeverity(debug, error.message, error.context);
+        debug(message, context);
         break;
     }
   }
