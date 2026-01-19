@@ -158,7 +158,6 @@ export class SchedulerProcessor {
     } catch (e) {
       if (!this.persistentBufferStatsFailedLogged) {
         const msg = e instanceof Error ? e.message : String(e);
-        // Suppress warning if manager is simply not initialized (expected in non-GPU envs)
         if (!msg.includes('PersistentGPUBufferManager not initialized')) {
           this.persistentBufferStatsFailedLogged = true;
           warn('getPersistentGPUBufferManager().getStats failed', {

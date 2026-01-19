@@ -4,7 +4,7 @@
  * Caches and retrieves compute pipelines for different workgroup sizes.
  */
 
-import { WebGPUConstants } from '../../constants/webgpu';
+import { WebGPUConstants } from '../constants/webgpu';
 
 const WORKGROUP_SIZES = [
   WebGPUConstants.WORKGROUP.SIZE_SMALL,
@@ -14,7 +14,6 @@ const WORKGROUP_SIZES = [
 ] as const;
 type WorkgroupSize = (typeof WORKGROUP_SIZES)[number];
 
-// Pipeline cache for different workgroup sizes
 type PipelineBucket = {
   pipelineCache: Map<number, GPUComputePipeline>;
   pipelineCacheKey: string | null;
@@ -37,17 +36,10 @@ function getBucket(cacheId: string): PipelineBucket {
   return b;
 }
 
-/**
- * Cache a pipeline for a specific workgroup size
- */
 export function cachePipeline(workgroupSize: number, pipeline: GPUComputePipeline): void {
   getBucket('default').pipelineCache.set(workgroupSize, pipeline);
 }
 
-/**
- * Get or retrieve pipeline for a given workgroup size
- * Returns best-match pipeline based on workgroupHint.
- */
 export async function getPipelineForWorkgroup(
   _device: GPUDevice,
   workgroupHint: number,
@@ -66,9 +58,6 @@ export async function getPipelineForWorkgroup(
   );
 }
 
-/**
- * Clear all cached pipelines
- */
 export function clearPipelineCache(): void {
   for (const b of pipelineBuckets.values()) {
     b.pipelineCache.clear();
@@ -95,39 +84,6 @@ export function selectWorkgroupSize(workgroupHint: number): WorkgroupSize {
   if (entityCount < WORKGROUP.ENTITY_COUNT_SMALL_THRESHOLD) return WORKGROUP.SIZE_SMALL;
   if (entityCount < WORKGROUP.ENTITY_COUNT_MEDIUM_THRESHOLD) return WORKGROUP.SIZE_MEDIUM;
   return WORKGROUP.SIZE_DEFAULT;
-}
-
-function hashString(input: string): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i) >>> 0;
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function buildCacheKey(
-  shaderCode: string,
-  bindGroupLayoutEntries: any[],
-  entryPoint: string,
-): string {
-  const bindingsSig = Array.isArray(bindGroupLayoutEntries)
-    ? bindGroupLayoutEntries
-        .map((e: any) => {
-          const t = e?.buffer?.type ? String(e.buffer.type) : '';
-          return `${e?.binding ?? ''}:${e?.visibility ?? ''}:${t}`;
-        })
-        .join('|')
-    : '';
-  return `${entryPoint}|${hashString(shaderCode)}|${hashString(bindingsSig)}`;
-}
-
-function makeWorkgroupVariant(shaderCode: string, workgroupSize: WorkgroupSize): string {
-  const replaced = shaderCode.replace(
-    /@workgroup_size\(\s*\d+\s*\)/g,
-    `@workgroup_size(${workgroupSize})`,
-  );
-  return replaced;
 }
 
 export async function precompileWorkgroupPipelines(
@@ -188,3 +144,38 @@ export async function precompileWorkgroupPipelines(
     return false;
   }
 }
+
+function hashString(input: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function buildCacheKey(
+  shaderCode: string,
+  bindGroupLayoutEntries: any[],
+  entryPoint: string,
+): string {
+  const bindingsSig = Array.isArray(bindGroupLayoutEntries)
+    ? bindGroupLayoutEntries
+        .map((e: any) => {
+          const t = e?.buffer?.type ? String(e.buffer.type) : '';
+          return `${e?.binding ?? ''}:${e?.visibility ?? ''}:${t}`;
+        })
+        .join('|')
+    : '';
+  return `${entryPoint}|${hashString(shaderCode)}|${hashString(bindingsSig)}`;
+}
+
+function makeWorkgroupVariant(shaderCode: string, workgroupSize: WorkgroupSize): string {
+  const replaced = shaderCode.replace(
+    /@workgroup_size\(\s*\d+\s*\)/g,
+    `@workgroup_size(${workgroupSize})`,
+  );
+  return replaced;
+}
+
+export type { WorkgroupSize };

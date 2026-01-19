@@ -1,4 +1,4 @@
-import type { MotionPlugin, MotionApp } from '@g-motion/core';
+import type { MotionPlugin } from '@g-motion/core';
 import { registerPlugin } from '@g-motion/core';
 import { InertiaComponentSchema } from './component';
 import inertiaShaderCode from './shaders/inertia.wgsl?raw';
@@ -26,13 +26,6 @@ const inertiaShader = {
 export const inertiaPlugin: MotionPlugin = {
   name: 'inertia',
   version: '0.0.0',
-
-  setup(app: MotionApp) {
-    app.registerComponent('Inertia', {
-      schema: InertiaComponentSchema,
-    });
-  },
-
   manifest: {
     components: {
       Inertia: { schema: InertiaComponentSchema },
@@ -54,6 +47,3 @@ export type { InertiaOptions } from '@g-motion/core';
 
 // Re-export shader code for external use
 export { default as INERTIA_GPU_SHADER } from './shaders/inertia.wgsl?raw';
-
-// Legacy export for backward compatibility
-export const InertiaPlugin = inertiaPlugin;

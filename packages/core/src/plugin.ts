@@ -134,15 +134,6 @@ export interface PluginComponentDef {
 }
 
 /**
- * Plugin system definition
- */
-export interface PluginSystemDef {
-  name: string;
-  order: number;
-  update(dt: number, ctx?: SystemContext): void;
-}
-
-/**
  * GPU Shader binding definition
  */
 export interface ShaderBindingDef {
@@ -172,7 +163,7 @@ export interface PluginConfig {
  */
 export interface PluginManifest {
   components?: Record<string, PluginComponentDef>;
-  systems?: PluginSystemDef[];
+  systems?: SystemDef[];
   shaders?: Record<string, ShaderModuleDef>;
   config?: PluginConfig;
   setup?(app: MotionApp, services?: EngineServices): void;
@@ -188,23 +179,11 @@ export interface ShaderDef {
   bindings?: ShaderBindingDef[];
 }
 
-/**
- * Motion Plugin interface
- * Supports both legacy setup() pattern and new manifest pattern
- */
 export interface MotionPlugin {
   name: string;
   version?: string;
 
-  /**
-   * Legacy setup pattern (backward compatible)
-   */
-  setup?(app: MotionApp, services?: EngineServices): void;
-
-  /**
-   * New manifest pattern for self-contained plugins
-   */
-  manifest?: PluginManifest;
+  manifest: PluginManifest;
 }
 
 /**

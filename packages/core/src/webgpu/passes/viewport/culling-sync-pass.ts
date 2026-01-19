@@ -14,7 +14,7 @@ import {
   resetParamsBuffer,
 } from './culling-types';
 import { getCullingCompactPipeline, cullingCompactBindGroupLayout } from './culling-pipeline';
-import { resolveViewportBounds } from '../viewport-bounds';
+import { resolveViewportBounds } from './viewport-bounds';
 
 export async function runViewportCullingCompactionPass(
   device: GPUDevice,

@@ -2,7 +2,7 @@
  * Output Format Types
  */
 
-import { OUTPUT_FORMAT, packOutputChannels } from '../../../webgpu/output-format-shader';
+import { OUTPUT_FORMAT, packOutputChannels } from '../output-format-shader';
 
 export { OUTPUT_FORMAT, packOutputChannels };
 

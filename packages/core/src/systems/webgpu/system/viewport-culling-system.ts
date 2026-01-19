@@ -5,11 +5,11 @@ import type { ComputeBatchProcessor } from '../../batch';
 import {
   runViewportCullingCompactionPass,
   runViewportCullingCompactionPassAsync,
-} from '../viewport';
+} from '../../../webgpu/passes/viewport';
 import { setPendingReadbackCount } from '../../../webgpu/sync-manager';
 import type { WebGPUEngine } from '../../../webgpu/engine';
-import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import { tryReleasePooledOutputBufferFromTag } from '../../../webgpu/output-buffer-pool';
+import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 export type CullingReadbackTag = {
   kind: 'culling';

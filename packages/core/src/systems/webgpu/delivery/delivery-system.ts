@@ -7,7 +7,8 @@
 
 import type { SystemContext, SystemDef } from '../../../plugin';
 import { MotionStatus } from '../../../components/state';
-import { drainGPUResults, unmarkPhysicsGPUEntity } from '../../../webgpu/sync-manager';
+import { drainGPUResultsInto, unmarkPhysicsGPUEntity } from '../../../webgpu/sync-manager';
+import type { GPUResultPacket } from '../../../webgpu/sync-manager';
 import {
   getGPUChannelMappingRegistry,
   isMatrix2DTransformChannels,
@@ -28,14 +29,16 @@ import {
 
 const warn = createDebugger('GPUResultApplySystem', 'warn');
 
+const s_gpuResultPacketsScratch: GPUResultPacket[] = [];
+
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
-  order: 28, // before RenderSystem
+  order: 28,
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
     const errorHandler = ctx?.services.errorHandler;
     if (!world) return;
-    const packets = drainGPUResults();
+    const packets = drainGPUResultsInto(s_gpuResultPacketsScratch);
     if (!packets.length) return;
     const channelRegistry = getGPUChannelMappingRegistry();
     const primitiveCode = getRendererCode('primitive');

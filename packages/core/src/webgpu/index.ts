@@ -10,6 +10,47 @@
 export { WebGPUEngine, getWebGPUEngine, resetWebGPUEngine } from './engine';
 export type { WebGPUEngineConfig } from './engine';
 
+export { createWebGPUFrameEncoder } from './command-encoder';
+export type { WebGPUFrameEncoder } from './command-encoder';
+
+export { dispatchGPUBatch, dispatchPhysicsBatch } from './dispatch';
+
+export {
+  getPipelineForWorkgroup,
+  cachePipeline,
+  clearPipelineCache,
+  precompileWorkgroupPipelines,
+  selectWorkgroupSize,
+} from './pipeline';
+export type { WorkgroupSize } from './pipeline';
+
+export {
+  initWebGPUCompute,
+  ensureWebGPUInitialized,
+  ensureWebGPUPipelines,
+} from './initialization';
+export type { WebGPUInitializationDeps } from './initialization';
+
+export type { OutputFormatPoolStats } from './output-format';
+export {
+  enableGPUOutputFormatPass,
+  disableGPUOutputFormatPass,
+  getOutputFormatBufferPoolStats,
+  __getOutputFormatBufferPoolStatsForTests,
+  __resetOutputFormatPassForTests,
+  releaseOutputFormatBuffer,
+  runOutputFormatPass,
+} from './output-format';
+
+export { processOutputBuffer } from './output-buffer-processing';
+export type {
+  ProcessOutputBufferInput,
+  OutputBufferLeaseManager,
+} from './output-buffer-processing';
+
+export { acquirePooledOutputBuffer, releasePooledOutputBuffer } from './output-buffer-pool';
+export type { OutputBufferReadbackTag } from './output-buffer-pool';
+
 export {
   enqueueGPUResults,
   drainGPUResults,

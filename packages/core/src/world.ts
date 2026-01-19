@@ -5,7 +5,6 @@ import type { Archetype } from './archetype';
 import type { ComponentValue } from './types';
 import type { MotionAppConfig } from './plugin';
 import { ArchetypeManager, type MotionStatusCoordinator } from './archetypeManager';
-import { ConfigurationService } from './configurationService';
 import { SystemCoordinator } from './systemCoordinator';
 
 /**
@@ -24,7 +23,7 @@ export class World {
   readonly registry = new ComponentRegistry();
   readonly entityManager = new EntityManager();
   readonly scheduler = new SystemScheduler();
-  private configurationService: ConfigurationService;
+  private _config: MotionAppConfig;
   private systemCoordinator: SystemCoordinator;
   private archetypeManager: ArchetypeManager;
 
@@ -35,7 +34,7 @@ export class World {
     const namespaceOffset = World.worldCounter++ * 1_000_000;
     this.entityManager.setOffset(namespaceOffset);
 
-    this.configurationService = new ConfigurationService(config);
+    this._config = { ...config };
 
     let systems: SystemCoordinator | undefined;
     const motion: MotionStatusCoordinator = {
@@ -57,11 +56,11 @@ export class World {
   }
 
   get config(): MotionAppConfig {
-    return this.configurationService.config;
+    return this._config;
   }
 
   setConfig(config?: MotionAppConfig): void {
-    this.configurationService.setConfig(config);
+    this._config = { ...config };
   }
 
   resetState(): void {

@@ -2,9 +2,8 @@
  * Output Format Pipeline
  */
 
-import { OUTPUT_FORMAT_SHADER } from '../../../webgpu/output-format-shader';
+import { OUTPUT_FORMAT_SHADER } from '../output-format-shader';
 
-// Pipeline cache (exported for use by pass file)
 export let outputFormatPipeline: GPUComputePipeline | null = null;
 export let outputFormatBindGroupLayout: GPUBindGroupLayout | null = null;
 

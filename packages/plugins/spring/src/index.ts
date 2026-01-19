@@ -1,4 +1,4 @@
-import type { MotionApp, MotionPlugin } from '@g-motion/core';
+import type { MotionPlugin } from '@g-motion/core';
 import { registerPlugin } from '@g-motion/core';
 import { SpringComponentSchema } from './component';
 import springShaderCode from './shaders/spring.wgsl?raw';
@@ -26,13 +26,6 @@ const springShader = {
 export const springPlugin: MotionPlugin = {
   name: 'spring',
   version: '0.0.0',
-
-  setup(app: MotionApp) {
-    app.registerComponent('Spring', {
-      schema: SpringComponentSchema,
-    });
-  },
-
   manifest: {
     components: {
       Spring: { schema: SpringComponentSchema },
@@ -56,6 +49,3 @@ export { default as SPRING_GPU_SHADER } from './shaders/spring.wgsl?raw';
 
 // Re-export spring utilities
 export { SPRING_PRESETS, calculateCriticalDamping } from './component';
-
-// Legacy export for backward compatibility
-export const SpringPlugin = springPlugin;

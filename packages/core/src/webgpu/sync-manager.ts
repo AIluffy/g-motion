@@ -13,7 +13,7 @@ const _resultQueue: GPUResultPacket[] = [];
 let _pendingReadbackCount = 0;
 let _wakeup: (() => void) | undefined;
 const _physicsGPUEntityIds = new Set<number>();
-const _forcedPhysicsSyncEntityIds = new Set<number>();
+let _forcedPhysicsSyncEntityIds = new Set<number>();
 
 export function setGPUResultWakeup(fn: (() => void) | undefined): void {
   _wakeup = fn;
@@ -41,8 +41,18 @@ export function enqueueGPUResults(p: GPUResultPacket): void {
 }
 
 export function drainGPUResults(): GPUResultPacket[] {
-  if (_resultQueue.length === 0) return [];
-  const out = _resultQueue.slice();
+  return drainGPUResultsInto();
+}
+
+export function drainGPUResultsInto(out: GPUResultPacket[] = []): GPUResultPacket[] {
+  out.length = 0;
+  const n = _resultQueue.length;
+  if (n === 0) {
+    return out;
+  }
+  for (let i = 0; i < n; i++) {
+    out.push(_resultQueue[i]);
+  }
   _resultQueue.length = 0;
   return out;
 }
@@ -73,10 +83,20 @@ export function forceGPUStateSync(entityId: number): void {
   }
 }
 
+export function consumeForcedGPUStateSyncEntityIdsSet(): Set<number> {
+  const out = _forcedPhysicsSyncEntityIds;
+  _forcedPhysicsSyncEntityIds = new Set<number>();
+  return out;
+}
+
 export function consumeForcedGPUStateSyncEntityIds(): number[] {
-  if (_forcedPhysicsSyncEntityIds.size === 0) return [];
-  const out: number[] = [];
-  for (const id of _forcedPhysicsSyncEntityIds) out.push(id);
-  _forcedPhysicsSyncEntityIds.clear();
+  const set = consumeForcedGPUStateSyncEntityIdsSet();
+  if (set.size === 0) return [];
+  const out = new Array<number>(set.size);
+  let i = 0;
+  for (const id of set) {
+    out[i] = id;
+    i++;
+  }
   return out;
 }

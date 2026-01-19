@@ -88,11 +88,4 @@ export class MotionError extends Error {
   isFatal(): boolean {
     return this.severity === ErrorSeverity.FATAL;
   }
-
-  /**
-   * Check if this error should trigger GPU fallback
-   */
-  shouldFallback(): boolean {
-    return this.code.startsWith('GPU_');
-  }
 }

@@ -132,7 +132,7 @@ pnpm type-check
 - **ECS**: Entity = numeric ID, Components = data schemas, Systems = pure functions
 - **Renderer types**: DOM, Canvas, WebGL, WebGPU—isolated per target
 - **Archetype**: O(1) entity lookup via reverse index map; SoA layout for cache locality
-- **WebGPU**: Automatic CPU fallback; threshold-based activation (default 5000+ entities)
+- **WebGPU**: GPU-first compute; no CPU fallback
 
 ## References
 

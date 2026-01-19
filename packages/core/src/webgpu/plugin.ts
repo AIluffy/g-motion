@@ -1,4 +1,4 @@
-import { MotionPlugin, MotionApp } from '../plugin';
+import { MotionPlugin } from '../plugin';
 import { WebGPUComputeSystem } from '../systems/webgpu';
 import { BatchSamplingSystem } from '../systems/batch';
 
@@ -13,15 +13,10 @@ import { BatchSamplingSystem } from '../systems/batch';
  * - Built-in WGSL compute shader for interpolation calculations
  * - Automatic GPU buffer management and pipeline initialization
  * - Seamless integration with batch sampling system
- * - Graceful fallback when WebGPU is unavailable
  */
 export const WebGPUComputePlugin: MotionPlugin = {
   name: 'WebGPUComputePlugin',
-  setup(app: MotionApp) {
-    // Register batch sampling system (runs first, order 5)
-    app.registerSystem(BatchSamplingSystem);
-
-    // Register WebGPU compute system (runs after batch, order 6)
-    app.registerSystem(WebGPUComputeSystem);
+  manifest: {
+    systems: [BatchSamplingSystem, WebGPUComputeSystem],
   },
 };

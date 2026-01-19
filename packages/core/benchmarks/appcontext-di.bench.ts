@@ -66,32 +66,8 @@ describe('AppContext Dependency Injection Performance', () => {
     }
   });
 
-  bench('WebGPU initialization flag check via AppContext', () => {
+  bench('Full per-frame context operations (batch)', () => {
     const ctx = getAppContext();
-    ctx.setWebGPUInitialized(true);
-
-    for (let i = 0; i < 100000; i++) {
-      const initialized = ctx.isWebGPUInitialized();
-      if (!initialized) {
-        throw new Error('WebGPU should be initialized');
-      }
-    }
-  });
-
-  bench('globalThis WebGPU flag check (baseline)', () => {
-    (globalThis as any).__webgpuInitialized = true;
-
-    for (let i = 0; i < 100000; i++) {
-      const initialized = (globalThis as any).__webgpuInitialized;
-      if (!initialized) {
-        throw new Error('WebGPU should be initialized');
-      }
-    }
-  });
-
-  bench('Full per-frame context operations (batch + WebGPU)', () => {
-    const ctx = getAppContext();
-    ctx.setWebGPUInitialized(true);
 
     // Simulate 60 frames of operations
     for (let frame = 0; frame < 60; frame++) {
@@ -100,7 +76,6 @@ describe('AppContext Dependency Injection Performance', () => {
         lastBatchId: `batch-${frame}`,
         entityCount: 1000 + frame * 10,
       });
-      ctx.isWebGPUInitialized();
       ctx.getBatchContext();
     }
   });

@@ -1,3 +1,4 @@
+import type { InertiaOptions } from '@g-motion/core';
 import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/core';
 import { createDebugger } from '@g-motion/utils';
 
@@ -6,7 +7,6 @@ const warn = createDebugger('Validation', 'warn');
 const SUPPORTED_INTERP = new Set(['linear', 'bezier', 'hold', 'autoBezier', 'spring', 'inertia']);
 
 const DEFAULT_INERTIA_DECEL = 4; // approx half-life 250ms (1000/4)
-const DEFAULT_SNAP_THRESHOLD = 1;
 
 export interface MarkValidationOptions {
   to?: any;
@@ -18,7 +18,7 @@ export interface MarkValidationOptions {
   easing?: string | ((t: number) => number);
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
   spring?: any;
-  inertia?: { deceleration?: number; snapTo?: any; snap?: any };
+  inertia?: InertiaOptions;
   stagger?: number | ((index: number) => number);
 }
 
@@ -171,11 +171,8 @@ export function normalizeMarkOptions<T extends MarkValidationOptions>(options: T
   }
 
   if (normalized.inertia) {
-    const inertia: any = { ...normalized.inertia };
+    const inertia = { ...normalized.inertia };
     if (inertia.deceleration === undefined) inertia.deceleration = DEFAULT_INERTIA_DECEL;
-    if (inertia.snapTo === undefined && inertia.snap === undefined) {
-      inertia.snapTo = DEFAULT_SNAP_THRESHOLD;
-    }
     normalized.inertia = inertia;
   }
 

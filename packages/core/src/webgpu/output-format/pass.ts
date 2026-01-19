@@ -5,18 +5,18 @@
  * Handles color encoding, value clamping, and format conversion.
  */
 
-import type { ChannelMapping } from '../../../webgpu/channel-mapping';
-import { isStandardTransformChannels } from '../../../webgpu/channel-mapping';
+import type { ChannelMapping } from '../channel-mapping';
+import { isStandardTransformChannels } from '../channel-mapping';
 import {
   createStandardChannelMapping,
   OUTPUT_FORMAT,
   packOutputChannels,
-} from '../../../webgpu/output-format-shader';
+} from '../output-format-shader';
 import { outputFormatBufferPool, trackBuffer } from './buffer-pool';
 import { getOutputFormatPipeline, outputFormatBindGroupLayout } from './pipeline';
 import { resetOutputFormatPassState } from './pipeline';
 import { makeChannelsKey } from './types';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import type { WebGPUFrameEncoder } from '../command-encoder';
 
 let outputFormatPassEnabled = true;
 

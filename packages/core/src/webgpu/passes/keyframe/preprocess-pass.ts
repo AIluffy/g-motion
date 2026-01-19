@@ -16,7 +16,7 @@ import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer
 import { getKeyframePreprocessPipeline, keyframePreprocessBindGroupLayout } from './pipelines';
 import { s_keyframePreprocessCPUCache } from './caches';
 import type { KeyframePreprocessResult } from './types';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 const KEYFRAME_SEARCH_INDEX_BLOCK_SIZE = 8;
 

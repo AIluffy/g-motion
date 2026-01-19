@@ -88,31 +88,13 @@ function getUrlOrStorageDebugFlag(): boolean {
   return false;
 }
 
-// Cache for threshold to avoid repeated checks
-// We cache based on the computed result, and invalidate when state changes
-let _cachedThreshold: DebugLevel | null = null;
-let _cacheTime = 0;
-const CACHE_TTL = 1000; // 1 second cache for repeated calls within same event loop
-
-/**
- * Get the debug threshold with caching
- * Avoids repeated checks for global flags, URL params, and environment
- */
 function getDebugThreshold(): DebugLevel {
-  const now = Date.now();
-  if (_cachedThreshold !== null && now - _cacheTime < CACHE_TTL) {
-    return _cachedThreshold;
-  }
-
   const globalLevel = getGlobalDebugLevel();
   const urlDebug = getUrlOrStorageDebugFlag();
   const globalDebug = getGlobalFlag<boolean>('__MOTION_DEBUG__', false);
 
   // Priority: globalLevel > urlDebug > globalDebug > environment default
-  _cachedThreshold =
-    globalLevel ?? (urlDebug || globalDebug ? 'debug' : isProd() ? 'warn' : 'debug');
-  _cacheTime = now;
-  return _cachedThreshold;
+  return globalLevel ?? (urlDebug || globalDebug ? 'debug' : isProd() ? 'warn' : 'debug');
 }
 
 function shouldLog(level: DebugLevel): boolean {
@@ -158,8 +140,6 @@ export function createDebugger(namespace: string, level: DebugLevel = 'debug') {
  * Clear all caches - useful for testing
  */
 export function _clearDebuggerCache(): void {
-  _cachedThreshold = null;
-  _cacheTime = 0;
   debuggerCache.clear();
 }
 

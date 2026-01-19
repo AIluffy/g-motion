@@ -240,9 +240,6 @@ importers:
         specifier: workspace:*
         version: link:../../utils
     devDependencies:
-      '@g-motion/animation':
-        specifier: workspace:*
-        version: link:../../animation
       '@rslib/core':
         specifier: ^0.18.3
         version: 0.18.3(typescript@5.9.3)
@@ -268,9 +265,6 @@ importers:
         specifier: workspace:*
         version: link:../../utils
     devDependencies:
-      '@g-motion/animation':
-        specifier: workspace:*
-        version: link:../../animation
       '@rslib/core':
         specifier: ^0.18.3
         version: 0.18.3(typescript@5.9.3)

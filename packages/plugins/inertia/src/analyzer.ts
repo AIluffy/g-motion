@@ -70,50 +70,44 @@ export function buildInertiaComponent(
   config: InertiaOptions,
   velocities: Map<string, number>,
 ): Record<string, unknown> {
-  const normalizeTimeConstant = (cfg: InertiaOptions) => {
+  const normalizeTimeConstant = (cfg: InertiaOptions): number => {
     if (typeof cfg.deceleration === 'number' && cfg.deceleration > 0) {
       return 1000 / cfg.deceleration;
     }
-    if (typeof cfg.timeConstant === 'number') return cfg.timeConstant;
-    if (cfg.duration !== undefined) {
-      if (typeof cfg.duration === 'number') return cfg.duration * 1000;
-      const avg = (cfg.duration.min + cfg.duration.max) / 2;
-      return avg * 1000;
+
+    if (typeof cfg.duration === 'number' && cfg.duration > 0) {
+      return cfg.duration * 1000;
     }
+    if (cfg.duration && typeof cfg.duration === 'object') {
+      const min = cfg.duration.min;
+      const max = cfg.duration.max;
+      if (typeof min === 'number' && typeof max === 'number') {
+        return ((min + max) / 2) * 1000;
+      }
+      if (typeof min === 'number') return min * 1000;
+      if (typeof max === 'number') return max * 1000;
+    }
+
     if (typeof cfg.resistance === 'number') {
       const r = Math.max(1, cfg.resistance);
       return 1000 / r;
     }
+
     return 350;
   };
 
-  const snap = config.snap ?? (config as any).snapTo ?? config.end;
   const bounds = config.bounds ?? { min: config.min, max: config.max };
-  const clamp = config.clamp ?? false;
-  const bounceConfig = config.bounce;
-  const bounceDisabled = bounceConfig === false;
+  const clamp = config.clamp === true;
 
   return {
-    power: config.power ?? 0.8,
     timeConstant: normalizeTimeConstant(config),
     min: bounds.min,
     max: bounds.max,
     bounds,
     clamp: clamp ? 1 : 0,
-    snap,
-    end: config.end,
-    modifyTarget: config.modifyTarget,
-    bounceStiffness: bounceDisabled
-      ? 0
-      : (bounceConfig?.stiffness ?? config.bounceStiffness ?? 500),
-    bounceDamping: bounceDisabled ? 0 : (bounceConfig?.damping ?? config.bounceDamping ?? 10),
-    bounceMass: bounceDisabled ? 1.0 : (bounceConfig?.mass ?? config.bounceMass ?? 1.0),
-    bounce: bounceConfig,
-    handoff: config.handoff,
+    bounce: config.bounce,
     restSpeed: config.restSpeed ?? 0.5,
     restDelta: config.restDelta ?? 0.5,
     velocities,
-    bounceVelocities: new Map<string, number>(),
-    inBounce: new Map<string, boolean>(),
   };
 }

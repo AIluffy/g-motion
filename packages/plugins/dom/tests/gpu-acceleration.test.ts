@@ -35,7 +35,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 100, y: 50 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Should use translate3d even for 2D transform
       const transform = element.style.transform;
@@ -54,7 +54,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 10 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Should have will-change set
       expect(element.style.willChange).toBe('transform');
@@ -70,7 +70,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 10 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Should have transform set (either translateZ(0) or the actual transform)
       expect(element.style.transform).toBeTruthy();
@@ -88,7 +88,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 100, y: 50, z: 0 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // With z=0 and forceGPUAcceleration=false, might use 2D transform
       const transform = element.style.transform;
@@ -105,7 +105,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 10 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       expect(element.style.willChange).not.toBe('transform');
     });
@@ -132,7 +132,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 100, y: 50, z: 30 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       const transform = element.style.transform;
       expect(transform).toContain('translate3d');
@@ -155,7 +155,7 @@ describe('GPU Acceleration Configuration', () => {
         },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       const transform = element.style.transform;
       expect(transform).toContain('perspective');
@@ -176,7 +176,7 @@ describe('GPU Acceleration Configuration', () => {
         },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       const transform = element.style.transform;
       expect(transform).toContain('rotate');
@@ -199,7 +199,7 @@ describe('GPU Acceleration Configuration', () => {
         },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       const transform = element.style.transform;
       expect(transform).toContain('scale');
@@ -210,7 +210,7 @@ describe('GPU Acceleration Configuration', () => {
     it('should create plugin with default GPU settings', () => {
       const plugin = createDOMPlugin();
       expect(plugin.name).toBe('DOMPlugin');
-      expect(plugin.setup).toBeDefined();
+      expect(plugin.manifest?.setup).toBeDefined();
     });
 
     it('should create plugin with custom renderer config', () => {
@@ -222,7 +222,7 @@ describe('GPU Acceleration Configuration', () => {
 
       const plugin = createDOMPlugin({ rendererConfig: config });
       expect(plugin.name).toBe('DOMPlugin');
-      expect(plugin.setup).toBeDefined();
+      expect(plugin.manifest?.setup).toBeDefined();
     });
 
     it('should allow partial config override', () => {
@@ -250,15 +250,15 @@ describe('GPU Acceleration Configuration', () => {
 
       // First update
       renderer.update(1, element1, { Transform: { x: 10 } });
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Second update to same element
       renderer.update(1, element1, { Transform: { x: 20 } });
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Update to different element
       renderer.update(2, element2, { Transform: { y: 30 } });
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Both should be initialized
       expect(element1.style.willChange).toBe('transform');
@@ -281,7 +281,7 @@ describe('GPU Acceleration Configuration', () => {
         });
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       elements.forEach((el, i) => {
         const transform = el.style.transform;
@@ -306,7 +306,7 @@ describe('GPU Acceleration Configuration', () => {
         renderer.update(1, element, {
           Transform: { x: i, y: i * 2 },
         });
-        renderer.postFrame();
+        renderer.postFrame?.();
       }
 
       // Element should still have will-change
@@ -324,7 +324,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 100 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       const resolvedElement = document.querySelector('#test-element') as HTMLElement;
       expect(resolvedElement.style.transform).toContain('translate3d');
@@ -342,7 +342,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: {},
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Should still initialize for GPU
       if (element.style.willChange) {
@@ -360,7 +360,7 @@ describe('GPU Acceleration Configuration', () => {
         Transform: { x: 0, y: 0, z: 0 },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       // Even with zero values, should use translate3d when forced
       const transform = element.style.transform;
@@ -377,7 +377,7 @@ describe('GPU Acceleration Configuration', () => {
         Render: { props: { opacity: 0.5 } },
       });
 
-      renderer.postFrame();
+      renderer.postFrame?.();
 
       expect(element.style.opacity).toBe('0.5');
     });
@@ -390,7 +390,7 @@ describe('GPU Acceleration Configuration', () => {
         renderer.update(1, '#non-existent-element', {
           Transform: { x: 100 },
         });
-        renderer.postFrame();
+        renderer.postFrame?.();
       }).not.toThrow();
     });
   });

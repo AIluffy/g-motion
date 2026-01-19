@@ -12,7 +12,7 @@ describe('DOM Transform Animation', () => {
     global.cancelAnimationFrame = (id) => clearTimeout(id);
 
     // Register DOM plugin once
-    DOMPlugin.setup(app);
+    DOMPlugin.manifest?.setup?.(app);
   });
 
   beforeEach(() => {

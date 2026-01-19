@@ -117,7 +117,7 @@ export class WebGPUEngine {
   private async _initializeInternal(): Promise<boolean> {
     if (typeof navigator === 'undefined' || !(navigator as unknown as { gpu?: unknown }).gpu) {
       const error = new MotionError(
-        'navigator.gpu not available; WebGPU disabled.',
+        'navigator.gpu not available; WebGPU unavailable.',
         ErrorCode.GPU_ADAPTER_UNAVAILABLE,
         ErrorSeverity.FATAL,
         {
@@ -143,7 +143,7 @@ export class WebGPUEngine {
 
       if (!this.adapter) {
         const error = new MotionError(
-          'requestAdapter returned null; WebGPU disabled.',
+          'requestAdapter returned null; WebGPU unavailable.',
           ErrorCode.GPU_ADAPTER_UNAVAILABLE,
           ErrorSeverity.FATAL,
           { stage: 'adapter', source: 'WebGPUEngine.initialize' },
@@ -161,7 +161,7 @@ export class WebGPUEngine {
 
       if (!this.device) {
         const error = new MotionError(
-          'requestDevice returned null; WebGPU disabled.',
+          'requestDevice returned null; WebGPU unavailable.',
           ErrorCode.GPU_DEVICE_UNAVAILABLE,
           ErrorSeverity.FATAL,
           { stage: 'device', source: 'WebGPUEngine.initialize' },

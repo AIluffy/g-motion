@@ -1,5 +1,10 @@
+import { getErrorHandler } from '../../../context';
+import { ErrorCode, ErrorSeverity, MotionError } from '../../../errors';
 import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
-import { acquirePooledOutputBuffer, releasePooledOutputBuffer } from '../output-buffer-pool';
+import {
+  acquirePooledOutputBuffer,
+  releasePooledOutputBuffer,
+} from '../../../webgpu/output-buffer-pool';
 import {
   getKeyframeEntryExpandPipeline,
   getKeyframeInterpPipeline,
@@ -9,7 +14,7 @@ import {
   keyframeSearchWindowBindGroupLayout,
 } from './pipelines';
 import type { KeyframePreprocessResult } from './types';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 const s_keyframeEntryExpandParams = new Uint32Array(4);
 const s_keyframeSearchInterpParams = new Uint32Array(4);
@@ -363,7 +368,24 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
     }
 
     return { outputBuffer, outputBufferTag: outputBufferRes?.tag };
-  } catch {
+  } catch (error) {
+    const errorHandler = getErrorHandler();
+    const originalError = error instanceof Error ? error.message : String(error);
+    errorHandler.handle(
+      new MotionError(
+        'Keyframe interpolation pass failed.',
+        ErrorCode.GPU_PIPELINE_FAILED,
+        ErrorSeverity.ERROR,
+        {
+          archetypeId,
+          entryCount,
+          entityCount,
+          channelCount,
+          indexedSearchEnabled,
+          originalError,
+        },
+      ),
+    );
     return null;
   }
 }

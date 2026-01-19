@@ -3,6 +3,7 @@ import type {
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
 } from '../../types';
+import { selectWorkgroupSize } from '../../webgpu/pipeline';
 import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
 import type { BatchStatistics } from './batchStatistics';
 import type { EntityIdLeasePool } from './entityIdLeasePool';
@@ -158,10 +159,7 @@ export class GPUBatchDispatcher {
   }
 
   selectWorkgroup(entityCount: number): number {
-    if (entityCount < 64) return 16;
-    if (entityCount < 256) return 32;
-    if (entityCount < 1024) return 64;
-    return 128;
+    return selectWorkgroupSize(entityCount);
   }
 
   clear(): void {

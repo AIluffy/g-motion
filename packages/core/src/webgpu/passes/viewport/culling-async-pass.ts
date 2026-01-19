@@ -14,8 +14,8 @@ import {
   resetParamsBuffer,
 } from './culling-types';
 import { getCullingCompactPipeline, cullingCompactBindGroupLayout } from './culling-pipeline';
-import { resolveViewportBounds } from '../viewport-bounds';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import { resolveViewportBounds } from './viewport-bounds';
+import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 export async function runViewportCullingCompactionPassAsync(
   device: GPUDevice,

@@ -58,33 +58,15 @@ export interface InertiaOptions {
   // Clamp instead of bounce when hitting bounds
   clamp?: boolean;
 
-  // End value control (GSAP-inspired snap-to)
-  snap?: number | number[] | ((naturalEnd: number) => number); // Preferred name
-  end?: number | number[] | ((naturalEnd: number) => number); // Alias for backward compatibility
-  snapTo?: number | number[] | ((naturalEnd: number) => number); // Additional alias per spec
-
   // Deceleration (ms-based). If provided, maps to timeConstant = 1000 / deceleration
   deceleration?: number;
 
-  // Modify target before snap/bounds evaluation
-  modifyTarget?: (target: number) => number;
-
   // Physics parameters
-  resistance?: number; // Resistance per second (friction) - more intuitive than timeConstant
-  duration?: number | { min: number; max: number }; // Tween duration in seconds or range
-
-  // Legacy parameters (for backward compatibility)
-  power?: number; // Target distance factor (deprecated, use resistance instead)
-  timeConstant?: number; // Decay duration in ms (deprecated, use resistance/duration instead)
+  resistance?: number;
+  duration?: number | { min: number; max: number };
 
   // Bounce parameters (when hitting min/max boundaries)
-  bounce?: false | { stiffness?: number; damping?: number; mass?: number }; // Preferred form; false disables bounce
-  bounceStiffness?: number; // Legacy stiffness
-  bounceDamping?: number; // Legacy damping
-  bounceMass?: number; // Legacy mass
-
-  // Optional handoff into spring when decay/bounce completes
-  handoff?: { type: 'spring'; to?: number };
+  bounce?: false | { stiffness?: number; damping?: number; mass?: number };
 
   // Completion thresholds
   restSpeed?: number; // Velocity threshold for completion (default: 0.5 units/sec)
@@ -227,25 +209,15 @@ export interface SpringComponentData {
 }
 
 export interface InertiaComponentData {
-  power?: number;
   timeConstant?: number;
   min?: number;
   max?: number;
   bounds?: { min?: number; max?: number };
   clamp?: boolean | number;
-  snap?: unknown;
-  end?: unknown;
-  modifyTarget?: unknown;
-  bounce?: unknown | false;
-  bounceStiffness?: number;
-  bounceDamping?: number;
-  bounceMass?: number;
-  handoff?: unknown;
+  bounce?: false | { stiffness?: number; damping?: number; mass?: number };
   restSpeed?: number;
   restDelta?: number;
   velocities?: Map<string, number>;
-  bounceVelocities?: Map<string, number>;
-  inBounce?: Map<string, boolean>;
 }
 
 /**

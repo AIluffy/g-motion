@@ -1,4 +1,4 @@
-import type { TimingHelper } from '../../webgpu/timing-helper';
+import type { TimingHelper } from './timing-helper';
 
 type CopyCommand = {
   src: GPUBuffer;

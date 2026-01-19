@@ -112,33 +112,55 @@ export class App implements MotionApp {
 }
 
 export function registerBuiltInRenderers(app: App): void {
+  function callUpdateFn(fn: ((val: any) => void) | undefined, props: Record<string, any>): void {
+    if (!fn) return;
+
+    let firstKey: string | undefined;
+    for (const k in props) {
+      if (Object.prototype.hasOwnProperty.call(props, k)) {
+        if (firstKey === undefined) {
+          firstKey = k;
+          continue;
+        }
+        fn(props);
+        return;
+      }
+    }
+
+    if (firstKey === undefined) return;
+    fn(props[firstKey]);
+  }
+
+  function applyPropsToTarget(target: any, props: Record<string, any>): void {
+    if (
+      target &&
+      typeof target === 'object' &&
+      typeof target.set === 'function' &&
+      typeof target.get === 'function'
+    ) {
+      for (const key in props) {
+        if (Object.prototype.hasOwnProperty.call(props, key)) {
+          target.set(key, props[key]);
+        }
+      }
+      return;
+    }
+    Object.assign(target, props);
+  }
+
   app.registerRenderer('callback', {
     update(_entity: number, target: any, components: any) {
       const props = components.Render?.props;
       if (!props) return;
 
-      if (target.onUpdate) {
-        if (Object.keys(props).length === 1) {
-          const componentValue = Object.values(props)[0];
-          target.onUpdate(componentValue);
-        } else {
-          target.onUpdate(props);
-        }
-      }
+      callUpdateFn(target.onUpdate, props);
     },
     updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
       const renderComp = getComponent('Render') as { props?: Record<string, unknown> } | undefined;
       const props = renderComp?.props;
       if (!props) return;
 
-      if (target.onUpdate) {
-        if (Object.keys(props).length === 1) {
-          const componentValue = Object.values(props)[0];
-          target.onUpdate(componentValue);
-        } else {
-          target.onUpdate(props);
-        }
-      }
+      callUpdateFn(target.onUpdate, props);
     },
   });
 
@@ -176,27 +198,8 @@ export function registerBuiltInRenderers(app: App): void {
       const props = renderComp?.props;
       if (!props) return;
 
-      if (
-        target &&
-        typeof target === 'object' &&
-        typeof (target as any).set === 'function' &&
-        typeof (target as any).get === 'function'
-      ) {
-        for (const [key, value] of Object.entries(props)) {
-          (target as any).set(key, value as any);
-        }
-      } else {
-        Object.assign(target, props);
-      }
-
-      if (renderComp?.onUpdate) {
-        if (Object.keys(props).length === 1) {
-          const value = Object.values(props)[0];
-          renderComp.onUpdate(value);
-        } else {
-          renderComp.onUpdate(props);
-        }
-      }
+      applyPropsToTarget(target, props);
+      callUpdateFn(renderComp?.onUpdate, props);
     },
     updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
       const renderComp = getComponent('Render') as
@@ -205,27 +208,8 @@ export function registerBuiltInRenderers(app: App): void {
       const props = renderComp?.props;
       if (!props) return;
 
-      if (
-        target &&
-        typeof target === 'object' &&
-        typeof (target as any).set === 'function' &&
-        typeof (target as any).get === 'function'
-      ) {
-        for (const [key, value] of Object.entries(props)) {
-          (target as any).set(key, value as any);
-        }
-      } else {
-        Object.assign(target, props);
-      }
-
-      if (renderComp?.onUpdate) {
-        if (Object.keys(props).length === 1) {
-          const value = Object.values(props)[0];
-          renderComp.onUpdate(value);
-        } else {
-          renderComp.onUpdate(props);
-        }
-      }
+      applyPropsToTarget(target, props);
+      callUpdateFn(renderComp?.onUpdate, props);
     },
   });
 }

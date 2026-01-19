@@ -28,10 +28,6 @@ export class ErrorHandler {
   handle(error: MotionError): void {
     this.context.getErrorMonitor().record(error);
 
-    if (error.shouldFallback()) {
-      this.context.setWebGPUInitialized(false);
-    }
-
     this.logError(error);
 
     if (error.isFatal()) {

@@ -3,7 +3,7 @@ import { createDebugger } from '@g-motion/utils';
 import { getAppContext } from './context';
 import { getGPUMetricsProvider } from './webgpu/metrics-provider';
 import { resetWebGPUEngine } from './webgpu/engine';
-import { clearPipelineCache } from './systems/webgpu';
+import { clearPipelineCache } from './webgpu/pipeline';
 import { World } from './world';
 import { WorldProvider } from './worldProvider';
 import type { SystemScheduler } from './scheduler';
@@ -68,44 +68,40 @@ class MotionEngineImpl implements MotionEngine {
   }
 
   use(plugin: MotionPlugin): void {
-    if (plugin.manifest) {
-      const manifest = plugin.manifest;
+    const manifest = plugin.manifest;
 
-      if (manifest.components) {
-        for (const [name, def] of Object.entries(manifest.components)) {
-          if (!this.world.registry.has(name)) {
-            this.app.registerComponent(name, { schema: def.schema });
-          }
+    if (manifest.components) {
+      for (const [name, def] of Object.entries(manifest.components)) {
+        if (!this.world.registry.has(name)) {
+          this.app.registerComponent(name, { schema: def.schema });
         }
       }
-
-      if (manifest.systems) {
-        const existingSystems = this.world.scheduler['systems'] as Array<{ name: string }>;
-        for (const system of manifest.systems) {
-          if (!existingSystems || !existingSystems.some((s) => s.name === system.name)) {
-            this.app.registerSystem(system);
-          }
-        }
-      }
-
-      if (manifest.shaders) {
-        const shaderRegistry = (this.services.appContext as any)['shaderRegistry'];
-        for (const [name, shaderDef] of Object.entries(manifest.shaders)) {
-          if (!shaderRegistry || !shaderRegistry.has(name)) {
-            this.app.registerShader({
-              name,
-              code: shaderDef.code,
-              entryPoint: shaderDef.entryPoint,
-              bindings: shaderDef.bindings,
-            });
-          }
-        }
-      }
-
-      manifest.setup?.(this.app, this.services);
-    } else {
-      plugin.setup?.(this.app, this.services);
     }
+
+    if (manifest.systems) {
+      const existingSystems = this.world.scheduler['systems'] as Array<{ name: string }>;
+      for (const system of manifest.systems) {
+        if (!existingSystems || !existingSystems.some((s) => s.name === system.name)) {
+          this.app.registerSystem(system);
+        }
+      }
+    }
+
+    if (manifest.shaders) {
+      const shaderRegistry = (this.services.appContext as any)['shaderRegistry'];
+      for (const [name, shaderDef] of Object.entries(manifest.shaders)) {
+        if (!shaderRegistry || !shaderRegistry.has(name)) {
+          this.app.registerShader({
+            name,
+            code: shaderDef.code,
+            entryPoint: shaderDef.entryPoint,
+            bindings: shaderDef.bindings,
+          });
+        }
+      }
+    }
+
+    manifest.setup?.(this.app, this.services);
   }
 
   dispose(): void {

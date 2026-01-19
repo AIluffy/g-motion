@@ -8,6 +8,6 @@
  */
 
 export { WebGPUComputeSystem } from './system';
-export { initWebGPUCompute } from './initialization';
-export { getPipelineForWorkgroup, cachePipeline, clearPipelineCache } from './pipeline';
-export { dispatchGPUBatch } from './dispatch';
+export { initWebGPUCompute } from '../../webgpu/initialization';
+export { getPipelineForWorkgroup, cachePipeline, clearPipelineCache } from '../../webgpu/pipeline';
+export { dispatchGPUBatch, dispatchPhysicsBatch } from '../../webgpu/dispatch';

@@ -5,12 +5,11 @@
  */
 
 import { runOutputFormatPass, releaseOutputFormatBuffer } from './output-format';
-import { StagingBufferPool } from '../../webgpu/staging-pool';
-import { AsyncReadbackManager } from '../../webgpu/async-readback';
-import { ComputeBatchProcessor } from '../batch/processor';
-import { setPendingReadbackCount } from '../../webgpu/sync-manager';
+import { StagingBufferPool } from './staging-pool';
+import { AsyncReadbackManager } from './async-readback';
+import { setPendingReadbackCount } from './sync-manager';
 import { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
-import type { WebGPUFrameEncoder } from './frame-encoder';
+import type { WebGPUFrameEncoder } from './command-encoder';
 
 export interface ProcessOutputBufferInput {
   archetypeId: string;
@@ -26,12 +25,17 @@ export interface ProcessOutputBufferInput {
   readbackTag?: unknown;
 }
 
+export type OutputBufferLeaseManager = {
+  markEntityIdsInFlight: (leaseId: number) => void;
+  releaseEntityIds: (leaseId: number) => void;
+};
+
 export async function processOutputBuffer(
   device: GPUDevice,
   queue: GPUQueue,
   sp: StagingBufferPool,
   readbackManager: AsyncReadbackManager | null,
-  processor: ComputeBatchProcessor,
+  processor: OutputBufferLeaseManager,
   input: ProcessOutputBufferInput,
   frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
@@ -116,30 +120,6 @@ export async function processOutputBuffer(
   }
   sp.markInFlight(stagingBuffer);
 
-  let mapPromise: Promise<void> | null = null;
-  let resolveMapPromise: (() => void) | null = null;
-  let rejectMapPromise: ((e: unknown) => void) | null = null;
-
-  if (readbackManager) {
-    mapPromise = new Promise<void>((resolve, reject) => {
-      resolveMapPromise = resolve;
-      rejectMapPromise = reject;
-    });
-    readbackManager.enqueueMapAsync(
-      archetypeId,
-      entityIdsForReadback,
-      stagingBuffer,
-      mapPromise,
-      byteSize,
-      200,
-      stride,
-      channelsForReadback,
-      leaseId,
-      readbackTag,
-    );
-    setPendingReadbackCount(readbackManager.getPendingCount());
-  }
-
   const afterSubmit = () => {
     if (didFormat) {
       releaseOutputFormatBuffer(formattedBuffer, queue);
@@ -149,8 +129,20 @@ export async function processOutputBuffer(
       }
     }
     if (readbackManager) {
-      const p = stagingBuffer.mapAsync((GPUMapMode as any).READ);
-      p.then(() => resolveMapPromise?.()).catch((e) => rejectMapPromise?.(e));
+      const mapPromise = stagingBuffer.mapAsync((GPUMapMode as any).READ);
+      readbackManager.enqueueMapAsync(
+        archetypeId,
+        entityIdsForReadback,
+        stagingBuffer,
+        mapPromise,
+        byteSize,
+        200,
+        stride,
+        channelsForReadback,
+        leaseId,
+        readbackTag,
+      );
+      setPendingReadbackCount(readbackManager.getPendingCount());
     }
   };
 

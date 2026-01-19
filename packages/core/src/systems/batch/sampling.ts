@@ -18,7 +18,10 @@ import type {
 } from '../../types';
 import { getRendererCode } from '../../renderer-code';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
-import { consumeForcedGPUStateSyncEntityIds, isPhysicsGPUEntity } from '../../webgpu/sync-manager';
+import {
+  consumeForcedGPUStateSyncEntityIdsSet,
+  isPhysicsGPUEntity,
+} from '../../webgpu/sync-manager';
 import { PHYSICS_STATE_STRIDE } from '../../webgpu/physics-shader';
 import type { ArchetypeTypedBuffer } from '../../archetype';
 import {
@@ -145,7 +148,7 @@ export const BatchSamplingSystem: SystemDef = {
       return kf.startValue + (kf.endValue - kf.startValue) * p;
     };
     const callbackCode = getRendererCode('callback');
-    const forcedSync = new Set(consumeForcedGPUStateSyncEntityIds());
+    const forcedSync = consumeForcedGPUStateSyncEntityIdsSet();
     const staticReuseEnabled = config.batchSamplingStaticReuse === true;
     const seekInvalidation = consumeBatchSamplingSeekInvalidation();
 
@@ -182,9 +185,9 @@ export const BatchSamplingSystem: SystemDef = {
       toProcess = world.getArchetypes();
     }
 
+    const archetypeBufferCache = getArchetypeBufferCache();
+
     for (const archetype of toProcess) {
-      // P1-2 Optimization: Use cached buffers to avoid repeated Map lookups
-      const archetypeBufferCache = getArchetypeBufferCache();
       let cachedBuffers = archetypeBufferCache.getBuffers(archetype);
 
       let stateBuffer: Array<unknown> | undefined;
@@ -999,16 +1002,14 @@ export const BatchSamplingSystem: SystemDef = {
 
             if (inertia) {
               const velocities = inertia.velocities instanceof Map ? inertia.velocities : undefined;
-              const bounceVelocities =
-                inertia.bounceVelocities instanceof Map ? inertia.bounceVelocities : undefined;
-              const inBounce = inertia.inBounce instanceof Map ? inertia.inBounce : undefined;
-
-              const isBouncing = inBounce ? !!inBounce.get(prop) : false;
               const vDecay = velocities ? Number(velocities.get(prop) ?? 0) : 0;
-              const vBounce = bounceVelocities
-                ? Number(bounceVelocities.get(prop) ?? vDecay)
-                : vDecay;
-              const v0 = isBouncing ? vBounce : vDecay;
+              const v0 = vDecay;
+
+              const bounceConfig = inertia.bounce;
+              const bounceEnabled = bounceConfig !== false;
+              const bounceStiffness = bounceEnabled ? Number(bounceConfig?.stiffness ?? 500) : 0;
+              const bounceDamping = bounceEnabled ? Number(bounceConfig?.damping ?? 10) : 0;
+              const bounceMass = bounceEnabled ? Number(bounceConfig?.mass ?? 1) : 1;
 
               const bounds = inertia.bounds ?? undefined;
               const minB = bounds?.min ?? inertia.min;
@@ -1024,12 +1025,12 @@ export const BatchSamplingSystem: SystemDef = {
               stateData[base + 7] = Number(inertia.restSpeed ?? 0.5);
               stateData[base + 8] = Number(inertia.restDelta ?? 0.5);
               stateData[base + 9] = inertia.clamp ? 1 : 0;
-              stateData[base + 10] = inertia.bounce === false ? 0 : 1;
-              stateData[base + 11] = Number(inertia.bounceStiffness ?? 0);
-              stateData[base + 12] = Number(inertia.bounceDamping ?? 0);
-              stateData[base + 13] = Number(inertia.bounceMass ?? 1);
+              stateData[base + 10] = bounceEnabled ? 1 : 0;
+              stateData[base + 11] = Number.isFinite(bounceStiffness) ? bounceStiffness : 0;
+              stateData[base + 12] = Number.isFinite(bounceDamping) ? bounceDamping : 0;
+              stateData[base + 13] = Number.isFinite(bounceMass) ? bounceMass : 1;
               stateData[base + 14] = 1;
-              stateData[base + 15] = isBouncing ? 1 : 0;
+              stateData[base + 15] = 0;
               continue;
             }
 

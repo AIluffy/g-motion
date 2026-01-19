@@ -3,13 +3,13 @@ import type { World } from '../../../world';
 import type { ComputeBatchProcessor } from '../../batch';
 import { getGPUChannelMappingRegistry } from '../../../webgpu/channel-mapping';
 import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
-import { dispatchGPUBatch } from '../dispatch';
+import { dispatchGPUBatch } from '../../../webgpu/dispatch';
 import { debugIO, float32Preview, firstEntityChannelPreview } from '../debug';
-import { processOutputBuffer } from '../output-buffer-processing';
-import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../keyframe';
+import { processOutputBuffer } from '../../../webgpu/output-buffer-processing';
+import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../../../webgpu/passes/keyframe';
 import { maybeRunViewportCulling } from './viewport-culling-system';
 import type { WebGPUEngine } from '../../../webgpu/engine';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 export async function processInterpolationArchetype(params: {
   engine: WebGPUEngine;

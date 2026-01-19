@@ -38,10 +38,10 @@ import {
   resolveWebGPUOutputBufferReuseEnabled,
   resolveKeyframeSearchOptimizedFlag,
 } from './system-config';
-import { __resetOutputFormatPassForTests } from './output-format';
-import { __resetViewportCullingPassForTests } from './viewport';
-import { __resetKeyframePassesForTests } from './keyframe';
-import { createWebGPUFrameEncoder } from './frame-encoder';
+import { __resetOutputFormatPassForTests } from '../../webgpu/output-format';
+import { __resetViewportCullingPassForTests } from '../../webgpu/passes/viewport';
+import { __resetKeyframePassesForTests } from '../../webgpu/passes/keyframe';
+import { createWebGPUFrameEncoder } from '../../webgpu/command-encoder';
 
 import {
   ensureWebGPUInitialized,
@@ -52,9 +52,9 @@ import { processCompletedReadbacks } from './system/readback-processing-system';
 import { dispatchPhysicsBatchForArchetype } from './system/physics-dispatch-system';
 import { processInterpolationArchetype } from './system/output-buffer-processor';
 
-export { enableGPUOutputFormatPass, disableGPUOutputFormatPass } from './output-format';
+export { enableGPUOutputFormatPass, disableGPUOutputFormatPass } from '../../webgpu/output-format';
 export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
-export { __getKeyframeSearchShaderModeForTests } from './keyframe';
+export { __getKeyframeSearchShaderModeForTests } from '../../webgpu/passes/keyframe';
 export { debugIO, float32Preview, firstEntityChannelPreview } from './debug';
 export {
   stepPhysicsShadow,
@@ -63,7 +63,10 @@ export {
   setPhysicsValidationShadow,
   clearPhysicsValidationShadow,
 } from './physics-validation';
-export { processOutputBuffer, ProcessOutputBufferInput } from './output-buffer-processing';
+export {
+  processOutputBuffer,
+  ProcessOutputBufferInput,
+} from '../../webgpu/output-buffer-processing';
 export { getPhysicsValidationShadow } from './physics-validation';
 
 const engine = getWebGPUEngine();
@@ -102,7 +105,7 @@ export const WebGPUComputeSystem: SystemDef = {
     const { world, metricsProvider, processor, config } = deps;
 
     const debugIOEnabled = isWebGPUIODebugEnabled(config);
-    await ensureWebGPUInitialized({ engine, metricsProvider, config });
+    await ensureWebGPUInitialized({ engine, metricsProvider });
     if (engine.mockWebGPU) {
       metricsProvider.updateStatus({ enabled: true });
       return;
@@ -137,7 +140,7 @@ export const WebGPUComputeSystem: SystemDef = {
       maybeSampleOutputFormatPoolStats({ engine, metricsProvider, config, device });
     } catch {}
 
-    await ensureWebGPUPipelines({ engine, device });
+    await ensureWebGPUPipelines({ engine, device, metricsProvider });
 
     processCompletedReadbacks({
       engine,

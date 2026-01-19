@@ -13,7 +13,7 @@ import {
 } from '../../../webgpu/keyframe-preprocess-shader';
 import { tryRunKeyframeInterpPassWithGpuEntryExpand } from './interp-pass-gpu-expand';
 import type { KeyframePreprocessResult } from './types';
-import type { WebGPUFrameEncoder } from '../frame-encoder';
+import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 export async function runKeyframeInterpPass(
   device: GPUDevice,

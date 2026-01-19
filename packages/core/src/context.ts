@@ -27,7 +27,6 @@ export class AppContext {
 
   private batchProcessor: ComputeBatchProcessor | null = null;
   private batchContext: BatchContext = {};
-  private webgpuInitialized = false;
   private errorHandler: ErrorHandler | null = null;
   private errorMonitor: ErrorMonitor | null = null;
 
@@ -108,20 +107,6 @@ export class AppContext {
   }
 
   /**
-   * Check if WebGPU has been initialized
-   */
-  isWebGPUInitialized(): boolean {
-    return this.webgpuInitialized;
-  }
-
-  /**
-   * Mark WebGPU as initialized
-   */
-  setWebGPUInitialized(initialized: boolean): void {
-    this.webgpuInitialized = initialized;
-  }
-
-  /**
    * Get or create the error handler
    */
   getErrorHandler(): ErrorHandler {
@@ -165,7 +150,6 @@ export class AppContext {
     }
     this.batchProcessor = null;
     this.batchContext = {};
-    this.webgpuInitialized = false;
     this.errorHandler = null;
     this.errorMonitor = null;
   }

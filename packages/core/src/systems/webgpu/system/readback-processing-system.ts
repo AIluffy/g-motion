@@ -6,12 +6,12 @@ import { PHYSICS_STATE_STRIDE } from '../../../webgpu/physics-shader';
 import { WebGPUConstants } from '../../../constants/webgpu';
 import { createDebugger } from '@g-motion/utils';
 import { stepPhysicsShadow, physicsValidationShadow } from '../physics-validation';
-import { processOutputBuffer } from '../output-buffer-processing';
+import { processOutputBuffer } from '../../../webgpu/output-buffer-processing';
 import type { WebGPUEngine } from '../../../webgpu/engine';
 import type { CullingReadbackTag } from './viewport-culling-system';
 import type { PhysicsReadbackTag } from './physics-dispatch-system';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
-import { tryReleasePooledOutputBufferFromTag } from '../output-buffer-pool';
+import { tryReleasePooledOutputBufferFromTag } from '../../../webgpu/output-buffer-pool';
 
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
