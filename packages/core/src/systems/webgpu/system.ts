@@ -171,6 +171,7 @@ export const WebGPUComputeSystem: SystemDef = {
       processor,
       config,
       device,
+      metricsProvider,
       debugIOEnabled,
       dtMs,
       dtSec,
@@ -261,6 +262,7 @@ async function processArchetypeBatches(params: {
   processor: NonNullable<SystemContext['services']['batchProcessor']>;
   config: NonNullable<SystemContext['services']['config']>;
   device: GPUDevice;
+  metricsProvider: NonNullable<SystemContext['services']['metrics']>;
   debugIOEnabled: boolean;
   preprocessEnabled: boolean;
   useOptimizedKeyframeSearch: boolean;
@@ -282,6 +284,7 @@ async function processArchetypeBatches(params: {
     processor,
     config,
     device,
+    metricsProvider,
     debugIOEnabled,
     preprocessEnabled,
     useOptimizedKeyframeSearch,
@@ -365,6 +368,7 @@ async function processArchetypeBatches(params: {
           device,
           world,
           processor,
+          metricsProvider,
           archetypeId,
           batch: batch as GPUBatchDescriptor,
           debugIOEnabled,

@@ -75,9 +75,9 @@ export class SchedulerProcessor {
       },
     };
 
-    const frameStart = performance.now();
+    const frameStart = getNowMs();
     for (const system of systems) {
-      const systemStart = performance.now();
+      const systemStart = getNowMs();
       try {
         const result = system.update(dtMs, ctx) as unknown;
         if (result && typeof (result as Promise<void>).catch === 'function') {
@@ -104,7 +104,7 @@ export class SchedulerProcessor {
       } catch (e) {
         reportSystemUpdateFailed(services.errorHandler ?? getErrorHandler(), system.name, e);
       } finally {
-        const systemDuration = performance.now() - systemStart;
+        const systemDuration = getNowMs() - systemStart;
         this.metricsCounter++;
         const shouldSample =
           samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
@@ -114,7 +114,7 @@ export class SchedulerProcessor {
       }
     }
 
-    const frameDurationMs = performance.now() - frameStart;
+    const frameDurationMs = getNowMs() - frameStart;
     const updateStatus = services.metrics.updateStatus;
     if (updateStatus) {
       try {
@@ -169,7 +169,7 @@ export class SchedulerProcessor {
     }
 
     if (!managerStats) return;
-    const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const timestamp = getNowMs();
     try {
       recordMemorySnapshot.call(services.metrics, {
         bytesSkipped: managerStats.bytesSkipped,

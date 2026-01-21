@@ -2,6 +2,8 @@ import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { AppContext } from '../src/context';
 import { enqueueGPUResults } from '../src/webgpu/sync-manager';
 import { GPUResultApplySystem } from '../src/systems/webgpu/delivery/delivery-system';
+import { applyGPUResultPacket } from '../src/systems/webgpu/delivery/apply-results';
+import type { ChannelMapping } from '../src/webgpu/channel-mapping';
 
 describe('GPUResultApplySystem validation', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
@@ -63,5 +65,81 @@ describe('GPUResultApplySystem validation', () => {
         channelCount: 2,
       }),
     );
+  });
+
+  test('applies consistent render props across result paths', () => {
+    const channelsResolved: ChannelMapping[] = [
+      { index: 0, property: 'opacity' },
+      { index: 1, property: 'translateX' },
+    ];
+    const packet = {
+      archetypeId: 'arch',
+      entityIds: new Int32Array([1]),
+      values: new Float32Array([0.5, 10]),
+    };
+    const renderStable = {
+      rendererId: 'dom',
+      rendererCode: 0,
+      props: {} as Record<string, number>,
+      version: 0,
+    };
+    const renderFallback = {
+      rendererId: 'dom',
+      rendererCode: 0,
+      props: {} as Record<string, number>,
+      version: 0,
+    };
+    const transformBuffer = [{ translateX: 0, x: 0 }];
+    const indices = new Map<number, number>([[1, 0]]);
+    const typedRendererCode = new Int32Array([0]);
+    const typedTransformX = new Float32Array([0]);
+    const typedTransformTranslateX = new Float32Array([0]);
+
+    const stableArchetype = {
+      id: 'arch',
+      getBuffer: (name: string) => {
+        if (name === 'Render') return [renderStable];
+        if (name === 'Transform') return transformBuffer;
+        return undefined;
+      },
+      getInternalEntityIndices: () => indices,
+      getTypedBuffer: (component: string, field: string) => {
+        if (component === 'Render' && field === 'rendererCode') return typedRendererCode;
+        if (component === 'Transform' && field === 'x') return typedTransformX;
+        if (component === 'Transform' && field === 'translateX') return typedTransformTranslateX;
+        return undefined;
+      },
+    };
+
+    const fallbackArchetype = {
+      id: 'other',
+      getEntityData: (entityId: number, componentName: string) => {
+        if (entityId === 1 && componentName === 'Render') return renderFallback;
+        return undefined;
+      },
+    };
+
+    const worldStable = { getEntityArchetype: () => stableArchetype };
+    const worldFallback = { getEntityArchetype: () => fallbackArchetype };
+
+    applyGPUResultPacket({
+      world: worldStable as any,
+      packet: packet as any,
+      channelsResolved,
+      stride: 2,
+      primitiveCode: -1,
+    });
+    applyGPUResultPacket({
+      world: worldFallback as any,
+      packet: packet as any,
+      channelsResolved,
+      stride: 2,
+      primitiveCode: -1,
+    });
+
+    expect(renderStable.props).toEqual(renderFallback.props);
+    expect(renderStable.version).toBe(renderFallback.version);
+    expect(renderStable.props.opacity).toBe(0.5);
+    expect(renderStable.props.translateX).toBe(10);
   });
 });

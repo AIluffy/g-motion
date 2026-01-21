@@ -1,4 +1,5 @@
 import { ComputeBatchProcessor } from './systems/batch';
+import type { ShaderDef } from './plugin';
 import { createDebugger } from '@g-motion/utils';
 import { BatchContext } from './types';
 import { ErrorHandler } from './error-handler.js';
@@ -29,6 +30,7 @@ export class AppContext {
   private batchContext: BatchContext = {};
   private errorHandler: ErrorHandler | null = null;
   private errorMonitor: ErrorMonitor | null = null;
+  private shaderRegistry: Map<string, ShaderDef> | null = null;
 
   private factories: Required<AppContextFactories>;
 
@@ -134,6 +136,13 @@ export class AppContext {
     this.errorMonitor = monitor;
   }
 
+  getShaderRegistry(): Map<string, ShaderDef> {
+    if (!this.shaderRegistry) {
+      this.shaderRegistry = new Map();
+    }
+    return this.shaderRegistry;
+  }
+
   /**
    * Reset the singleton (useful for testing)
    */
@@ -152,6 +161,7 @@ export class AppContext {
     this.batchContext = {};
     this.errorHandler = null;
     this.errorMonitor = null;
+    this.shaderRegistry = null;
   }
 }
 

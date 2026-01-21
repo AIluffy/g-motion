@@ -1,6 +1,7 @@
 import { getErrorHandler } from '../context';
 import { ErrorCode, ErrorSeverity, MotionError } from '../errors';
 import { WebGPUConstants } from '../constants/webgpu';
+import { getNowMs } from '../utils';
 
 export interface PendingReadback {
   archetypeId: string;
@@ -35,6 +36,8 @@ export interface PendingReadback {
 export class AsyncReadbackManager {
   private pending: PendingReadback[] = [];
   private readonly defaultTimeoutMs: number = WebGPUConstants.GPU.DEFAULT_READBACK_TIMEOUT_MS;
+  private completedCount = 0;
+  private expiredCount = 0;
 
   /**
    * Queue a readback that's already mapped
@@ -51,13 +54,13 @@ export class AsyncReadbackManager {
     leaseId?: number,
     tag?: any,
   ): void {
-    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const startTime = getNowMs();
     const entry: PendingReadback = {
       archetypeId,
       entityIds,
       stagingBuffer,
       mapPromise,
-      timestamp: Date.now(),
+      timestamp: getNowMs(),
       timeoutMs,
       byteSize,
       stride,
@@ -72,12 +75,12 @@ export class AsyncReadbackManager {
     mapPromise
       .then(() => {
         (entry.mapPromise as any).settled = true;
-        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        entry.resolveTime = getNowMs();
       })
       .catch(() => {
         // Ignore map errors here, handled in drain
         (entry.mapPromise as any).settled = true;
-        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        entry.resolveTime = getNowMs();
       });
 
     this.pending.push(entry);
@@ -92,13 +95,13 @@ export class AsyncReadbackManager {
     timeoutMs = this.defaultTimeoutMs,
     tag?: any,
   ): void {
-    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const startTime = getNowMs();
     const entry: PendingReadback = {
       archetypeId,
       entityIds: [],
       stagingBuffer,
       mapPromise,
-      timestamp: Date.now(),
+      timestamp: getNowMs(),
       timeoutMs,
       byteSize,
       decode,
@@ -110,11 +113,11 @@ export class AsyncReadbackManager {
     mapPromise
       .then(() => {
         (entry.mapPromise as any).settled = true;
-        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        entry.resolveTime = getNowMs();
       })
       .catch(() => {
         (entry.mapPromise as any).settled = true;
-        entry.resolveTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        entry.resolveTime = getNowMs();
       });
 
     this.pending.push(entry);
@@ -154,17 +157,15 @@ export class AsyncReadbackManager {
       syncDurationMs?: number;
       expired?: boolean;
     }> = [];
-    const now = Date.now();
-    const startTime = typeof performance !== 'undefined' ? performance.now() : now;
+    const now = getNowMs();
+    const startTime = getNowMs();
 
     const toRemove: number[] = [];
 
     for (let i = 0; i < this.pending.length; i++) {
       // Check time budget
-      if (typeof performance !== 'undefined') {
-        if (performance.now() - startTime > timeBudgetMs) {
-          break;
-        }
+      if (getNowMs() - startTime > timeBudgetMs) {
+        break;
       }
 
       const p = this.pending[i];
@@ -224,6 +225,8 @@ export class AsyncReadbackManager {
           syncDurationMs: p.resolveTime && p.startTime ? p.resolveTime - p.startTime : undefined,
           expired,
         });
+        this.completedCount += 1;
+        if (expired) this.expiredCount += 1;
         toRemove.push(i);
       } catch (e) {
         try {
@@ -266,6 +269,10 @@ export class AsyncReadbackManager {
     return this.pending.length;
   }
 
+  getQueueDepth(): number {
+    return this.pending.length;
+  }
+
   /**
    * Clear queue (for cleanup)
    */
@@ -278,5 +285,12 @@ export class AsyncReadbackManager {
       }
     }
     this.pending = [];
+    this.completedCount = 0;
+    this.expiredCount = 0;
+  }
+
+  getTimeoutRate(): number {
+    if (this.completedCount <= 0) return 0;
+    return this.expiredCount / this.completedCount;
   }
 }

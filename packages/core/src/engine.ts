@@ -88,7 +88,7 @@ class MotionEngineImpl implements MotionEngine {
     }
 
     if (manifest.shaders) {
-      const shaderRegistry = (this.services.appContext as any)['shaderRegistry'];
+      const shaderRegistry = this.services.appContext.getShaderRegistry();
       for (const [name, shaderDef] of Object.entries(manifest.shaders)) {
         if (!shaderRegistry || !shaderRegistry.has(name)) {
           this.app.registerShader({

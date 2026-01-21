@@ -13,6 +13,10 @@ import {
 } from '../src/systems/webgpu/system';
 import { getGPUMetricsProvider } from '../src/webgpu/metrics-provider';
 import { getAppContext } from '../src/context';
+import {
+  __resetCullingPassForTests,
+  collectViewportCullingCPUInputs,
+} from '../src/webgpu/passes/viewport/culling-types';
 import type { EngineServices } from '../src/plugin';
 
 let webgpuMockInstalled = false;
@@ -627,5 +631,89 @@ describe('Readback Metrics Baseline', () => {
       console.log(line);
       expect(row.avgMs).toBeLessThan(50);
     }
+  });
+});
+
+describe('Viewport Culling CPU Collection', () => {
+  const entityCount = 2000;
+  const entityIds = new Int32Array(entityCount);
+  const renderBuffer = new Array(entityCount);
+  for (let i = 0; i < entityCount; i++) {
+    entityIds[i] = i + 1;
+    renderBuffer[i] = {
+      rendererCode: 3,
+      version: 2,
+      renderedVersion: 1,
+      props: { __bounds: { centerX: 1, centerY: 2, centerZ: 0, radius: 4 } },
+    };
+  }
+  const indices = new Map<number, number>();
+  for (let i = 0; i < entityCount; i++) {
+    indices.set(entityIds[i], i);
+  }
+  const typedRendererCode = new Uint32Array(entityCount);
+  const typedVersion = new Uint32Array(entityCount);
+  const typedRenderedVersion = new Uint32Array(entityCount);
+  typedRendererCode.fill(3);
+  typedVersion.fill(2);
+  typedRenderedVersion.fill(1);
+  const batch = {
+    archetypeId: 'arch',
+    entityIds,
+    entityCount,
+    statesData: new Float32Array(entityCount * 4),
+  };
+  for (let i = 0; i < entityCount; i++) {
+    batch.statesData[i * 4 + 1] = i % 2 === 0 ? 0.25 : 0.5;
+  }
+  const stableArchetype = {
+    id: 'arch',
+    getBuffer: () => renderBuffer,
+    getInternalEntityIndices: () => indices,
+    getTypedBuffer: (_name: string, field: string) => {
+      if (field === 'rendererCode') return typedRendererCode;
+      if (field === 'version') return typedVersion;
+      if (field === 'renderedVersion') return typedRenderedVersion;
+      return undefined;
+    },
+  };
+  const unstableArchetype = {
+    id: 'other',
+    getBuffer: () => renderBuffer,
+    getInternalEntityIndices: () => indices,
+    getTypedBuffer: (_name: string, field: string) => {
+      if (field === 'rendererCode') return typedRendererCode;
+      if (field === 'version') return typedVersion;
+      if (field === 'renderedVersion') return typedRenderedVersion;
+      return undefined;
+    },
+  };
+
+  bench('Viewport culling CPU inputs - stable archetype', () => {
+    __resetCullingPassForTests();
+    const world = {
+      getEntityArchetype: () => stableArchetype,
+    };
+    const result = collectViewportCullingCPUInputs({
+      world,
+      archetypeId: 'arch',
+      batch,
+      rawStride: 4,
+    });
+    expect(result.entityCount).toBe(entityCount);
+  });
+
+  bench('Viewport culling CPU inputs - per-entity lookup', () => {
+    __resetCullingPassForTests();
+    const world = {
+      getEntityArchetype: () => unstableArchetype,
+    };
+    const result = collectViewportCullingCPUInputs({
+      world,
+      archetypeId: 'arch',
+      batch,
+      rawStride: 4,
+    });
+    expect(result.entityCount).toBe(entityCount);
   });
 });

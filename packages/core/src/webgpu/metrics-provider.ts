@@ -10,6 +10,7 @@ export interface GPUBatchStatus {
   threshold: number;
   webgpuAvailable: boolean;
   gpuInitialized: boolean;
+  timeoutRate?: number;
   frameTimeMs?: number;
   queueDepth?: number;
   memoryUsageBytes?: number;
@@ -28,6 +29,9 @@ export interface GPUBatchMetric {
   syncPerformed?: boolean;
   syncDurationMs?: number;
   syncDataSize?: number;
+  syncExpired?: boolean;
+  syncTimeoutRate?: number;
+  syncQueueDepth?: number;
   // GPU Compute timing (via timestamp queries)
   gpuComputeTimeMs?: number;
   gpuComputeTimeNs?: number;

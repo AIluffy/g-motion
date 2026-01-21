@@ -17,6 +17,7 @@ import type {
   Track,
 } from '../../types';
 import { getRendererCode } from '../../renderer-code';
+import { getNowMs } from '../../utils';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
 import {
   consumeForcedGPUStateSyncEntityIdsSet,
@@ -117,12 +118,7 @@ export const BatchSamplingSystem: SystemDef = {
     if (!world || !processor || !appContext) {
       return;
     }
-    const nowMs =
-      typeof ctx?.nowMs === 'number'
-        ? ctx.nowMs
-        : typeof performance !== 'undefined'
-          ? performance.now()
-          : Date.now();
+    const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
     const config = world.config;
     const timelineFlatEnabled = config.timelineFlat === true;
     const engineFrame =

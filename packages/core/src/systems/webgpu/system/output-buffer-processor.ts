@@ -10,12 +10,14 @@ import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../../../webgp
 import { maybeRunViewportCulling } from './viewport-culling-system';
 import type { WebGPUEngine } from '../../../webgpu/engine';
 import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
+import type { GPUMetricsProvider } from '../../../webgpu/metrics-provider';
 
 export async function processInterpolationArchetype(params: {
   engine: WebGPUEngine;
   device: GPUDevice;
   world: World | null;
   processor: ComputeBatchProcessor;
+  metricsProvider: GPUMetricsProvider;
   archetypeId: string;
   batch: GPUBatchDescriptor;
   debugIOEnabled: boolean;
@@ -37,6 +39,7 @@ export async function processInterpolationArchetype(params: {
     device,
     world,
     processor,
+    metricsProvider,
     archetypeId,
     batch,
     debugIOEnabled,
@@ -236,6 +239,7 @@ export async function processInterpolationArchetype(params: {
     },
     frame,
     submit,
+    metricsProvider,
   );
 }
 

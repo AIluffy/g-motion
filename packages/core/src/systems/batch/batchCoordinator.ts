@@ -179,10 +179,11 @@ export class BatchCoordinator {
   }
 
   clearBatch(batchId: string): boolean {
-    return this.collector.clearBatch(batchId);
+    const cleared = this.collector.clearBatch(batchId);
     this.resultCache.delete(batchId);
     this.entityBufferCache.delete(batchId);
     this.keyframeBufferCache.delete(batchId);
+    return cleared;
   }
 
   getStats() {

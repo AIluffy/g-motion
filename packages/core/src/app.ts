@@ -3,6 +3,7 @@ import { registerGpuEasing } from './systems/easing-registry';
 import { createDebugger } from '@g-motion/utils';
 import { MotionApp, MotionAppConfig } from './plugin';
 import { WorldProvider } from './worldProvider';
+import { getAppContext } from './context';
 import { getRendererCode } from './renderer-code';
 import type { World } from './world';
 import { ErrorCode, ErrorSeverity, MotionError } from './errors';
@@ -95,10 +96,8 @@ export class App implements MotionApp {
   }
 
   registerShader(shader: ShaderDef): void {
-    // Store shader in global registry for WebGPU system to pick up
-    const globalRegistry = (globalThis as any).__shaderRegistry ?? new Map();
-    globalRegistry.set(shader.name, shader);
-    (globalThis as any).__shaderRegistry = globalRegistry;
+    const registry = getAppContext().getShaderRegistry();
+    registry.set(shader.name, shader);
     debug('Registered shader', shader.name);
   }
 

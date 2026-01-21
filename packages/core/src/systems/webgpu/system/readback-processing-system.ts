@@ -12,6 +12,7 @@ import type { CullingReadbackTag } from './viewport-culling-system';
 import type { PhysicsReadbackTag } from './physics-dispatch-system';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
 import { tryReleasePooledOutputBufferFromTag } from '../../../webgpu/output-buffer-pool';
+import { getNowMs } from '../../../utils';
 
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
@@ -52,11 +53,14 @@ export function processCompletedReadbacks(params: {
           metricsProvider.recordMetric({
             batchId: `${res.archetypeId}-cull-sync`,
             entityCount: cullingTag.entityCountMax ?? res.entityIds.length,
-            timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+            timestamp: getNowMs(),
             gpu: true,
             syncPerformed: true,
             syncDurationMs: res.syncDurationMs ?? 0,
             syncDataSize: res.byteSize,
+            syncExpired: !!res.expired,
+            syncTimeoutRate: readbackManager.getTimeoutRate(),
+            syncQueueDepth: readbackManager.getQueueDepth(),
           });
         } catch {}
 
@@ -81,17 +85,27 @@ export function processCompletedReadbacks(params: {
 
         Promise.resolve()
           .then(async () => {
-            await processOutputBuffer(device, queue, sp, readbackManager, processor, {
-              archetypeId: res.archetypeId,
-              outputBuffer: cullingTag.outputBuffer,
-              entityCount: visibleCount,
-              entityIdsForReadback: res.entityIds,
-              leaseId: res.leaseId,
-              rawStride: cullingTag.rawStride,
-              outputStride: cullingTag.outputStride,
-              rawChannels: cullingTag.rawChannels,
-              outputChannels: cullingTag.outputChannels,
-            });
+            await processOutputBuffer(
+              device,
+              queue,
+              sp,
+              readbackManager,
+              processor,
+              {
+                archetypeId: res.archetypeId,
+                outputBuffer: cullingTag.outputBuffer,
+                entityCount: visibleCount,
+                entityIdsForReadback: res.entityIds,
+                leaseId: res.leaseId,
+                rawStride: cullingTag.rawStride,
+                outputStride: cullingTag.outputStride,
+                rawChannels: cullingTag.rawChannels,
+                outputChannels: cullingTag.outputChannels,
+              },
+              undefined,
+              undefined,
+              metricsProvider,
+            );
           })
           .catch(() => {
             try {
@@ -113,6 +127,20 @@ export function processCompletedReadbacks(params: {
 
       const values = res.values;
       if (res.expired) {
+        try {
+          metricsProvider.recordMetric({
+            batchId: `${res.archetypeId}-sync`,
+            entityCount: res.entityIds.length,
+            timestamp: getNowMs(),
+            gpu: true,
+            syncPerformed: true,
+            syncDurationMs: res.syncDurationMs ?? 0,
+            syncDataSize: res.byteSize,
+            syncExpired: true,
+            syncTimeoutRate: readbackManager.getTimeoutRate(),
+            syncQueueDepth: readbackManager.getQueueDepth(),
+          });
+        } catch {}
         sp.markAvailable(res.stagingBuffer);
         tryReleasePooledOutputBufferFromTag(res.tag);
         if (typeof res.leaseId === 'number') {
@@ -191,11 +219,14 @@ export function processCompletedReadbacks(params: {
         metricsProvider.recordMetric({
           batchId: `${res.archetypeId}-sync`,
           entityCount: res.entityIds.length,
-          timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+          timestamp: getNowMs(),
           gpu: true,
           syncPerformed: true,
           syncDurationMs: res.syncDurationMs ?? 0,
           syncDataSize: res.byteSize,
+          syncExpired: !!res.expired,
+          syncTimeoutRate: readbackManager.getTimeoutRate(),
+          syncQueueDepth: readbackManager.getQueueDepth(),
         });
       } catch {}
 
@@ -206,8 +237,22 @@ export function processCompletedReadbacks(params: {
         processor.releaseEntityIds(res.leaseId);
       }
     }
-    setPendingReadbackCount(readbackManager.getPendingCount());
+    const pending = readbackManager.getPendingCount();
+    setPendingReadbackCount(pending);
+    try {
+      metricsProvider.updateStatus({
+        queueDepth: pending,
+        timeoutRate: readbackManager.getTimeoutRate(),
+      });
+    } catch {}
   });
 
-  setPendingReadbackCount(readbackManager.getPendingCount());
+  const pending = readbackManager.getPendingCount();
+  setPendingReadbackCount(pending);
+  try {
+    metricsProvider.updateStatus({
+      queueDepth: pending,
+      timeoutRate: readbackManager.getTimeoutRate(),
+    });
+  } catch {}
 }

@@ -122,6 +122,7 @@ class BurstManager {
     indicesMap.delete(lastIndex);
     internal.setInternalCount(lastIndex);
     this.entityArchetypes.delete(entityId);
+    this.entityManager.destroy(entityId);
   }
 
   getPendingCount(): number {

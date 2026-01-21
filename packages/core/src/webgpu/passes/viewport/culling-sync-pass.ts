@@ -6,15 +6,8 @@
  */
 
 import type { ViewportCullingBatchDescriptor } from '../../../types';
-import { ENTITY_BOUNDS_STRIDE, RENDER_STATE_EX_STRIDE } from './culling-types';
-import {
-  getScratch,
-  getFrustumBuffer,
-  updateFrustumBuffer,
-  resetParamsBuffer,
-} from './culling-types';
+import { collectViewportCullingCPUInputs } from './culling-types';
 import { getCullingCompactPipeline, cullingCompactBindGroupLayout } from './culling-pipeline';
-import { resolveViewportBounds } from './viewport-bounds';
 
 export async function runViewportCullingCompactionPass(
   device: GPUDevice,
@@ -41,122 +34,14 @@ export async function runViewportCullingCompactionPass(
     };
   }
 
-  const now = Date.now();
-  const entityCount = batch.entityCount;
-  const renderStatesBufferSize = entityCount * RENDER_STATE_EX_STRIDE * 4;
-  const boundsBufferSize = entityCount * ENTITY_BOUNDS_STRIDE * 4;
-
-  const scratch = getScratch(archetypeId, entityCount);
-  const statesU32 = scratch.statesU32;
-  const statesF32 = scratch.statesF32;
+  const { entityCount, renderStatesBufferSize, boundsBufferSize, scratch, frustumF32, paramsU32 } =
+    collectViewportCullingCPUInputs({
+      world,
+      archetypeId,
+      batch,
+      rawStride,
+    });
   const boundsF32 = scratch.boundsF32;
-
-  const firstId = (batch.entityIds as any)[0] as number | undefined;
-  const packetArchetype = firstId != null ? world.getEntityArchetype?.(firstId) : undefined;
-  const stableArchetype =
-    packetArchetype && packetArchetype.id === archetypeId ? packetArchetype : undefined;
-
-  const stableRenderBuffer = stableArchetype ? stableArchetype.getBuffer?.('Render') : undefined;
-  const stableIndices = stableArchetype
-    ? (stableArchetype as any).getInternalEntityIndices?.()
-    : undefined;
-  const stableTypedRendererCode = stableArchetype
-    ? stableArchetype.getTypedBuffer?.('Render', 'rendererCode')
-    : undefined;
-  const stableTypedVersion = stableArchetype
-    ? stableArchetype.getTypedBuffer?.('Render', 'version')
-    : undefined;
-  const stableTypedRenderedVersion = stableArchetype
-    ? stableArchetype.getTypedBuffer?.('Render', 'renderedVersion')
-    : undefined;
-
-  for (let i = 0; i < entityCount; i++) {
-    const id = (batch.entityIds as any)[i] as number;
-    const a = stableArchetype ?? world.getEntityArchetype?.(id);
-    let rendererCode = 0;
-    let version = 0;
-    let renderedVersion = -1;
-    let bounds: any = null;
-
-    if (a && typeof (a as any).getBuffer === 'function') {
-      const renderBuffer = stableArchetype ? stableRenderBuffer : a.getBuffer?.('Render');
-      const indices = stableArchetype ? stableIndices : (a as any).getInternalEntityIndices?.();
-      const index = indices ? indices.get(id) : undefined;
-      if (renderBuffer && index !== undefined) {
-        const render = renderBuffer[index] as any;
-        const typed = stableArchetype
-          ? stableTypedRendererCode
-          : a.getTypedBuffer?.('Render', 'rendererCode');
-        rendererCode = typed ? typed[index] : (render?.rendererCode ?? 0);
-        const typedV = stableArchetype
-          ? stableTypedVersion
-          : a.getTypedBuffer?.('Render', 'version');
-        const typedRV = stableArchetype
-          ? stableTypedRenderedVersion
-          : a.getTypedBuffer?.('Render', 'renderedVersion');
-        version = typedV ? typedV[index] : (render?.version ?? 0);
-        renderedVersion = typedRV ? typedRV[index] : (render?.renderedVersion ?? -1);
-        const b = render?.props?.__bounds as any;
-        if (
-          b &&
-          typeof b.centerX === 'number' &&
-          typeof b.centerY === 'number' &&
-          typeof b.radius === 'number'
-        ) {
-          bounds = b;
-        } else {
-          bounds = resolveViewportBounds(render?.target, now);
-        }
-      }
-    } else if (a && typeof (a as any).getEntityData === 'function') {
-      const render = (a as any).getEntityData(id, 'Render');
-      if (render) {
-        rendererCode = render.rendererCode ?? 0;
-        version = render.version ?? 0;
-        renderedVersion = render.renderedVersion ?? -1;
-        const b = render?.props?.__bounds as any;
-        if (
-          b &&
-          typeof b.centerX === 'number' &&
-          typeof b.centerY === 'number' &&
-          typeof b.radius === 'number'
-        ) {
-          bounds = b;
-        } else {
-          bounds = resolveViewportBounds(render?.target, now);
-        }
-      }
-    }
-
-    const base = i * RENDER_STATE_EX_STRIDE;
-    statesU32[base + 0] = id >>> 0;
-    statesU32[base + 1] = version >>> 0;
-    statesU32[base + 2] = renderedVersion >>> 0;
-    statesU32[base + 3] = 1;
-    statesU32[base + 4] = rendererCode >>> 0;
-    statesF32[base + 5] = 0;
-    statesF32[base + 6] = batch.statesData[i * 4 + 1] ?? 0;
-    statesU32[base + 7] = 0;
-
-    const bb = i * ENTITY_BOUNDS_STRIDE;
-    if (bounds) {
-      boundsF32[bb + 0] = bounds.centerX;
-      boundsF32[bb + 1] = bounds.centerY;
-      boundsF32[bb + 2] = bounds.centerZ ?? 0;
-      boundsF32[bb + 3] = bounds.radius;
-    } else {
-      boundsF32[bb + 0] = 0;
-      boundsF32[bb + 1] = 0;
-      boundsF32[bb + 2] = 0;
-      boundsF32[bb + 3] = 0;
-    }
-  }
-
-  const frustumF32 = getFrustumBuffer();
-  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 0;
-  const viewportH = typeof window !== 'undefined' ? window.innerHeight : 0;
-  updateFrustumBuffer(frustumF32, viewportW, viewportH);
-  resetParamsBuffer(rawStride);
 
   const renderStatesGPU = device.createBuffer({
     size: renderStatesBufferSize,
@@ -207,13 +92,7 @@ export async function runViewportCullingCompactionPass(
   queue.writeBuffer(renderStatesGPU, 0, scratch.statesAB as ArrayBuffer, 0, renderStatesBufferSize);
   queue.writeBuffer(boundsGPU, 0, boundsF32.buffer as ArrayBuffer, 0, boundsBufferSize);
   queue.writeBuffer(frustumGPU, 0, frustumF32.buffer as ArrayBuffer, 0, frustumF32.byteLength);
-  queue.writeBuffer(
-    paramsGPU,
-    0,
-    new Uint32Array([Math.max(1, rawStride | 0), 0, 0, 0]).buffer as ArrayBuffer,
-    0,
-    16,
-  );
+  queue.writeBuffer(paramsGPU, 0, paramsU32.buffer as ArrayBuffer, 0, 16);
   queue.writeBuffer(visibleCountGPU, 0, new Uint32Array([0]).buffer as ArrayBuffer, 0, 4);
 
   const bindGroup = device.createBindGroup({

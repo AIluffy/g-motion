@@ -45,7 +45,7 @@ class MockGPUBuffer {
 
   getMappedRange(): ArrayBuffer {
     if (!this.mapped) throw new Error('Buffer not mapped');
-    return this.data.buffer;
+    return this.data.buffer as ArrayBuffer;
   }
 
   unmap(): void {
@@ -279,5 +279,25 @@ describe('Phase 3: Pool Growth', () => {
       expect(statsAfter.inFlightCount).toBe(0);
     },
     { iterations: 50, time: 500, warmupTime: 100, warmupIterations: 10 },
+  );
+});
+
+describe('Phase 3: Readback Metrics', () => {
+  bench(
+    'Readback metrics: queue depth and timeout rate',
+    async () => {
+      const manager = new AsyncReadbackManager();
+      const buffer = new MockGPUBuffer(1, 256, 'buffer-metrics') as any;
+      const mapPromise = buffer.mapAsync(1);
+      manager.enqueueMapAsync('metrics', [1], buffer, mapPromise, 256, 0);
+      await mapPromise;
+      await Promise.resolve();
+
+      const results = await manager.drainCompleted(10);
+      expect(results.length).toBe(1);
+      expect(manager.getQueueDepth()).toBe(0);
+      expect(manager.getTimeoutRate()).toBe(1);
+    },
+    { iterations: 10, time: 1000 },
   );
 });

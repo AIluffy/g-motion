@@ -5,6 +5,8 @@ import {
   createBatchChannelTable,
 } from '../src/webgpu/channel-mapping';
 import { clamp01 } from '@g-motion/utils';
+import { applyGPUResultPacket } from '../src/systems/webgpu/delivery/apply-results';
+import type { ChannelMapping } from '../src/webgpu/channel-mapping';
 
 /**
  * Phase 4 Validation: Multi-Channel GPU Output Mapping
@@ -259,6 +261,120 @@ describe('Phase 4: Helper Function - createBatchChannelTable', () => {
         ]);
         expect(table.channels.length).toBe(5);
       }
+    },
+    { iterations: 20, time: 500, warmupTime: 100, warmupIterations: 5 },
+  );
+});
+
+describe('Phase 4: GPU Result Apply', () => {
+  const entityCount = 2000;
+  const stride = 4;
+  const channelsResolved: ChannelMapping[] = [
+    { index: 0, property: 'opacity' },
+    { index: 1, property: 'translateX' },
+    { index: 2, property: 'translateY' },
+    { index: 3, property: 'scaleX' },
+  ];
+
+  const entityIds = new Int32Array(entityCount);
+  const values = new Float32Array(entityCount * stride);
+  for (let i = 0; i < entityCount; i++) {
+    entityIds[i] = i;
+    const base = i * stride;
+    values[base] = (i % 100) / 100;
+    values[base + 1] = i * 0.5;
+    values[base + 2] = i * 0.25;
+    values[base + 3] = 1 + (i % 10) * 0.01;
+  }
+  const packet = { archetypeId: 'arch', entityIds, values };
+
+  const renderBuffer = Array.from({ length: entityCount }, () => ({
+    rendererId: 'dom',
+    rendererCode: 0,
+    props: {} as Record<string, number>,
+    version: 0,
+  }));
+  const transformBuffer = Array.from({ length: entityCount }, () => ({
+    translateX: 0,
+    translateY: 0,
+    scaleX: 1,
+    x: 0,
+    y: 0,
+  }));
+  const indices = new Map<number, number>();
+  for (let i = 0; i < entityCount; i++) {
+    indices.set(i, i);
+  }
+  const typedRendererCode = new Int32Array(entityCount);
+  const typedTransformX = new Float32Array(entityCount);
+  const typedTransformY = new Float32Array(entityCount);
+  const typedTransformTranslateX = new Float32Array(entityCount);
+  const typedTransformTranslateY = new Float32Array(entityCount);
+  const typedTransformScaleX = new Float32Array(entityCount);
+
+  const stableArchetype = {
+    id: 'arch',
+    getBuffer: (name: string) => {
+      if (name === 'Render') return renderBuffer;
+      if (name === 'Transform') return transformBuffer;
+      return undefined;
+    },
+    getInternalEntityIndices: () => indices,
+    getTypedBuffer: (component: string, field: string) => {
+      if (component === 'Render' && field === 'rendererCode') return typedRendererCode;
+      if (component === 'Transform' && field === 'x') return typedTransformX;
+      if (component === 'Transform' && field === 'y') return typedTransformY;
+      if (component === 'Transform' && field === 'translateX') return typedTransformTranslateX;
+      if (component === 'Transform' && field === 'translateY') return typedTransformTranslateY;
+      if (component === 'Transform' && field === 'scaleX') return typedTransformScaleX;
+      return undefined;
+    },
+  };
+
+  const renderById = new Map<number, any>();
+  for (let i = 0; i < entityCount; i++) {
+    renderById.set(i, {
+      rendererId: 'dom',
+      rendererCode: 0,
+      props: {} as Record<string, number>,
+      version: 0,
+    });
+  }
+  const fallbackArchetype = {
+    id: 'other',
+    getEntityData: (entityId: number, componentName: string) => {
+      if (componentName !== 'Render') return undefined;
+      return renderById.get(entityId);
+    },
+  };
+
+  const worldStable = { getEntityArchetype: () => stableArchetype };
+  const worldFallback = { getEntityArchetype: () => fallbackArchetype };
+
+  bench(
+    'Apply results: stable archetype path',
+    () => {
+      applyGPUResultPacket({
+        world: worldStable as any,
+        packet: packet as any,
+        channelsResolved,
+        stride,
+        primitiveCode: -1,
+      });
+    },
+    { iterations: 20, time: 500, warmupTime: 100, warmupIterations: 5 },
+  );
+
+  bench(
+    'Apply results: fallback path',
+    () => {
+      applyGPUResultPacket({
+        world: worldFallback as any,
+        packet: packet as any,
+        channelsResolved,
+        stride,
+        primitiveCode: -1,
+      });
     },
     { iterations: 20, time: 500, warmupTime: 100, warmupIterations: 5 },
   );
