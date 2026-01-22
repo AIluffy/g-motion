@@ -1,4 +1,4 @@
-import { Track } from '../../types';
+import { Track } from '@g-motion/shared';
 
 export function linearSearchKeyframe(track: Track, t: number): number {
   for (let i = track.length - 1; i >= 0; i--) {

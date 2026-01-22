@@ -1,18 +1,19 @@
+import { WebGPUConstants } from '@g-motion/shared';
+import { createDebugger, getNowMs } from '@g-motion/utils';
+import type { GPUMetricsProvider, WebGPUEngine } from '@g-motion/webgpu';
+import {
+  enqueueGPUResults,
+  PHYSICS_STATE_STRIDE,
+  processOutputBuffer,
+  setPendingReadbackCount,
+  tryReleasePooledOutputBufferFromTag,
+} from '@g-motion/webgpu';
 import type { MotionAppConfig } from '../../../plugin';
-import type { GPUMetricsProvider } from '../../../webgpu/metrics-provider';
 import type { ComputeBatchProcessor } from '../../batch';
-import { enqueueGPUResults, setPendingReadbackCount } from '../../../webgpu/sync-manager';
-import { PHYSICS_STATE_STRIDE } from '../../../webgpu/physics-shader';
-import { WebGPUConstants } from '../../../constants/webgpu';
-import { createDebugger } from '@g-motion/utils';
-import { stepPhysicsShadow, physicsValidationShadow } from '../physics-validation';
-import { processOutputBuffer } from '../../../webgpu/output-buffer-processing';
-import type { WebGPUEngine } from '../../../webgpu/engine';
-import type { CullingReadbackTag } from './viewport-culling-system';
-import type { PhysicsReadbackTag } from './physics-dispatch-system';
+import { physicsValidationShadow, stepPhysicsShadow } from '../physics-validation';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
-import { tryReleasePooledOutputBufferFromTag } from '../../../webgpu/output-buffer-pool';
-import { getNowMs } from '../../../utils';
+import type { PhysicsReadbackTag } from './physics-dispatch-system';
+import type { CullingReadbackTag } from './viewport-culling-system';
 
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 

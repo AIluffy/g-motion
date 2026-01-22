@@ -1,13 +1,13 @@
 import { getErrorHandler } from '../../../context';
 import type { MotionAppConfig } from '../../../plugin';
-import { getCustomEasingVersion, getCustomGpuEasings } from '../../easing-registry';
-import { getOutputFormatBufferPoolStats } from '../../../webgpu/output-format';
-import type { GPUMetricsProvider } from '../../../webgpu/metrics-provider';
-import type { WebGPUEngine } from '../../../webgpu/engine';
+import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
+import { getOutputFormatBufferPoolStats } from '@g-motion/webgpu';
+import type { GPUMetricsProvider } from '@g-motion/webgpu';
+import type { WebGPUEngine } from '@g-motion/webgpu';
 import {
   ensureWebGPUInitialized as ensureWebGPUInitializedCore,
   ensureWebGPUPipelines as ensureWebGPUPipelinesCore,
-} from '../../../webgpu/initialization';
+} from '@g-motion/webgpu';
 
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,

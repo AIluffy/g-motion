@@ -2,18 +2,18 @@
  * Test suite for logging behavior in SystemScheduler
  * Verifies that errors are logged appropriately without flooding console
  */
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SystemScheduler } from '../src/scheduler';
-import { SystemDef } from '../src/plugin';
-import { WorldProvider } from '../src/worldProvider';
-import { World } from '../src/world';
-import { AppContext } from '../src/context';
 import {
+  AsyncReadbackManager,
   drainGPUResults,
   enqueueGPUResults,
   setPendingReadbackCount,
-} from '../src/webgpu/sync-manager';
-import { AsyncReadbackManager } from '../src/webgpu/async-readback';
+} from '@g-motion/webgpu';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { AppContext } from '../src/context';
+import { SystemDef } from '../src/plugin';
+import { SystemScheduler } from '../src/scheduler';
+import { World } from '../src/world';
+import { WorldProvider } from '../src/worldProvider';
 
 describe('SystemScheduler Logging', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
@@ -311,7 +311,7 @@ describe('SystemScheduler Logging', () => {
     const manager = new AsyncReadbackManager();
 
     let now = 0;
-    const dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const perfNowSpy = vi.spyOn(performance, 'now').mockImplementation(() => now);
 
     const mapped = new Float32Array([42]).buffer;
     let unmapped = false;
@@ -338,7 +338,7 @@ describe('SystemScheduler Logging', () => {
     expect(unmapped).toBe(true);
     expect(manager.getPendingCount()).toBe(0);
 
-    dateNowSpy.mockRestore();
+    perfNowSpy.mockRestore();
   });
 
   test('should carry decoded tag metadata for culling-style readbacks', async () => {

@@ -1,14 +1,13 @@
-import { App, app as globalApp, appWorld, registerBuiltInRenderers } from './app';
 import { createDebugger } from '@g-motion/utils';
+import { getGPUMetricsProvider, resetWebGPUEngine } from '@g-motion/webgpu';
+import { App, appWorld, app as globalApp, registerBuiltInRenderers } from './app';
 import { getAppContext } from './context';
-import { getGPUMetricsProvider } from './webgpu/metrics-provider';
-import { resetWebGPUEngine } from './webgpu/engine';
-import { clearPipelineCache } from './webgpu/pipeline';
-import { World } from './world';
-import { WorldProvider } from './worldProvider';
-import type { SystemScheduler } from './scheduler';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
+import type { SystemScheduler } from './scheduler';
+import { clearPipelineCache } from './systems/webgpu';
+import { World } from './world';
+import { WorldProvider } from './worldProvider';
 
 const warn = createDebugger('MotionEngine', 'warn');
 
@@ -88,7 +87,7 @@ class MotionEngineImpl implements MotionEngine {
     }
 
     if (manifest.shaders) {
-      const shaderRegistry = this.services.appContext.getShaderRegistry();
+      const shaderRegistry = (this.services.appContext as any)['shaderRegistry'];
       for (const [name, shaderDef] of Object.entries(manifest.shaders)) {
         if (!shaderRegistry || !shaderRegistry.has(name)) {
           this.app.registerShader({

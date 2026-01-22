@@ -151,6 +151,7 @@ export type { DebugLevel };
 
 export * from './targetResolver';
 export * from './time/frameSampler';
+export * from './time/now';
 export * from './math/rollingAverage';
 export * from './math/interpolation';
 export * from './dom';

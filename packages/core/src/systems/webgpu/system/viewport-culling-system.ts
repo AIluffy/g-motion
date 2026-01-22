@@ -1,15 +1,13 @@
-import type { GPUBatchDescriptor } from '../../../types';
-import type { World } from '../../../world';
-import type { PendingReadback } from '../../../webgpu/async-readback';
-import type { ComputeBatchProcessor } from '../../batch';
+import type { GPUBatchDescriptor } from '@g-motion/shared';
+import type { PendingReadback, WebGPUEngine, WebGPUFrameEncoder } from '@g-motion/webgpu';
 import {
   runViewportCullingCompactionPass,
   runViewportCullingCompactionPassAsync,
-} from '../../../webgpu/passes/viewport';
-import { setPendingReadbackCount } from '../../../webgpu/sync-manager';
-import type { WebGPUEngine } from '../../../webgpu/engine';
-import { tryReleasePooledOutputBufferFromTag } from '../../../webgpu/output-buffer-pool';
-import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
+  setPendingReadbackCount,
+  tryReleasePooledOutputBufferFromTag,
+} from '@g-motion/webgpu';
+import type { World } from '../../../world';
+import type { ComputeBatchProcessor } from '../../batch';
 
 export type CullingReadbackTag = {
   kind: 'culling';

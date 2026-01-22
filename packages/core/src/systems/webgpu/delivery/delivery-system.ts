@@ -6,18 +6,18 @@
  */
 
 import type { SystemContext, SystemDef } from '../../../plugin';
-import { drainGPUResultsInto } from '../../../webgpu/sync-manager';
-import type { GPUResultPacket } from '../../../webgpu/sync-manager';
+import { drainGPUResultsInto } from '@g-motion/webgpu';
+import type { GPUResultPacket } from '@g-motion/webgpu';
 import {
   getGPUChannelMappingRegistry,
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
   isStandardTransformChannels,
-} from '../../../webgpu/channel-mapping';
-import type { ChannelMapping } from '../../../webgpu/channel-mapping';
+} from '@g-motion/webgpu';
+import type { ChannelMapping } from '@g-motion/webgpu';
 import { isDev } from '@g-motion/utils';
 import { getRendererCode } from '../../../renderer-code';
-import { MotionError, ErrorCode, ErrorSeverity } from '../../../errors';
+import { MotionError, ErrorCode, ErrorSeverity } from '@g-motion/shared';
 import { applyGPUResultPacket } from './apply-results';
 
 const s_gpuResultPacketsScratch: GPUResultPacket[] = [];

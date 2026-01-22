@@ -1,14 +1,15 @@
-import type { PhysicsBatchDescriptor } from '../../../types';
+import type { PhysicsBatchDescriptor } from '@g-motion/shared';
+import type { PendingReadback, WebGPUEngine, WebGPUFrameEncoder } from '@g-motion/webgpu';
+import {
+  dispatchPhysicsBatch,
+  getPersistentGPUBufferManager,
+  markPhysicsGPUEntity,
+  PHYSICS_STATE_STRIDE,
+  setPendingReadbackCount,
+} from '@g-motion/webgpu';
 import type { MotionAppConfig } from '../../../plugin';
-import type { PendingReadback } from '../../../webgpu/async-readback';
-import { dispatchPhysicsBatch } from '../../../webgpu/passes/physics/dispatch-pass';
-import { PHYSICS_STATE_STRIDE } from '../../../webgpu/physics-shader';
-import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
-import { markPhysicsGPUEntity, setPendingReadbackCount } from '../../../webgpu/sync-manager';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';
-import type { WebGPUEngine } from '../../../webgpu/engine';
-import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
 
 export type PhysicsReadbackTag = {
   kind: 'physics';

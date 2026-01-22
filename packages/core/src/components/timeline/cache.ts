@@ -1,4 +1,4 @@
-import { Track } from '../../types';
+import { Track } from '@g-motion/shared';
 import { findActiveKeyframeCached } from './search';
 import { positionCache } from './cache-map';
 

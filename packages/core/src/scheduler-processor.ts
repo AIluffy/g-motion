@@ -1,9 +1,9 @@
-import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
-import { createDebugger } from '@g-motion/utils';
-import { FrameSampler, getNowMs } from './utils';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { createDebugger, getNowMs } from '@g-motion/utils';
+import { getPersistentGPUBufferManager } from '@g-motion/webgpu';
 import { getErrorHandler } from './context';
-import { ErrorCode, ErrorSeverity, MotionError } from './errors';
-import { getPersistentGPUBufferManager } from './webgpu/persistent-buffer-manager';
+import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
+import { FrameSampler } from './utils';
 
 const warn = createDebugger('SchedulerProcessor', 'warn');
 

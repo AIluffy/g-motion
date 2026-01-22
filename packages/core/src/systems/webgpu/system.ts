@@ -14,60 +14,65 @@
  * - Buffer pooling and reuse
  */
 
-import type { SystemContext, SystemDef } from '../../plugin';
 import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '../../types';
+} from '@g-motion/shared';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
 import { createDebugger } from '@g-motion/utils';
-import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
-import { getWebGPUEngine, resetWebGPUEngine } from '../../webgpu/engine';
-import { clearPhysicsGPUEntities, setPendingReadbackCount } from '../../webgpu/sync-manager';
 import {
-  isWebGPUIODebugEnabled,
+  __resetKeyframePassesForTests,
+  __resetOutputFormatPassForTests,
+  __resetViewportCullingPassForTests,
+  clearPhysicsGPUEntities,
+  createWebGPUFrameEncoder,
+  getWebGPUEngine,
+  resetWebGPUEngine,
+  setPendingReadbackCount,
+} from '@g-motion/webgpu';
+import type { SystemContext, SystemDef } from '../../plugin';
+import {
   isKeyframeEntryExpandOnGPUEnabled,
   isKeyframeSearchIndexedEnabled,
   isWebGPUBatchedSubmitEnabled,
   isWebGPUForceStatesUploadEnabled,
+  isWebGPUIODebugEnabled,
   isWebGPUStatesConditionalUploadEnabled,
-  isWebGPUViewportCullingEnabled,
   isWebGPUViewportCullingAsyncEnabled,
+  isWebGPUViewportCullingEnabled,
   resolveKeyframeSearchIndexedMinKeyframes,
-  resolveWebGPUReadbackMode,
-  resolveWebGPUOutputBufferReuseEnabled,
   resolveKeyframeSearchOptimizedFlag,
+  resolveWebGPUOutputBufferReuseEnabled,
+  resolveWebGPUReadbackMode,
 } from './system-config';
-import { __resetOutputFormatPassForTests } from '../../webgpu/output-format';
-import { __resetViewportCullingPassForTests } from '../../webgpu/passes/viewport';
-import { __resetKeyframePassesForTests } from '../../webgpu/passes/keyframe';
-import { createWebGPUFrameEncoder } from '../../webgpu/command-encoder';
 
 import {
   ensureWebGPUInitialized,
   ensureWebGPUPipelines,
   maybeSampleOutputFormatPoolStats,
 } from './system/gpu-initialization-system';
-import { processCompletedReadbacks } from './system/readback-processing-system';
-import { dispatchPhysicsBatchForArchetype } from './system/physics-dispatch-system';
 import { processInterpolationArchetype } from './system/output-buffer-processor';
+import { dispatchPhysicsBatchForArchetype } from './system/physics-dispatch-system';
+import { processCompletedReadbacks } from './system/readback-processing-system';
 
-export { enableGPUOutputFormatPass, disableGPUOutputFormatPass } from '../../webgpu/output-format';
-export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
-export { __getKeyframeSearchShaderModeForTests } from '../../webgpu/passes/keyframe';
-export { debugIO, float32Preview, firstEntityChannelPreview } from './debug';
 export {
-  stepPhysicsShadow,
-  f32,
-  physicsValidationShadow,
-  setPhysicsValidationShadow,
-  clearPhysicsValidationShadow,
-} from './physics-validation';
-export {
+  __getKeyframeSearchShaderModeForTests,
+  disableGPUOutputFormatPass,
+  enableGPUOutputFormatPass,
   processOutputBuffer,
   ProcessOutputBufferInput,
-} from '../../webgpu/output-buffer-processing';
-export { getPhysicsValidationShadow } from './physics-validation';
+} from '@g-motion/webgpu';
+export { debugIO, firstEntityChannelPreview, float32Preview } from './debug';
+export {
+  clearPhysicsValidationShadow,
+  f32,
+  getPhysicsValidationShadow,
+  physicsValidationShadow,
+  setPhysicsValidationShadow,
+  stepPhysicsShadow,
+} from './physics-validation';
+export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
 
 const engine = getWebGPUEngine();
 const warn = createDebugger('WebGPUComputeSystem', 'warn');

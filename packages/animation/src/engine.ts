@@ -1,4 +1,5 @@
-import { ErrorCode, ErrorSeverity, MotionError, WorldProvider } from '@g-motion/core';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { WorldProvider } from '@g-motion/core';
 
 /**
  * Global engine configuration object for controlling animation behavior

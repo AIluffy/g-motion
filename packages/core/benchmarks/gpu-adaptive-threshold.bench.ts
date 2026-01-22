@@ -1,5 +1,5 @@
 import { describe, bench, expect } from 'vitest';
-import { getGPUMetricsProvider } from '../src/webgpu/metrics-provider';
+import { getGPUMetricsProvider } from '@g-motion/webgpu';
 
 describe('GPU Adaptive Threshold Performance', () => {
   bench('Dynamic threshold calculation - baseline 1000 entities', () => {

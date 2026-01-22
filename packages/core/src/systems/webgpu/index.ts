@@ -7,7 +7,12 @@
  * - Initialization: GPU setup and validation
  */
 
+export {
+  cachePipeline,
+  clearPipelineCache,
+  dispatchGPUBatch,
+  dispatchPhysicsBatch,
+  getPipelineForWorkgroup,
+  initWebGPUCompute,
+} from '@g-motion/webgpu';
 export { WebGPUComputeSystem } from './system';
-export { initWebGPUCompute } from '../../webgpu/initialization';
-export { getPipelineForWorkgroup, cachePipeline, clearPipelineCache } from '../../webgpu/pipeline';
-export { dispatchGPUBatch, dispatchPhysicsBatch } from '../../webgpu/dispatch';

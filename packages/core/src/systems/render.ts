@@ -1,5 +1,5 @@
 import { isDev } from '@g-motion/utils';
-import { ErrorCode, ErrorSeverity } from '../errors';
+import { ErrorCode, ErrorSeverity } from '@g-motion/shared';
 import { SystemContext, SystemDef } from '../index';
 import { getRendererName } from '../renderer-code';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';

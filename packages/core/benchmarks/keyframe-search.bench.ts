@@ -1,5 +1,5 @@
 import { describe, bench } from 'vitest';
-import { Keyframe, Track } from '../src/types';
+import { Keyframe, Track } from '@g-motion/shared';
 import { findActiveKeyframe } from '../src/components/timeline';
 
 describe('Keyframe Search Performance', () => {

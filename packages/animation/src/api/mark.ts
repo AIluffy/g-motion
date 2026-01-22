@@ -1,21 +1,18 @@
 import {
-  TimelineData,
+  InertiaOptions,
   Keyframe,
   SpringOptions,
-  InertiaOptions,
-  Easing,
-  ErrorCode,
-  ErrorSeverity,
-  MotionError,
+  TimelineData,
   getErrorHandler,
 } from '@g-motion/core';
+import { Easing, ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
 import {
   createDebugger,
+  isArrayLike,
   isDev,
-  resolveDomElements,
   isDomElement,
   isNodeList,
-  isArrayLike,
+  resolveDomElements,
 } from '@g-motion/utils';
 
 export type MarkOptions = {

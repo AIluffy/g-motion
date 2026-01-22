@@ -1,23 +1,22 @@
-import { describe, bench, expect, beforeEach } from 'vitest';
-import { World } from '../src/world';
-import { MotionStatus } from '../src/components/state';
-import { MotionStateComponent } from '../src/components/state';
-import { TimelineComponent, findActiveKeyframe } from '../src/components/timeline';
+import { beforeEach, bench, describe, expect } from 'vitest';
 import { RenderComponent } from '../src/components/render';
+import { MotionStateComponent, MotionStatus } from '../src/components/state';
+import { TimelineComponent, findActiveKeyframe } from '../src/components/timeline';
 import { TimeSystem } from '../src/systems/time';
+import { World } from '../src/world';
 
+import {
+  __resetCullingPassForTests,
+  collectViewportCullingCPUInputs,
+  getGPUMetricsProvider,
+} from '@g-motion/webgpu';
+import { getAppContext } from '../src/context';
+import type { EngineServices } from '../src/plugin';
 import { BatchSamplingSystem, ComputeBatchProcessor } from '../src/systems/batch';
 import {
   WebGPUComputeSystem,
   __resetWebGPUComputeSystemForTests,
 } from '../src/systems/webgpu/system';
-import { getGPUMetricsProvider } from '../src/webgpu/metrics-provider';
-import { getAppContext } from '../src/context';
-import {
-  __resetCullingPassForTests,
-  collectViewportCullingCPUInputs,
-} from '../src/webgpu/passes/viewport/culling-types';
-import type { EngineServices } from '../src/plugin';
 
 let webgpuMockInstalled = false;
 

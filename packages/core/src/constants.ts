@@ -5,7 +5,7 @@
  */
 
 import { SchedulingConstants } from './constants/scheduling';
-import { WebGPUConstants } from './constants/webgpu';
+import { WebGPUConstants } from '@g-motion/shared';
 
 /**
  * Archetype default settings

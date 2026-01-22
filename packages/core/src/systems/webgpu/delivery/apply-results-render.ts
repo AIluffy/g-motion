@@ -1,6 +1,5 @@
-import type { ChannelMapping } from '../../../webgpu/channel-mapping';
-import type { GPUResultPacket } from '../../../webgpu/sync-manager';
 import { createDebugger } from '@g-motion/utils';
+import type { ChannelMapping, GPUResultPacket } from '@g-motion/webgpu';
 import {
   buildMatrix2DTransformString,
   buildMatrix3DTransformString,

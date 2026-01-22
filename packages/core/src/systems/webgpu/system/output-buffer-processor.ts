@@ -1,16 +1,17 @@
-import type { GPUBatchDescriptor, GPUBatchWithPreprocessedKeyframes } from '../../../types';
+import type { GPUBatchDescriptor, GPUBatchWithPreprocessedKeyframes } from '@g-motion/shared';
+import type { GPUMetricsProvider, WebGPUEngine, WebGPUFrameEncoder } from '@g-motion/webgpu';
+import {
+  dispatchGPUBatch,
+  getGPUChannelMappingRegistry,
+  getPersistentGPUBufferManager,
+  processOutputBuffer,
+  runKeyframeInterpPass,
+  runKeyframePreprocessPass,
+} from '@g-motion/webgpu';
 import type { World } from '../../../world';
 import type { ComputeBatchProcessor } from '../../batch';
-import { getGPUChannelMappingRegistry } from '../../../webgpu/channel-mapping';
-import { getPersistentGPUBufferManager } from '../../../webgpu/persistent-buffer-manager';
-import { dispatchGPUBatch } from '../../../webgpu/dispatch';
-import { debugIO, float32Preview, firstEntityChannelPreview } from '../debug';
-import { processOutputBuffer } from '../../../webgpu/output-buffer-processing';
-import { runKeyframeInterpPass, runKeyframePreprocessPass } from '../../../webgpu/passes/keyframe';
+import { debugIO, firstEntityChannelPreview, float32Preview } from '../debug';
 import { maybeRunViewportCulling } from './viewport-culling-system';
-import type { WebGPUEngine } from '../../../webgpu/engine';
-import type { WebGPUFrameEncoder } from '../../../webgpu/command-encoder';
-import type { GPUMetricsProvider } from '../../../webgpu/metrics-provider';
 
 export async function processInterpolationArchetype(params: {
   engine: WebGPUEngine;

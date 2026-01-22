@@ -1,4 +1,4 @@
-import { Keyframe, Track } from '../../types';
+import { Keyframe, Track } from '@g-motion/shared';
 import { linearSearchKeyframe, binarySearchKeyframe } from './search-algorithms';
 import { positionCache } from './cache-map';
 

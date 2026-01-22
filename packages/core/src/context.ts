@@ -1,9 +1,12 @@
-import { ComputeBatchProcessor } from './systems/batch';
-import type { ShaderDef } from './plugin';
+import {
+  BatchContext,
+  ErrorHandler,
+  ErrorMonitor,
+  createErrorHandlerFromContext,
+} from '@g-motion/shared';
 import { createDebugger } from '@g-motion/utils';
-import { BatchContext } from './types';
-import { ErrorHandler } from './error-handler.js';
-import { ErrorMonitor } from './error-monitor.js';
+import type { ShaderDef } from './plugin';
+import { ComputeBatchProcessor } from './systems/batch';
 
 const warn = createDebugger('AppContext', 'warn');
 
@@ -44,7 +47,7 @@ export class AppContext {
         new ComputeBatchProcessor({
           maxBatchSize: options?.maxBatchSize ?? 1024,
         }),
-      createErrorHandler: (context) => new ErrorHandler(context),
+      createErrorHandler: (context) => createErrorHandlerFromContext(context),
       createErrorMonitor: (_context) => new ErrorMonitor(),
     };
   }

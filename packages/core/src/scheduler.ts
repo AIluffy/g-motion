@@ -1,14 +1,14 @@
-import type { EngineServices, SystemDef } from './plugin';
-import { WorldProvider } from './worldProvider';
-import { WebGPUConstants } from './constants';
+import { getNowMs } from '@g-motion/utils';
 import {
   getGPUResultQueueLength,
   getPendingReadbackCount,
   setGPUResultWakeup,
-} from './webgpu/sync-manager';
+} from '@g-motion/webgpu';
+import { WebGPUConstants } from './constants';
+import type { EngineServices, SystemDef } from './plugin';
 import { SchedulerLoop } from './scheduler-loop';
 import { SchedulerProcessor } from './scheduler-processor';
-import { getNowMs } from './utils';
+import { WorldProvider } from './worldProvider';
 
 const GPU_TAIL_KEEP_ALIVE_MS = WebGPUConstants.GPU.TAIL_KEEP_ALIVE_MS;
 

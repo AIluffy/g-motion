@@ -1,25 +1,26 @@
-import { World, TimelineData, MotionStatus, WorldProvider, getNowMs } from '@g-motion/core';
-import { AnimationControl } from './control';
+import { MotionStatus, TimelineData, World, WorldProvider } from '@g-motion/core';
+import { getNowMs } from '@g-motion/utils';
+import { BatchTemplate, runBatchAnimation } from '../batch-runner';
 import { applyAdjust } from './adjust';
-import { runBatchAnimation, BatchTemplate } from '../batch-runner';
-export type { MarkOptions, ResolvedMarkOptions } from './mark';
+import { AnimationControl } from './control';
+import { addKeyframesForTarget } from './keyframes';
 import {
+  computeMaxTime,
+  getTargetType,
   MarkOptions,
   ResolvedMarkOptions,
   resolveMarkOptions,
   resolveTimeValue,
-  computeMaxTime,
-  getTargetType,
   TargetType,
 } from './mark';
-import { addKeyframesForTarget } from './keyframes';
+export type { MarkOptions, ResolvedMarkOptions } from './mark';
 // Import physics analyzers from plugins
-import { analyzeSpringTracks } from '@g-motion/plugin-spring';
 import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
-import { buildRenderComponent } from './render';
-import { AnimationValidator } from './animationValidator';
+import { analyzeSpringTracks } from '@g-motion/plugin-spring';
 import { ComponentRegistrar } from '../registery';
+import { AnimationValidator } from './animationValidator';
 import { GPUChannelMapper } from './gpuChannelMapper';
+import { buildRenderComponent } from './render';
 import type { VisualTarget } from './visualTarget';
 import { getOrCreateVisualTarget } from './visualTarget';
 

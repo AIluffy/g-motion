@@ -3,8 +3,8 @@ import {
   KEYFRAME_SEARCH_SHADER,
   KEYFRAME_SEARCH_SHADER_OPT,
   PACKED_KEYFRAME_STRIDE,
-} from '../src/webgpu/keyframe-preprocess-shader';
-import { ComputeBenchmark } from '../src/webgpu/benchmark';
+} from '@g-motion/webgpu';
+import { ComputeBenchmark } from '@g-motion/webgpu';
 import { ensureMockWebGPU } from './memory-allocation-regression.bench';
 
 type ShaderBinding = {

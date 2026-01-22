@@ -1,11 +1,5 @@
-import type { SystemContext, SystemDef } from '../../plugin';
-import { MotionStatus } from '../../components/state';
-import { getEasingId } from '../easing-registry';
-import { getGPUChannelMappingRegistry } from '../../webgpu/channel-mapping';
-import { SchedulingConstants } from '../../constants/scheduling';
-import { TimelineTracksMap } from '../../types';
-import type { Easing } from '../../types';
 import type {
+  Easing,
   InertiaComponentData,
   Keyframe,
   MotionStateData,
@@ -15,49 +9,51 @@ import type {
   TimelineComponentData,
   TimelineData,
   Track,
-} from '../../types';
-import { getRendererCode } from '../../renderer-code';
-import { getNowMs } from '../../utils';
-import { getArchetypeBufferCache } from './archetype-buffer-cache';
+} from '@g-motion/shared';
+import { getEasingId, TimelineTracksMap } from '@g-motion/shared';
+import { getNowMs } from '@g-motion/utils';
 import {
   consumeForcedGPUStateSyncEntityIdsSet,
+  getGPUChannelMappingRegistry,
   isPhysicsGPUEntity,
-} from '../../webgpu/sync-manager';
-import { PHYSICS_STATE_STRIDE } from '../../webgpu/physics-shader';
-import type { ArchetypeTypedBuffer } from '../../archetype';
-import {
+  packChannelMaps,
+  packRawKeyframes,
+  PHYSICS_STATE_STRIDE,
   preprocessChannelsToRawAndMap,
   type RawKeyframeGenerationOptions,
   type RawKeyframeValueEvaluator,
-  packRawKeyframes,
-  packChannelMaps,
-} from '../../webgpu/keyframe-preprocess-shader';
+} from '@g-motion/webgpu';
+import type { ArchetypeTypedBuffer } from '../../archetype';
+import { MotionStatus } from '../../components/state';
+import { SchedulingConstants } from '../../constants/scheduling';
+import type { SystemContext, SystemDef } from '../../plugin';
+import { getRendererCode } from '../../renderer-code';
+import { getArchetypeBufferCache } from './archetype-buffer-cache';
 
 import {
-  EASING_MODE_STANDARD,
   EASING_MODE_BEZIER,
   EASING_MODE_HOLD,
+  EASING_MODE_STANDARD,
+  KEYFRAME_FLOATS,
   MAX_KEYFRAMES_PER_CHANNEL,
   MIN_GPU_KEYFRAME_DURATION,
-  KEYFRAME_FLOATS,
 } from './constants';
 
 import {
   bufferCache,
-  __resetBatchSamplingCachesForTests,
+  consumeBatchSamplingSeekInvalidation,
+  getArchetypeCursor,
+  getArchetypeScratch,
+  getEntityIndicesScratchByArchetype,
+  getKeyframesPackedCache,
+  getPickedArchetypesScratch,
   hashEntityIndices,
   hashMotionStateVersionStep,
-  consumeBatchSamplingSeekInvalidation,
-  getKeyframesPackedCache,
-  getEntityIndicesScratchByArchetype,
-  getArchetypeCursor,
-  setArchetypeCursor,
   incrementFrameId,
-  getPickedArchetypesScratch,
-  getArchetypeScratch,
+  setArchetypeCursor,
 } from './utils';
 
-import { getPhysicsStateVersionByArchetype, getPhysicsLayoutSigByArchetype } from './physics-state';
+import { getPhysicsLayoutSigByArchetype, getPhysicsStateVersionByArchetype } from './physics-state';
 
 // Extract easing name from Easing type
 function getEasingName(easing?: Easing): string {

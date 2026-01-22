@@ -1,5 +1,5 @@
 import type { InertiaOptions } from '@g-motion/core';
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/core';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
 import { createDebugger } from '@g-motion/utils';
 
 const warn = createDebugger('Validation', 'warn');

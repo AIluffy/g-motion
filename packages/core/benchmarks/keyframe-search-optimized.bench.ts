@@ -5,7 +5,7 @@ import {
   prewarmKeyframeCache,
   isTrackSorted,
 } from '../src/components/timeline';
-import type { Keyframe } from '../src/types';
+import type { Keyframe } from '@g-motion/shared';
 
 describe('Keyframe Search Performance', () => {
   let smallTrack: Keyframe[];

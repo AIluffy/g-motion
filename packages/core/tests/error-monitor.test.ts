@@ -1,6 +1,12 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { AppContext, getErrorMonitor } from '../src/context';
-import { ErrorCode, ErrorSeverity } from '../src/errors';
+import { ErrorHandler } from '../../shared/src/error/error-handler';
+import {
+  ErrorCode,
+  ErrorMonitor,
+  ErrorSeverity,
+  type ErrorAggregate,
+} from '../../shared/src/error';
 
 describe('ErrorMonitor', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
@@ -54,7 +60,9 @@ describe('ErrorMonitor', () => {
 
     const aggregates = monitor.getAggregates();
     const batchAgg = aggregates.find(
-      (a) => a.code === ErrorCode.BATCH_NOT_FOUND && a.severity === ErrorSeverity.WARNING,
+      (aggregate: ErrorAggregate) =>
+        aggregate.code === ErrorCode.BATCH_NOT_FOUND &&
+        aggregate.severity === ErrorSeverity.WARNING,
     );
     expect(batchAgg).toEqual(
       expect.objectContaining({
@@ -62,6 +70,25 @@ describe('ErrorMonitor', () => {
         code: ErrorCode.BATCH_NOT_FOUND,
         severity: ErrorSeverity.WARNING,
         count: 2,
+      }),
+    );
+  });
+
+  test('supports dependency injection without AppContext', () => {
+    const monitor = new ErrorMonitor();
+    const handler = new ErrorHandler({
+      recordError: (error) => monitor.record(error),
+      logError: () => {},
+    });
+
+    handler.create('GPU init failed', ErrorCode.GPU_INIT_FAILED, ErrorSeverity.ERROR);
+
+    const events = monitor.getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        code: ErrorCode.GPU_INIT_FAILED,
+        severity: ErrorSeverity.ERROR,
       }),
     );
   });

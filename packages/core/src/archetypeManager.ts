@@ -2,7 +2,7 @@ import type { ComponentRegistry } from './registry';
 import type { EntityManager } from './entity';
 import { Archetype, ArchetypeInternal, type ComponentValue } from './archetype';
 import { ARCHETYPE_DEFAULTS } from './constants';
-import { ErrorCode, ErrorSeverity, MotionError } from './errors';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
 import type { ComponentDef } from './plugin';
 
 type ComponentData = Record<string, ComponentValue | undefined>;

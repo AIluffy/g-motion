@@ -14,7 +14,7 @@ import {
   linearSearchKeyframe,
   binarySearchKeyframe,
 } from '../src/components/timeline/search-algorithms';
-import type { Keyframe, Track } from '../src/types';
+import type { Keyframe, Track } from '@g-motion/shared';
 
 describe('Timeline Component', () => {
   it('should export schema with correct properties', () => {

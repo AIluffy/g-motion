@@ -2,7 +2,7 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '../../types';
+} from '@g-motion/shared';
 import type {
   BatchEntity,
   BatchKeyframe,

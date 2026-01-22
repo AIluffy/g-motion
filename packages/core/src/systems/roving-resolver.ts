@@ -1,5 +1,5 @@
 import { SystemContext, SystemDef } from '../plugin';
-import type { Keyframe, TimelineComponentData } from '../types';
+import type { Keyframe, TimelineComponentData } from '@g-motion/shared';
 
 type GaussianKernel = { weights: number[]; radius: number };
 

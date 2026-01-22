@@ -1,6 +1,5 @@
-import { describe, bench, expect, beforeAll } from 'vitest';
-import { StagingBufferPool } from '../src/webgpu/staging-pool';
-import { AsyncReadbackManager } from '../src/webgpu/async-readback';
+import { AsyncReadbackManager, StagingBufferPool } from '@g-motion/webgpu';
+import { beforeAll, bench, describe, expect } from 'vitest';
 
 /**
  * Phase 3 Validation: Staging Buffer Pool & Async Readback

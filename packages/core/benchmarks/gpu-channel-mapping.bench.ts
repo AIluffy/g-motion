@@ -3,10 +3,10 @@ import {
   GPUChannelMappingRegistry,
   createChannelMapping,
   createBatchChannelTable,
-} from '../src/webgpu/channel-mapping';
+} from '@g-motion/webgpu';
 import { clamp01 } from '@g-motion/utils';
 import { applyGPUResultPacket } from '../src/systems/webgpu/delivery/apply-results';
-import type { ChannelMapping } from '../src/webgpu/channel-mapping';
+import type { ChannelMapping } from '@g-motion/webgpu';
 
 /**
  * Phase 4 Validation: Multi-Channel GPU Output Mapping

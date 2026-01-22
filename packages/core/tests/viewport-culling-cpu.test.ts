@@ -4,7 +4,7 @@ import {
   collectViewportCullingCPUInputs,
   ENTITY_BOUNDS_STRIDE,
   RENDER_STATE_EX_STRIDE,
-} from '../src/webgpu/passes/viewport/culling-types';
+} from '@g-motion/webgpu';
 
 describe('Viewport culling CPU inputs', () => {
   beforeEach(() => {

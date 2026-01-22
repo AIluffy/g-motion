@@ -1,7 +1,7 @@
-import type { ComponentDef, ComponentType, ComponentValue } from './types';
+import type { ComponentDef, ComponentType, ComponentValue } from '@g-motion/shared';
 import { ARCHETYPE_DEFAULTS } from './constants';
 
-export type { ComponentValue } from './types';
+export type { ComponentValue } from '@g-motion/shared';
 
 export type ArchetypeTypedBuffer = Float32Array | Float64Array | Int32Array;
 

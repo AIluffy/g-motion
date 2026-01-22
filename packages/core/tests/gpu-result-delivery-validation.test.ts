@@ -1,9 +1,9 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
 import { AppContext } from '../src/context';
-import { enqueueGPUResults } from '../src/webgpu/sync-manager';
+import { enqueueGPUResults } from '@g-motion/webgpu';
 import { GPUResultApplySystem } from '../src/systems/webgpu/delivery/delivery-system';
 import { applyGPUResultPacket } from '../src/systems/webgpu/delivery/apply-results';
-import type { ChannelMapping } from '../src/webgpu/channel-mapping';
+import type { ChannelMapping } from '@g-motion/webgpu';
 
 describe('GPUResultApplySystem validation', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;

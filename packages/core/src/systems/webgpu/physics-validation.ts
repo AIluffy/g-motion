@@ -5,7 +5,7 @@
  * Used when config.physicsValidation === true.
  */
 
-import { PHYSICS_STATE_STRIDE } from '../../webgpu/physics-shader';
+import { PHYSICS_STATE_STRIDE } from '@g-motion/webgpu';
 
 export interface PhysicsValidationShadow {
   slotCount: number;

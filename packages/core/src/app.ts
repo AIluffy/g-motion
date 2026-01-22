@@ -1,12 +1,11 @@
-import type { ComponentDef, SystemDef, RendererDef, ShaderDef } from './plugin';
-import { registerGpuEasing } from './systems/easing-registry';
+import { ErrorCode, ErrorSeverity, MotionError, registerGpuEasing } from '@g-motion/shared';
 import { createDebugger } from '@g-motion/utils';
-import { MotionApp, MotionAppConfig } from './plugin';
-import { WorldProvider } from './worldProvider';
 import { getAppContext } from './context';
+import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
+import { MotionApp, MotionAppConfig } from './plugin';
 import { getRendererCode } from './renderer-code';
 import type { World } from './world';
-import { ErrorCode, ErrorSeverity, MotionError } from './errors';
+import { WorldProvider } from './worldProvider';
 
 const debug = createDebugger('Core');
 

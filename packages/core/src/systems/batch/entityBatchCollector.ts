@@ -1,5 +1,5 @@
 import type { BatchEntity, BatchKeyframe, BatchMetadata } from './types';
-import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
 import { getErrorHandler } from '../../context';
 import type { BatchStatistics } from './batchStatistics';
 

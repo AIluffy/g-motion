@@ -18,6 +18,7 @@
     "@g-motion/core": "workspace:*",
     "@g-motion/utils": "workspace:*",
     "@g-motion/values": "workspace:*",
+    "@g-motion/shared": "workspace:*",
     "@g-motion/plugin-spring": "workspace:*",
     "@g-motion/plugin-inertia": "workspace:*"
   },

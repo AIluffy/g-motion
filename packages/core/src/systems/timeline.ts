@@ -1,6 +1,6 @@
 import { MotionStatus } from '../components/state';
 import { SystemContext, SystemDef } from '../plugin';
-import { getNowMs } from '../utils';
+import { getNowMs } from '@g-motion/utils';
 
 function mod(n: number, d: number): number {
   const r = n % d;

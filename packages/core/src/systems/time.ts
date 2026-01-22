@@ -1,6 +1,6 @@
 import { MotionStatus } from '../components/state';
 import type { SystemContext, SystemDef } from '../plugin';
-import { getNowMs } from '../utils';
+import { getNowMs } from '@g-motion/utils';
 
 export const TimeSystem: SystemDef = {
   name: 'TimeSystem',

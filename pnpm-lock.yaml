@@ -164,6 +164,9 @@ importers:
       '@g-motion/plugin-spring':
         specifier: workspace:*
         version: link:../plugins/spring
+      '@g-motion/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@g-motion/utils':
         specifier: workspace:*
         version: link:../utils
@@ -186,9 +189,15 @@ importers:
 
   packages/core:
     dependencies:
+      '@g-motion/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@g-motion/utils':
         specifier: workspace:*
         version: link:../utils
+      '@g-motion/webgpu':
+        specifier: workspace:*
+        version: link:../webgpu
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -281,6 +290,25 @@ importers:
         specifier: ^4.0.14
         version: 4.0.15(@types/node@24.10.1)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/shared:
+    dependencies:
+      '@g-motion/utils':
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      '@rslib/core':
+        specifier: ^0.18.3
+        version: 0.18.3(typescript@5.9.3)
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.14
+        version: 4.0.15(@types/node@24.10.1)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/utils:
     devDependencies:
       '@rslib/core':
@@ -311,6 +339,31 @@ importers:
       fast-check:
         specifier: ^4.4.0
         version: 4.4.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.14
+        version: 4.0.15(@types/node@24.10.1)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/webgpu:
+    dependencies:
+      '@g-motion/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@g-motion/utils':
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      '@rslib/core':
+        specifier: ^0.18.3
+        version: 0.18.3(typescript@5.9.3)
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      '@webgpu/types':
+        specifier: ^0.1.67
+        version: 0.1.67
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

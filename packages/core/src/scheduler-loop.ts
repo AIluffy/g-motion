@@ -1,5 +1,5 @@
 import { SCHEDULER_LIMITS } from './constants';
-import { getNowMs } from './utils';
+import { getNowMs } from '@g-motion/utils';
 
 export class SchedulerLoop {
   private running = false;

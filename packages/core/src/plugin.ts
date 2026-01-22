@@ -1,6 +1,6 @@
-import type { ComponentDef, ComponentValue } from './types';
+import type { ComponentDef, ComponentValue } from '@g-motion/shared';
 
-export type { ComponentDef, ComponentType, ComponentValue } from './types';
+export type { ComponentDef, ComponentType, ComponentValue } from '@g-motion/shared';
 
 export type TransformTypedBuffers = Record<
   string,
@@ -95,8 +95,8 @@ export interface EngineServices {
   app: MotionApp;
   config: MotionAppConfig;
   batchProcessor: import('./systems/batch').ComputeBatchProcessor;
-  metrics: import('./webgpu/metrics-provider').GPUMetricsProvider;
-  errorHandler: import('./error-handler').ErrorHandler;
+  metrics: import('@g-motion/webgpu').GPUMetricsProvider;
+  errorHandler: import('@g-motion/shared').ErrorHandler;
   appContext: import('./context').AppContext;
 }
 

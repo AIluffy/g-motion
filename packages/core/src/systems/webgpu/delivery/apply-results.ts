@@ -1,12 +1,11 @@
-import type { World } from '../../../world';
-import type { GPUResultPacket } from '../../../webgpu/sync-manager';
-import { unmarkPhysicsGPUEntity } from '../../../webgpu/sync-manager';
-import type { ChannelMapping } from '../../../webgpu/channel-mapping';
+import type { ChannelMapping, GPUResultPacket } from '@g-motion/webgpu';
 import {
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
-} from '../../../webgpu/channel-mapping';
+  unmarkPhysicsGPUEntity,
+} from '@g-motion/webgpu';
 import { MotionStatus } from '../../../components/state';
+import type { World } from '../../../world';
 import {
   applyMatrixTransform,
   applyPrimitiveValue,

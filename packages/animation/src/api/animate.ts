@@ -1,4 +1,4 @@
-import { ErrorCode, ErrorSeverity, MotionError, type Easing } from '@g-motion/core';
+import { ErrorCode, ErrorSeverity, MotionError, type Easing } from '@g-motion/shared';
 import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';

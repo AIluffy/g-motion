@@ -2,9 +2,9 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '../../types';
-import { selectWorkgroupSize } from '../../webgpu/pipeline';
-import { ErrorCode, ErrorSeverity, MotionError } from '../../errors';
+} from '@g-motion/shared';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { selectWorkgroupSize } from '@g-motion/webgpu';
 import type { BatchStatistics } from './batchStatistics';
 import type { EntityIdLeasePool } from './entityIdLeasePool';
 

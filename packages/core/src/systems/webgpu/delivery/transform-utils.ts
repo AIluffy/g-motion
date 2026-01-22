@@ -4,7 +4,7 @@
  * Builds CSS transform strings from GPU-computed values.
  */
 
-import { OUTPUT_FORMAT, packedRGBAToCSS, unpackHalf2 } from '../../../webgpu/output-format-shader';
+import { OUTPUT_FORMAT, packedRGBAToCSS, unpackHalf2 } from '@g-motion/webgpu';
 
 export function buildMatrix2DTransformString(
   values: Float32Array,
