@@ -51,12 +51,12 @@ logs/
 .cache/
 tmp/
 temp/
-routeTree.gen.ts
+**/**/routeTree.gen.ts
 
 # Generated files
 *.d.ts
 .tsbuildinfo
-tsconfig.tsbuildinfo
+**/**/tsconfig.tsbuildinfo
 
 # Optional npm cache directory
 .npm
