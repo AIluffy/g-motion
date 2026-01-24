@@ -156,6 +156,12 @@ export async function maybeRunViewportCulling(params: {
         };
       };
 
+      const release = () => {
+        try {
+          pending.readback.destroy();
+        } catch {}
+      };
+
       readbackManager.enqueueMapAsyncDecoded(
         archetypeId,
         pending.readback,
@@ -164,6 +170,7 @@ export async function maybeRunViewportCulling(params: {
         decode,
         200,
         cullingTag,
+        release,
       );
       setPendingReadbackCount(readbackManager.getPendingCount());
       return { kind: 'enqueued' };

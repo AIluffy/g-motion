@@ -13,7 +13,7 @@ import {
   packOutputChannels,
 } from '../output-format-shader';
 import { outputFormatBufferPool, trackBuffer } from './buffer-pool';
-import { getOutputFormatPipeline, outputFormatBindGroupLayout } from './pipeline';
+import { getOutputFormatPipeline } from './pipeline';
 import { resetOutputFormatPassState } from './pipeline';
 import { makeChannelsKey } from './types';
 import type { WebGPUFrameEncoder } from '../command-encoder';
@@ -104,10 +104,11 @@ export async function runOutputFormatPass(
     return rawOutputBuffer;
   }
 
-  const pipeline = await getOutputFormatPipeline(device);
-  if (!pipeline || !outputFormatBindGroupLayout) {
+  const state = await getOutputFormatPipeline(device);
+  if (!state) {
     return rawOutputBuffer;
   }
+  const { pipeline, bindGroupLayout } = state;
 
   const channelCount = outputChannels && outputChannels.length > 0 ? outputChannels.length : 0;
   if (!channelCount) {
@@ -218,7 +219,7 @@ export async function runOutputFormatPass(
   );
 
   const bindGroup = device.createBindGroup({
-    layout: outputFormatBindGroupLayout,
+    layout: bindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: rawOutputBuffer } },
       { binding: 1, resource: { buffer: channelsBuffer } },

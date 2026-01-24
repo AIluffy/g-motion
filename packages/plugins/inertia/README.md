@@ -1,326 +1,198 @@
 # @g-motion/plugin-inertia
 
-Inertia physics plugin for G-Motion animation engine, providing momentum-based motion with exponential decay and optional boundary bounce.
+面向 Motion 的惯性物理插件，使用 GPU 计算实现指数衰减与边界反弹。该插件在模块加载时自动注册，并通过 WebGPU 计算管线执行惯性更新，没有 CPU 兜底实现。
 
-Inspired by [Popmotion's inertia animation](https://popmotion.io/#quick-start-animation-inertia).
+## 项目概述
 
-## Features
+插件提供 Inertia 组件与对应的 GPU Shader。动画系统在批处理阶段把惯性状态写入 GPU 缓冲区，调用 updateInertia 计算下一帧的位置与速度，然后把结果回写到 Render 管线。
 
-- **Velocity-driven motion**: Animations driven by initial velocity rather than target position
-- **Exponential decay**: Natural deceleration simulating friction/momentum
-- **Snap-to control**: GSAP-inspired end parameter for precise landing (exact value, array, or custom function)
-- **Automatic velocity tracking**: Track property changes and calculate velocity automatically (via VelocityTracker)
-- **Boundary bounce**: Optional spring physics when hitting min/max boundaries
-- **Track-level independence**: Different tracks can use different physics (inertia, spring, or standard)
-- **Implicit boundaries**: Automatically infer boundaries from `to` parameter based on velocity direction
-- **Function-based velocity**: Support dynamic velocity calculation at animation start
+## 主要特性
 
-## Installation
+- GPU 侧惯性衰减与弹性反弹，适合动量滑动与回弹场景
+- 速度来源灵活：直接数值、函数回调、或通过 velocitySource 自行计算
+- 支持边界限制与 clamp 行为，可切换为弹性回弹
+- deceleration、duration、resistance 统一映射到 timeConstant
+- 提供 VelocityTracker 工具用于采样速度
+- 暴露分析与构建工具，便于自定义动画流程
+
+## 安装
 
 ```bash
 pnpm add @g-motion/plugin-inertia
 ```
 
-## Usage
+## 使用方式
 
-### Basic Decay Animation
+### 基础惯性衰减
 
-```typescript
+```ts
 import { motion } from '@g-motion/animation';
-import '@g-motion/plugin-inertia'; // Auto-registers the plugin
+import '@g-motion/plugin-inertia';
 
-// Pure decay with no boundaries
-motion('#element')
-  .mark({
-    inertia: {
-      velocity: 800, // Units per second
-      power: 0.8, // Target distance factor (optional)
-      timeConstant: 350, // Decay duration in ms (optional)
-    },
-  })
-  .animate();
-```
-
-### Explicit Boundary Bounce
-
-```typescript
-motion('#element')
-  .mark({
-    inertia: {
-      velocity: 1000,
-      min: 0,
-      max: 500,
-      bounceStiffness: 400, // Spring stiffness for bounce
-      bounceDamping: 10, // Spring damping for bounce
-    },
-  })
-  .animate();
-```
-
-### Implicit Boundary from 'to' Parameter
-
-When `to` is provided, it acts as a boundary based on velocity direction:
-- `velocity > 0`: `to` becomes the **max** boundary
-- `velocity < 0`: `to` becomes the **min** boundary
-
-```typescript
-motion('#element')
-  .mark({
-    to: { x: 300 }, // Acts as max boundary (velocity is positive)
-    inertia: {
-      velocity: 600,
-    },
-  })
-  .animate();
-```
-
-### Dynamic Velocity (e.g., from drag gesture)
-
-```typescript
-let dragVelocity = 0;
-
-// ... track drag velocity during interaction ...
-
-motion('#element')
-  .mark({
-    inertia: {
-      velocity: () => dragVelocity, // Resolved at animation start
-    },
-  })
-  .animate();
-```
-
-### Snap to Exact Value
-
-Ensure the animation ends at a specific position:
-
-```typescript
 motion('#element')
   .mark({
     inertia: {
       velocity: 800,
-      end: 500, // Will end exactly at 500px
+      deceleration: 4,
     },
   })
   .animate();
 ```
 
-### Snap to Grid/Array
+### 边界与反弹
 
-Perfect for carousels, tabs, or grid layouts:
-
-```typescript
-// Snap to closest value in array
+```ts
 motion('#element')
   .mark({
     inertia: {
       velocity: 1000,
-      end: [0, 100, 200, 300, 400], // Snaps to nearest value
+      bounds: { min: 0, max: 500 },
+      bounce: { stiffness: 400, damping: 10, mass: 1 },
     },
   })
   .animate();
 ```
 
-### Custom Snap Function
+### 自定义速度来源
 
-Use a function for advanced snap logic:
-
-```typescript
-// Snap to 50px increments
+```ts
 motion('#element')
   .mark({
     inertia: {
-      velocity: 750,
-      end: (naturalEnd) => Math.round(naturalEnd / 50) * 50,
-    },
-  })
-  .animate();
-
-// Wheel spinner: snap to degrees
-motion('#wheel')
-  .mark({
-    inertia: {
-      velocity: 2000,
-      end: (naturalEnd) => Math.round(naturalEnd / 45) * 45, // 8 segments
+      velocity: 'auto',
+      velocitySource: (_track, ctx) => {
+        return ctx.target?.velocityX ?? 0;
+      },
     },
   })
   .animate();
 ```
 
-### Automatic Velocity Tracking
+### VelocityTracker 配合使用
 
-Track property changes and calculate velocity automatically:
-
-```typescript
+```ts
 import { VelocityTracker } from '@g-motion/plugin-inertia';
 
 const element = document.querySelector('#draggable');
-
-// Start tracking x and y properties
 VelocityTracker.track(element, ['x', 'y']);
 
-// ... user drags element ...
-
-// Get tracked velocity at animation start
 motion(element)
   .mark({
     inertia: {
-      velocity: 'auto', // Uses VelocityTracker (future feature)
+      velocity: 'auto',
       velocitySource: (track) => VelocityTracker.getVelocity(element, track),
-      // OR manually retrieve:
-      // velocity: VelocityTracker.getVelocity(element, 'x')
     },
   })
   .animate();
 
-// Stop tracking when done
 VelocityTracker.untrack(element);
 ```
 
-### Mixed Physics (track-level independence)
-
-Different tracks can use different physics:
-
-```typescript
-import '@g-motion/plugin-spring';
-import '@g-motion/plugin-inertia';
-
-// X-axis uses inertia, Y-axis uses spring
-motion('#element')
-  .mark({
-    to: { x: 300, y: 100 },
-    inertia: { velocity: 800 }, // Applied to x-axis
-  })
-  .mark({
-    to: { y: 100 },
-    spring: { stiffness: 200, damping: 15 }, // Applied to y-axis
-  })
-  .animate();
-```
-
-## API Reference
+## 配置说明
 
 ### InertiaOptions
 
-```typescript
+```ts
 interface InertiaOptions {
   velocity?: number | 'auto' | (() => number);
-  velocitySource?: (track: string, ctx: { target: any }) => number; // For 'auto'
+  velocitySource?: (track: string, ctx: { target: any }) => number;
 
-  // Snap-to control (GSAP-inspired)
-  snap?: number | number[] | ((naturalEnd: number) => number); // Preferred
-  end?: number | number[] | ((naturalEnd: number) => number); // Alias
-  modifyTarget?: (target: number) => number;
-
-  // Boundary constraints
-  bounds?: { min?: number; max?: number };
   min?: number;
   max?: number;
-  clamp?: boolean; // Clamp instead of bounce
+  bounds?: { min?: number; max?: number };
+  clamp?: boolean;
 
-  // Physics parameters
+  deceleration?: number;
   resistance?: number;
-  duration?: number | { min: number; max: number }; // normalized to timeConstant
-  power?: number;
-  timeConstant?: number;
+  duration?: number | { min: number; max: number };
 
-  // Bounce parameters
   bounce?: false | { stiffness?: number; damping?: number; mass?: number };
-  bounceStiffness?: number; // Legacy
-  bounceDamping?: number; // Legacy
-  bounceMass?: number; // Legacy
 
-  // Optional handoff into spring when decay/bounce completes
-  handoff?: { type: 'spring'; to?: number };
-
-  // Completion thresholds
   restSpeed?: number;
   restDelta?: number;
 }
 ```
 
-### Snap-To Behavior
+### timeConstant 映射规则
 
-The `end` parameter calculates a snap target based on the natural end position:
+插件内部会把惯性参数规范化为 timeConstant（毫秒）：
 
-1. **Natural end calculation**: `currentValue + velocity * (timeConstant / 1000)`
-2. **Snap target processing**:
-   - `number`: Uses exact value as snap target
-   - `number[]`: Finds closest value in array
-   - `function`: Calls function with natural end, returns snap target
-3. **Boundary integration**: Snap target acts as boundary (max if velocity > 0, min if velocity < 0)
-4. **Physics**: Decays until reaching snap target, then spring bounce to settle
+- deceleration > 0：timeConstant = 1000 / deceleration
+- duration 为 number：timeConstant = duration * 1000
+- duration 为 { min, max }：timeConstant 取区间均值并转换为毫秒
+- resistance：timeConstant = 1000 / max(1, resistance)
+- 未提供时默认 350ms
 
-### Physics Formula
+## 核心 API
 
-**Decay phase** (no boundary hit):
-```
-velocity(t) = velocity₀ × exp(-t / timeConstant)
-position(t) = position₀ + ∫ velocity(t) dt
-```
+### inertiaPlugin
 
-**Bounce phase** (boundary hit):
-- Switches to spring physics using semi-implicit Euler integration
-- Target position is the boundary value
-- Uses `bounceStiffness`, `bounceDamping`, and `bounceMass` parameters
+插件实例，模块加载时会自动注册。引擎侧可直接使用：
 
-### Completion Conditions
-
-Animation completes when **all tracks** satisfy:
-1. `|velocity| < restSpeed`, AND
-2. Position is stable (within `restDelta` of target/boundary)
-
-## Comparison with Spring Plugin
-
-| Aspect | Inertia | Spring |
-|--------|---------|--------|
-| **Driving Force** | Initial velocity | Target position |
-| **Physics** | Exponential decay | Hooke's law (F = -kx) |
-| **Use Case** | Momentum/flick gestures | Natural settle to target |
-| **Duration** | Controlled by `timeConstant` | Physics-determined |
-| **Boundaries** | Optional with bounce | N/A |
-| **Target** | Calculated from velocity & power | Explicit `to` value |
-
-## Examples
-
-See the [examples app](../../apps/examples/src/routes/inertia.tsx) for interactive demonstrations:
-- Pure decay animation
-- Boundary bounce behavior
-- Implicit boundary inference
-- Mixed physics (inertia + spring)
-- Dynamic velocity control
-- **Snap to exact value** (GSAP-inspired)
-- **Snap to grid/array** (carousel, tabs)
-- **Custom snap function** (wheel spinner, custom logic)
-
-## Manual Registration
-
-The plugin auto-registers in browser environments. For manual registration:
-
-```typescript
-import { app } from '@g-motion/core';
-import { InertiaPlugin } from '@g-motion/plugin-inertia';
-
-InertiaPlugin.setup(app);
+```ts
+import { inertiaPlugin } from '@g-motion/plugin-inertia';
 ```
 
-## Conflict Detection
+### analyzeInertiaTracks(tracks, target)
 
-Using both `spring` and `inertia` on the same track will throw an error:
+扫描时间线轨道，收集惯性配置与各轨道速度：
 
-```typescript
-// ❌ This will throw an error
-motion('#element')
-  .mark({
-    to: { x: 100 },
-    spring: { stiffness: 200 },
-    inertia: { velocity: 500 }, // Conflict!
-  })
-  .animate();
+```ts
+import { analyzeInertiaTracks } from '@g-motion/plugin-inertia';
+
+const result = analyzeInertiaTracks(tracks, target);
 ```
 
-Use different tracks or choose one physics model per property.
+### buildInertiaComponent(config, velocities)
 
-## License
+构建 Inertia 组件数据：
 
-MIT
+```ts
+import { buildInertiaComponent } from '@g-motion/plugin-inertia';
+
+const inertiaComponent = buildInertiaComponent(config, velocities);
+```
+
+### VelocityTracker
+
+速度跟踪工具：
+
+```ts
+import { VelocityTracker } from '@g-motion/plugin-inertia';
+
+VelocityTracker.track(target, ['x', 'y']);
+const vx = VelocityTracker.getVelocity(target, 'x');
+VelocityTracker.untrack(target);
+```
+
+### INERTIA_GPU_SHADER
+
+暴露的 WGSL Shader 源码，供自定义渲染或调试使用：
+
+```ts
+import { INERTIA_GPU_SHADER } from '@g-motion/plugin-inertia';
+```
+
+## 常见问题
+
+### 为什么没有运动或速度为 0？
+
+确保 inertia.velocity 有值，或在 velocity 为 auto 时提供 velocitySource。未能解析速度时会被视为 0。
+
+### 边界为什么没有触发？
+
+GPU 侧仅在 min < max 时启用边界判断，请确保 bounds 或 min/max 合法。
+
+### 可以和 spring 同时使用吗？
+
+同一 mark 内同时使用 spring 与 inertia 会触发参数校验错误，应拆分为不同 mark 或选择一种物理模型。
+
+### 是否必须有 WebGPU？
+
+是的，该插件仅提供 GPU 实现，没有 CPU 兜底，需在 WebGPU 可用环境运行。
+
+## 贡献指南
+
+- 构建：pnpm --filter @g-motion/plugin-inertia run build
+- 测试：pnpm --filter @g-motion/plugin-inertia test
+- 提交前建议运行：pnpm lint 与 pnpm type-check

@@ -40,6 +40,7 @@ export function processCompletedReadbacks(params: {
       const tag = res.tag as unknown;
       const tagObj = tag && typeof tag === 'object' ? (tag as Record<string, unknown>) : undefined;
       const kind = typeof tagObj?.kind === 'string' ? (tagObj.kind as string) : undefined;
+      const released = (res as { released?: boolean }).released === true;
 
       if (kind === 'culling') {
         const cullingTag = tag as CullingReadbackTag;
@@ -78,9 +79,11 @@ export function processCompletedReadbacks(params: {
           if (typeof res.leaseId === 'number') {
             processor.releaseEntityIds(res.leaseId);
           }
-          try {
-            res.stagingBuffer.destroy();
-          } catch {}
+          if (!released) {
+            try {
+              res.stagingBuffer.destroy();
+            } catch {}
+          }
           continue;
         }
 
@@ -118,9 +121,11 @@ export function processCompletedReadbacks(params: {
           })
           .finally(() => {
             tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
-            try {
-              res.stagingBuffer.destroy();
-            } catch {}
+            if (!released) {
+              try {
+                res.stagingBuffer.destroy();
+              } catch {}
+            }
           });
 
         continue;
@@ -142,8 +147,10 @@ export function processCompletedReadbacks(params: {
             syncQueueDepth: readbackManager.getQueueDepth(),
           });
         } catch {}
-        sp.markAvailable(res.stagingBuffer);
-        tryReleasePooledOutputBufferFromTag(res.tag);
+        if (!released) {
+          sp.markAvailable(res.stagingBuffer);
+          tryReleasePooledOutputBufferFromTag(res.tag);
+        }
         if (typeof res.leaseId === 'number') {
           processor.releaseEntityIds(res.leaseId);
         }
@@ -231,8 +238,10 @@ export function processCompletedReadbacks(params: {
         });
       } catch {}
 
-      tryReleasePooledOutputBufferFromTag(res.tag);
-      sp.markAvailable(res.stagingBuffer);
+      if (!released) {
+        tryReleasePooledOutputBufferFromTag(res.tag);
+        sp.markAvailable(res.stagingBuffer);
+      }
 
       if (typeof res.leaseId === 'number') {
         processor.releaseEntityIds(res.leaseId);

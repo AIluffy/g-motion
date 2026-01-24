@@ -135,6 +135,7 @@ export async function processOutputBuffer(
     }
     enqueueReadback({
       readbackManager,
+      sp,
       metricsProvider,
       archetypeId,
       entityIdsForReadback,
@@ -257,6 +258,7 @@ function copyOutputBuffer(params: {
 
 function enqueueReadback(params: {
   readbackManager: AsyncReadbackManager | null;
+  sp: StagingBufferPool;
   metricsProvider?: GPUMetricsProvider;
   archetypeId: string;
   entityIdsForReadback: ArrayLike<number>;
@@ -269,6 +271,7 @@ function enqueueReadback(params: {
 }): void {
   const {
     readbackManager,
+    sp,
     metricsProvider,
     archetypeId,
     entityIdsForReadback,
@@ -283,6 +286,10 @@ function enqueueReadback(params: {
     return;
   }
   const mapPromise = stagingBuffer.mapAsync((GPUMapMode as any).READ);
+  const release = () => {
+    sp.markAvailable(stagingBuffer);
+    tryReleasePooledOutputBufferFromTag(readbackTag);
+  };
   readbackManager.enqueueMapAsync(
     archetypeId,
     entityIdsForReadback,
@@ -294,6 +301,7 @@ function enqueueReadback(params: {
     channelsForReadback,
     leaseId,
     readbackTag,
+    release,
   );
   const pending = readbackManager.getPendingCount();
   setPendingReadbackCount(pending);

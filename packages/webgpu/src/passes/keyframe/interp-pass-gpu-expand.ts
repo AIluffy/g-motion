@@ -5,9 +5,6 @@ import {
   getKeyframeEntryExpandPipeline,
   getKeyframeInterpPipeline,
   getKeyframeSearchWindowPipeline,
-  keyframeEntryExpandBindGroupLayout,
-  keyframeInterpBindGroupLayout,
-  keyframeSearchWindowBindGroupLayout,
 } from './pipelines';
 import type { KeyframePreprocessResult } from './types';
 
@@ -41,12 +38,13 @@ export async function recordKeyframeSearchWindowPass(params: {
   ) {
     return false;
   }
-  const pipeline = await getKeyframeSearchWindowPipeline(device);
-  if (!pipeline || !keyframeSearchWindowBindGroupLayout) {
+  const searchWindowState = await getKeyframeSearchWindowPipeline(device);
+  if (!searchWindowState) {
     return false;
   }
+  const { pipeline, bindGroupLayout } = searchWindowState;
   const bindGroup = device.createBindGroup({
-    layout: keyframeSearchWindowBindGroupLayout,
+    layout: bindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: preprocess.channelMapsBuffer } },
       { binding: 1, resource: { buffer: searchTimesBuffer } },
@@ -233,14 +231,9 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
         label: `motion-keyframe-interp-outputs-${archetypeId}`,
       });
 
-    const entryExpandPipeline = await getKeyframeEntryExpandPipeline(device);
-    const interpPipeline = await getKeyframeInterpPipeline(device);
-    if (
-      !entryExpandPipeline ||
-      !keyframeEntryExpandBindGroupLayout ||
-      !interpPipeline ||
-      !keyframeInterpBindGroupLayout
-    ) {
+    const entryExpandState = await getKeyframeEntryExpandPipeline(device);
+    const interpState = await getKeyframeInterpPipeline(device);
+    if (!entryExpandState || !interpState) {
       if (outputBufferRes) {
         releasePooledOutputBuffer(outputBuffer);
       } else {
@@ -249,8 +242,12 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
       return null;
     }
 
+    const { pipeline: entryExpandPipeline, bindGroupLayout: entryExpandBindGroupLayout } =
+      entryExpandState;
+    const { pipeline: interpPipeline, bindGroupLayout: interpBindGroupLayout } = interpState;
+
     const entryExpandBindGroup = device.createBindGroup({
-      layout: keyframeEntryExpandBindGroupLayout,
+      layout: entryExpandBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: statesBuffer } },
         { binding: 1, resource: { buffer: preprocess.channelMapsBuffer } },
@@ -265,7 +262,7 @@ export async function tryRunKeyframeInterpPassWithGpuEntryExpand(params: {
     });
 
     const interpBindGroup = device.createBindGroup({
-      layout: keyframeInterpBindGroupLayout,
+      layout: interpBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: preprocess.packedKeyframesBuffer } },
         { binding: 1, resource: { buffer: preprocess.keyframeStartTimesBuffer } },

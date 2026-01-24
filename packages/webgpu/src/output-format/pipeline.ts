@@ -4,24 +4,31 @@
 
 import { OUTPUT_FORMAT_SHADER } from '../output-format-shader';
 
-export let outputFormatPipeline: GPUComputePipeline | null = null;
-export let outputFormatBindGroupLayout: GPUBindGroupLayout | null = null;
+type OutputFormatPipelineState = {
+  pipeline: GPUComputePipeline;
+  bindGroupLayout: GPUBindGroupLayout;
+};
+
+let outputFormatCache = new WeakMap<GPUDevice, OutputFormatPipelineState>();
 
 export function __resetOutputFormatPassForTests(): void {
-  outputFormatPipeline = null;
-  outputFormatBindGroupLayout = null;
+  outputFormatCache = new WeakMap();
 }
 
 export function resetOutputFormatPassState(): void {
-  outputFormatPipeline = null;
-  outputFormatBindGroupLayout = null;
+  outputFormatCache = new WeakMap();
+}
+
+export function clearOutputFormatPipelineCache(device: GPUDevice): void {
+  outputFormatCache.delete(device);
 }
 
 export async function getOutputFormatPipeline(
   device: GPUDevice,
-): Promise<GPUComputePipeline | null> {
-  if (outputFormatPipeline && outputFormatBindGroupLayout) {
-    return outputFormatPipeline;
+): Promise<OutputFormatPipelineState | null> {
+  const cached = outputFormatCache.get(device);
+  if (cached) {
+    return cached;
   }
 
   const shaderModule = device.createShaderModule({
@@ -50,7 +57,7 @@ export async function getOutputFormatPipeline(
     compute: { module: shaderModule, entryPoint: 'formatOutputs' },
   });
 
-  outputFormatBindGroupLayout = bindGroupLayout;
-  outputFormatPipeline = pipeline;
-  return pipeline;
+  const state = { pipeline, bindGroupLayout };
+  outputFormatCache.set(device, state);
+  return state;
 }

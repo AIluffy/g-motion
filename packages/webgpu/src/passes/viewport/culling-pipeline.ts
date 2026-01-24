@@ -4,20 +4,27 @@
 
 import { ADVANCED_CULLING_OUTPUT_COMPACT_SHADER } from '../../culling-shader';
 
-// Pipeline cache (exported for use by pass files)
-export let cullingCompactPipeline: GPUComputePipeline | null = null;
-export let cullingCompactBindGroupLayout: GPUBindGroupLayout | null = null;
+type CullingPipelineState = {
+  pipeline: GPUComputePipeline;
+  bindGroupLayout: GPUBindGroupLayout;
+};
+
+let cullingCompactCache = new WeakMap<GPUDevice, CullingPipelineState>();
 
 export function __resetViewportCullingPassForTests(): void {
-  cullingCompactPipeline = null;
-  cullingCompactBindGroupLayout = null;
+  cullingCompactCache = new WeakMap();
+}
+
+export function clearViewportCullingPipelineCache(device: GPUDevice): void {
+  cullingCompactCache.delete(device);
 }
 
 export async function getCullingCompactPipeline(
   device: GPUDevice,
-): Promise<GPUComputePipeline | null> {
-  if (cullingCompactPipeline && cullingCompactBindGroupLayout) {
-    return cullingCompactPipeline;
+): Promise<CullingPipelineState | null> {
+  const cached = cullingCompactCache.get(device);
+  if (cached) {
+    return cached;
   }
 
   const shaderModule = device.createShaderModule({
@@ -50,7 +57,7 @@ export async function getCullingCompactPipeline(
     compute: { module: shaderModule, entryPoint: 'cullAndCompact' },
   });
 
-  cullingCompactBindGroupLayout = bindGroupLayout;
-  cullingCompactPipeline = pipeline;
-  return pipeline;
+  const state = { pipeline, bindGroupLayout };
+  cullingCompactCache.set(device, state);
+  return state;
 }

@@ -18,46 +18,52 @@ import {
 } from '../../keyframe-preprocess-shader';
 import { __resetKeyframePreprocessCPUCacheForTests } from './caches';
 
-// Pipeline cache (exported for use by pass files)
-export let keyframePreprocessPipeline: GPUComputePipeline | null = null;
-export let keyframePreprocessBindGroupLayout: GPUBindGroupLayout | null = null;
-export let keyframeEntryExpandPipeline: GPUComputePipeline | null = null;
-export let keyframeEntryExpandBindGroupLayout: GPUBindGroupLayout | null = null;
-export let keyframeSearchWindowPipeline: GPUComputePipeline | null = null;
-export let keyframeSearchWindowBindGroupLayout: GPUBindGroupLayout | null = null;
-export let keyframeSearchPipeline: GPUComputePipeline | null = null;
-export let keyframeSearchBindGroupLayout: GPUBindGroupLayout | null = null;
-export let keyframeInterpPipeline: GPUComputePipeline | null = null;
-export let keyframeInterpBindGroupLayout: GPUBindGroupLayout | null = null;
+type KeyframePipelineState = {
+  pipeline: GPUComputePipeline;
+  bindGroupLayout: GPUBindGroupLayout;
+};
 
-let keyframeSearchOptimizedInUse: boolean | null = null;
+type KeyframePipelineCache = {
+  preprocess?: KeyframePipelineState;
+  entryExpand?: KeyframePipelineState;
+  searchWindow?: KeyframePipelineState;
+  search?: KeyframePipelineState & { optimized: boolean };
+  interp?: KeyframePipelineState;
+};
+
+let keyframePipelineCache = new WeakMap<GPUDevice, KeyframePipelineCache>();
+let lastSearchOptimizedInUse: boolean | null = null;
 const debug = createDebugger('WebGPU');
 
 // Test utilities
 export function __getKeyframeSearchShaderModeForTests(): boolean | null {
-  return keyframeSearchOptimizedInUse;
+  return lastSearchOptimizedInUse;
+}
+
+export function clearKeyframePipelineCache(device: GPUDevice): void {
+  keyframePipelineCache.delete(device);
 }
 
 export function __resetKeyframePassesForTests(): void {
-  keyframePreprocessPipeline = null;
-  keyframePreprocessBindGroupLayout = null;
-  keyframeEntryExpandPipeline = null;
-  keyframeEntryExpandBindGroupLayout = null;
-  keyframeSearchWindowPipeline = null;
-  keyframeSearchWindowBindGroupLayout = null;
-  keyframeSearchPipeline = null;
-  keyframeSearchBindGroupLayout = null;
-  keyframeInterpPipeline = null;
-  keyframeInterpBindGroupLayout = null;
-  keyframeSearchOptimizedInUse = null;
+  keyframePipelineCache = new WeakMap();
+  lastSearchOptimizedInUse = null;
   __resetKeyframePreprocessCPUCacheForTests();
+}
+
+function getKeyframeCache(device: GPUDevice): KeyframePipelineCache {
+  const existing = keyframePipelineCache.get(device);
+  if (existing) return existing;
+  const cache: KeyframePipelineCache = {};
+  keyframePipelineCache.set(device, cache);
+  return cache;
 }
 
 export async function getKeyframePreprocessPipeline(
   device: GPUDevice,
-): Promise<GPUComputePipeline | null> {
-  if (keyframePreprocessPipeline && keyframePreprocessBindGroupLayout) {
-    return keyframePreprocessPipeline;
+): Promise<KeyframePipelineState | null> {
+  const cache = getKeyframeCache(device);
+  if (cache.preprocess) {
+    return cache.preprocess;
   }
 
   const shaderModule = device.createShaderModule({
@@ -88,16 +94,17 @@ export async function getKeyframePreprocessPipeline(
     compute: { module: shaderModule, entryPoint: 'packKeyframes' },
   });
 
-  keyframePreprocessBindGroupLayout = bindGroupLayout;
-  keyframePreprocessPipeline = pipeline;
-  return pipeline;
+  const state = { pipeline, bindGroupLayout };
+  cache.preprocess = state;
+  return state;
 }
 
 export async function getKeyframeEntryExpandPipeline(
   device: GPUDevice,
-): Promise<GPUComputePipeline | null> {
-  if (keyframeEntryExpandPipeline && keyframeEntryExpandBindGroupLayout) {
-    return keyframeEntryExpandPipeline;
+): Promise<KeyframePipelineState | null> {
+  const cache = getKeyframeCache(device);
+  if (cache.entryExpand) {
+    return cache.entryExpand;
   }
 
   const shaderModule = device.createShaderModule({
@@ -131,16 +138,17 @@ export async function getKeyframeEntryExpandPipeline(
     compute: { module: shaderModule, entryPoint: 'expandEntries' },
   });
 
-  keyframeEntryExpandBindGroupLayout = bindGroupLayout;
-  keyframeEntryExpandPipeline = pipeline;
-  return pipeline;
+  const state = { pipeline, bindGroupLayout };
+  cache.entryExpand = state;
+  return state;
 }
 
 export async function getKeyframeSearchWindowPipeline(
   device: GPUDevice,
-): Promise<GPUComputePipeline | null> {
-  if (keyframeSearchWindowPipeline && keyframeSearchWindowBindGroupLayout) {
-    return keyframeSearchWindowPipeline;
+): Promise<KeyframePipelineState | null> {
+  const cache = getKeyframeCache(device);
+  if (cache.searchWindow) {
+    return cache.searchWindow;
   }
 
   const shaderModule = device.createShaderModule({
@@ -171,17 +179,19 @@ export async function getKeyframeSearchWindowPipeline(
     compute: { module: shaderModule, entryPoint: 'computeSearchWindow' },
   });
 
-  keyframeSearchWindowBindGroupLayout = bindGroupLayout;
-  keyframeSearchWindowPipeline = pipeline;
-  return pipeline;
+  const state = { pipeline, bindGroupLayout };
+  cache.searchWindow = state;
+  return state;
 }
 
 export async function getKeyframeSearchPipeline(
   device: GPUDevice,
   useOptimizedShader: boolean,
-): Promise<GPUComputePipeline | null> {
-  if (keyframeSearchPipeline && keyframeSearchBindGroupLayout) {
-    return keyframeSearchPipeline;
+): Promise<KeyframePipelineState | null> {
+  const cache = getKeyframeCache(device);
+  if (cache.search && cache.search.optimized === useOptimizedShader) {
+    lastSearchOptimizedInUse = cache.search.optimized;
+    return cache.search;
   }
 
   const shaderModule = device.createShaderModule({
@@ -217,21 +227,22 @@ export async function getKeyframeSearchPipeline(
     compute: { module: shaderModule, entryPoint: 'findActiveKeyframes' },
   });
 
-  keyframeSearchBindGroupLayout = bindGroupLayout;
-  keyframeSearchPipeline = pipeline;
-  keyframeSearchOptimizedInUse = useOptimizedShader;
+  const state = { pipeline, bindGroupLayout, optimized: useOptimizedShader };
+  cache.search = state;
+  lastSearchOptimizedInUse = useOptimizedShader;
   try {
     const mode = useOptimizedShader ? 'optimized' : 'baseline';
     debug('keyframe search shader mode', mode);
   } catch {}
-  return pipeline;
+  return state;
 }
 
 export async function getKeyframeInterpPipeline(
   device: GPUDevice,
-): Promise<GPUComputePipeline | null> {
-  if (keyframeInterpPipeline && keyframeInterpBindGroupLayout) {
-    return keyframeInterpPipeline;
+): Promise<KeyframePipelineState | null> {
+  const cache = getKeyframeCache(device);
+  if (cache.interp) {
+    return cache.interp;
   }
 
   const shaderModule = device.createShaderModule({
@@ -265,7 +276,7 @@ export async function getKeyframeInterpPipeline(
     compute: { module: shaderModule, entryPoint: 'interpolateFromSearch' },
   });
 
-  keyframeInterpBindGroupLayout = bindGroupLayout;
-  keyframeInterpPipeline = pipeline;
-  return pipeline;
+  const state = { pipeline, bindGroupLayout };
+  cache.interp = state;
+  return state;
 }

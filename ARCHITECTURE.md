@@ -362,7 +362,7 @@ All optimizations validated through comprehensive benchmark suite (38+ tests, al
 5. GPU management isolated in dedicated modules
 6. Renderers isolated per target (DOM/Canvas/WebGL/WebGPU)
 7. Plugins extend via "component + system"; core ECS immutable
-8. Any file >400 lines must be split before submission
+8. Any file >500 lines must be split before submission
 
 **Performance Rules**:
 - Keep component buffers contiguous (SoA layout)

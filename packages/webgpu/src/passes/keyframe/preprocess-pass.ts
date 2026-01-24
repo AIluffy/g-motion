@@ -15,7 +15,7 @@ import {
 import { getGPUMetricsProvider } from '../../metrics-provider';
 import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
 import { s_keyframePreprocessCPUCache } from './caches';
-import { getKeyframePreprocessPipeline, keyframePreprocessBindGroupLayout } from './pipelines';
+import { getKeyframePreprocessPipeline } from './pipelines';
 import type { KeyframePreprocessResult } from './types';
 
 const KEYFRAME_SEARCH_INDEX_BLOCK_SIZE = 8;
@@ -511,13 +511,13 @@ export async function runKeyframePreprocessPass(
     label: `motion-keyframe-indices-${batch.archetypeId}`,
   });
 
-  const pipeline = await getKeyframePreprocessPipeline(device);
-  if (!pipeline || !keyframePreprocessBindGroupLayout) {
+  const pipelineState = await getKeyframePreprocessPipeline(device);
+  if (!pipelineState) {
     keyframeIndicesBuffer.destroy();
     return null;
   }
 
-  const bindGroupLayout = keyframePreprocessBindGroupLayout;
+  const { pipeline, bindGroupLayout } = pipelineState;
   const bindGroup = device.createBindGroup({
     layout: bindGroupLayout,
     entries: [

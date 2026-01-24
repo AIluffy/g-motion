@@ -29,7 +29,11 @@ export interface PendingReadback {
   } | null;
   startTime?: number;
   resolveTime?: number;
+
   expired?: boolean;
+  // Cleanup invoked by AsyncReadbackManager after unmap or on clear. Must be idempotent.
+  release?: () => void;
+  released?: boolean;
 }
 
 export class AsyncReadbackManager {
@@ -37,6 +41,10 @@ export class AsyncReadbackManager {
   private readonly defaultTimeoutMs: number = WebGPUConstants.GPU.DEFAULT_READBACK_TIMEOUT_MS;
   private completedCount = 0;
   private expiredCount = 0;
+
+  reset(): void {
+    this.clear();
+  }
 
   /**
    * Queue a readback that's already mapped
@@ -52,6 +60,7 @@ export class AsyncReadbackManager {
     channels?: Array<{ index: number; property: string }>,
     leaseId?: number,
     tag?: any,
+    release?: () => void,
   ): void {
     const startTime = getNowMs();
     const entry: PendingReadback = {
@@ -66,6 +75,7 @@ export class AsyncReadbackManager {
       channels,
       leaseId,
       tag,
+      release,
       startTime,
     };
 
@@ -93,6 +103,7 @@ export class AsyncReadbackManager {
     decode: PendingReadback['decode'],
     timeoutMs = this.defaultTimeoutMs,
     tag?: any,
+    release?: () => void,
   ): void {
     const startTime = getNowMs();
     const entry: PendingReadback = {
@@ -105,6 +116,7 @@ export class AsyncReadbackManager {
       byteSize,
       decode,
       tag,
+      release,
       startTime,
     };
 
@@ -141,6 +153,7 @@ export class AsyncReadbackManager {
       tag?: any;
       syncDurationMs?: number;
       expired?: boolean;
+      released?: boolean;
     }>
   > {
     const results: Array<{
@@ -155,6 +168,7 @@ export class AsyncReadbackManager {
       tag?: any;
       syncDurationMs?: number;
       expired?: boolean;
+      released?: boolean;
     }> = [];
     const now = getNowMs();
     const startTime = getNowMs();
@@ -189,6 +203,7 @@ export class AsyncReadbackManager {
           try {
             p.stagingBuffer.unmap();
           } catch {}
+          this.releaseEntry(p);
           toRemove.push(i);
           continue;
         }
@@ -210,6 +225,7 @@ export class AsyncReadbackManager {
           values = new Float32Array(view.slice(0, alignedBytes));
         }
         p.stagingBuffer.unmap();
+        this.releaseEntry(p);
 
         results.push({
           archetypeId: finalArchetypeId,
@@ -223,6 +239,7 @@ export class AsyncReadbackManager {
           tag: finalTag,
           syncDurationMs: p.resolveTime && p.startTime ? p.resolveTime - p.startTime : undefined,
           expired,
+          released: p.released,
         });
         this.completedCount += 1;
         if (expired) this.expiredCount += 1;
@@ -249,6 +266,7 @@ export class AsyncReadbackManager {
           p.stagingBuffer.unmap();
         } catch {}
 
+        this.releaseEntry(p);
         toRemove.push(i);
       }
     }
@@ -282,6 +300,7 @@ export class AsyncReadbackManager {
       } catch {
         // ignore
       }
+      this.releaseEntry(p);
     }
     this.pending = [];
     this.completedCount = 0;
@@ -291,5 +310,13 @@ export class AsyncReadbackManager {
   getTimeoutRate(): number {
     if (this.completedCount <= 0) return 0;
     return this.expiredCount / this.completedCount;
+  }
+
+  private releaseEntry(entry: PendingReadback): void {
+    if (!entry.release || entry.released) return;
+    try {
+      entry.release();
+    } catch {}
+    entry.released = true;
   }
 }

@@ -170,6 +170,9 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   let rejectMapPromise: ((e: unknown) => void) | null = null;
 
   if (readbackManager) {
+    const release = () => {
+      sp.markAvailable(stagingBuffer);
+    };
     mapPromise = new Promise<void>((resolve, reject) => {
       resolveMapPromise = resolve;
       rejectMapPromise = reject;
@@ -182,6 +185,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
       decode,
       200,
       { kind: 'physics' as const },
+      release,
     );
     setPendingReadbackCount(readbackManager.getPendingCount());
   }

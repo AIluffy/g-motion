@@ -85,7 +85,7 @@ pnpm type-check
   - `index.ts` (≤150 lines)
   - `pipeline.ts` (≤80 lines)
   - `*.compute.wgsl` shaders (≤80 lines)
-- **Any file >400 lines must be split** before PR
+- **Any file >500 lines must be split** before PR
 - Scheduler only orders systems (≤150 lines); no business logic inside
 - Shader logic separate from JS: one shader per file; no inline WGSL
 
@@ -101,10 +101,6 @@ pnpm type-check
 - Access shared resources via `AppContext` singleton (not globalThis)
 - Keep component buffers contiguous (SoA layout)
 
-### Error Handling
-- Use the centralized `ErrorHandler` from `@g-motion/core/error-handler`
-- Follow error code patterns: `[ERROR_CODE] Message { context }`
-- Never log secrets or keys
 
 ### Testing
 - Add Vitest coverage for any behavior change

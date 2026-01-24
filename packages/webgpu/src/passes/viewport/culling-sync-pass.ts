@@ -6,7 +6,7 @@
  */
 
 import type { ViewportCullingBatchDescriptor } from '@g-motion/shared';
-import { cullingCompactBindGroupLayout, getCullingCompactPipeline } from './culling-pipeline';
+import { getCullingCompactPipeline } from './culling-pipeline';
 import { collectViewportCullingCPUInputs } from './culling-types';
 
 export async function runViewportCullingCompactionPass(
@@ -24,8 +24,8 @@ export async function runViewportCullingCompactionPass(
   leaseId?: number;
   outputBuffer: GPUBuffer;
 }> {
-  const pipeline = await getCullingCompactPipeline(device);
-  if (!pipeline || !cullingCompactBindGroupLayout) {
+  const state = await getCullingCompactPipeline(device);
+  if (!state) {
     return {
       entityCount: batch.entityCount,
       entityIds: batch.entityIds as any,
@@ -33,6 +33,7 @@ export async function runViewportCullingCompactionPass(
       outputBuffer: rawOutputBuffer,
     };
   }
+  const { pipeline, bindGroupLayout } = state;
 
   const { entityCount, renderStatesBufferSize, boundsBufferSize, scratch, frustumF32, paramsU32 } =
     collectViewportCullingCPUInputs({
@@ -96,7 +97,7 @@ export async function runViewportCullingCompactionPass(
   queue.writeBuffer(visibleCountGPU, 0, new Uint32Array([0]).buffer as ArrayBuffer, 0, 4);
 
   const bindGroup = device.createBindGroup({
-    layout: cullingCompactBindGroupLayout,
+    layout: bindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: renderStatesGPU } },
       { binding: 1, resource: { buffer: boundsGPU } },

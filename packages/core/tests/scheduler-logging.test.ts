@@ -341,6 +341,45 @@ describe('SystemScheduler Logging', () => {
     perfNowSpy.mockRestore();
   });
 
+  test('should release readback resources on completion', async () => {
+    const manager = new AsyncReadbackManager();
+    let releaseCount = 0;
+    const mapped = new Float32Array([7]).buffer;
+    const buffer = {
+      getMappedRange() {
+        return mapped;
+      },
+      unmap() {},
+    } as any;
+    const release = () => {
+      releaseCount += 1;
+    };
+
+    const mapPromise = new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    manager.enqueueMapAsync(
+      'a',
+      [1],
+      buffer,
+      mapPromise,
+      4,
+      50,
+      1,
+      undefined,
+      undefined,
+      undefined,
+      release,
+    );
+
+    await mapPromise;
+    await Promise.resolve();
+
+    const results = await manager.drainCompleted(10);
+    expect(releaseCount).toBe(1);
+    expect((results[0] as { released?: boolean }).released).toBe(true);
+  });
+
   test('should carry decoded tag metadata for culling-style readbacks', async () => {
     const manager = new AsyncReadbackManager();
 
@@ -393,5 +432,52 @@ describe('SystemScheduler Logging', () => {
     expect((results[0].tag as any).kind).toBe('culling');
     expect((results[0].tag as any).stale).toBe(true);
     expect(unmapped).toBe(true);
+  });
+
+  test('should unmap pending readbacks on clear', () => {
+    const manager = new AsyncReadbackManager();
+    let unmapped = false;
+    const buffer = {
+      unmap() {
+        unmapped = true;
+      },
+    } as any;
+    const mapPromise = new Promise<void>(() => undefined);
+
+    manager.enqueueMapAsync('a', [1], buffer, mapPromise, 4, 50);
+    manager.clear();
+
+    expect(unmapped).toBe(true);
+    expect(manager.getPendingCount()).toBe(0);
+  });
+
+  test('should release readback resources on clear', () => {
+    const manager = new AsyncReadbackManager();
+    let releaseCount = 0;
+    const buffer = {
+      unmap: vi.fn(),
+    } as any;
+    const mapPromise = new Promise<void>(() => undefined);
+    const release = () => {
+      releaseCount += 1;
+    };
+
+    for (let i = 0; i < 32; i++) {
+      manager.enqueueMapAsyncDecoded(
+        'a',
+        buffer,
+        mapPromise,
+        4,
+        () => null,
+        50,
+        { kind: 'c' },
+        release,
+      );
+    }
+
+    manager.clear();
+
+    expect(releaseCount).toBe(32);
+    expect(manager.getPendingCount()).toBe(0);
   });
 });

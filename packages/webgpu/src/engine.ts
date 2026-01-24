@@ -5,16 +5,19 @@
  * into a single unified engine with a clean API.
  */
 
-import {
-  ErrorCode,
-  errorHandler,
-  ErrorSeverity,
-  MotionError,
-  WebGPUConstants,
-} from '@g-motion/shared';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
 import type { AsyncReadbackManager } from './async-readback';
+import { BufferManager } from './buffer-manager';
+import { DeviceManager } from './device-manager';
+import { PipelineManager } from './pipeline-manager';
+import type { WorkgroupSize } from './pipeline-manager';
+import { ReadbackManager } from './readback-manager';
 import type { PersistentGPUBufferManager } from './persistent-buffer-manager';
 import type { StagingBufferPool } from './staging-pool';
+import { clearKeyframePipelineCache } from './passes/keyframe/pipelines';
+import { clearViewportCullingPipelineCache } from './passes/viewport/culling-pipeline';
+import { clearOutputFormatPipelineCache } from './output-format/pipeline';
+import { getTimingHelper } from './timing-helper';
 import type { TimingHelper } from './timing-helper';
 
 // ============================================================================
@@ -38,14 +41,6 @@ export interface BufferAllocation {
   label?: string;
 }
 
-export type WorkgroupSize = 16 | 32 | 64 | 128;
-
-interface PipelineBucket {
-  pipelineCache: Map<WorkgroupSize, GPUComputePipeline>;
-  cacheKey: string | null;
-  device: GPUDevice | null;
-}
-
 export interface WebGPUEngineConfig {
   powerPreference?: GPUPowerPreference;
   timestampQuery?: boolean;
@@ -56,28 +51,11 @@ export interface WebGPUEngineConfig {
 // ============================================================================
 
 export class WebGPUEngine {
-  // Device and queue
-  private device: GPUDevice | null = null;
-  private queue: GPUQueue | null = null;
-  private adapter: GPUAdapter | null = null;
-
-  // Buffer management
-  private buffers = new Map<string, BufferAllocation>();
-  private metrics: ComputeMetrics = {
-    dispatchCount: 0,
-    totalDispatchTime: 0,
-    averageDispatchTime: 0,
-    lastDispatchTime: 0,
-    buffersAllocated: 0,
-    totalBufferMemory: 0,
-  };
+  private _deviceManager: DeviceManager;
+  private _pipelineManager: PipelineManager;
+  private _bufferManager: BufferManager;
+  private _readbackManagerInstance: AsyncReadbackManager | null = null;
   private initPromise: Promise<boolean> | null = null;
-
-  // Compute pipeline
-  private computePipeline: GPUComputePipeline | null = null;
-
-  // Pipeline caching
-  private pipelineBuckets = new Map<string, PipelineBucket>();
 
   // Runtime state
   private _isInitialized = false;
@@ -90,11 +68,7 @@ export class WebGPUEngine {
   private _latestAsyncCullingFrameByArchetype = new Map<string, number>();
   private _physicsParams = new Float32Array(4);
 
-  // Managers (injected or lazy-initialized)
   private _timingHelper: TimingHelper | null = null;
-  private _stagingPool: StagingBufferPool | null = null;
-  private _readbackManager: AsyncReadbackManager | null = null;
-  private _persistentBufferManager: PersistentGPUBufferManager | null = null;
 
   // Configuration
   private readonly config: Required<WebGPUEngineConfig>;
@@ -104,6 +78,10 @@ export class WebGPUEngine {
       powerPreference: cfg.powerPreference ?? 'high-performance',
       timestampQuery: cfg.timestampQuery ?? true,
     };
+    this._deviceManager = new DeviceManager(this.config);
+    this._pipelineManager = new PipelineManager();
+    this._bufferManager = new BufferManager();
+    this._readbackManagerInstance = new ReadbackManager();
   }
 
   // ============================================================================
@@ -111,7 +89,7 @@ export class WebGPUEngine {
   // ============================================================================
 
   async initialize(): Promise<boolean> {
-    if (this.device && this.queue) return true;
+    if (this._deviceManager.getDevice() && this._deviceManager.getQueue()) return true;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = this._initializeInternal();
@@ -119,82 +97,35 @@ export class WebGPUEngine {
   }
 
   private async _initializeInternal(): Promise<boolean> {
-    if (typeof navigator === 'undefined' || !(navigator as unknown as { gpu?: unknown }).gpu) {
-      const error = new MotionError(
-        'navigator.gpu not available; WebGPU unavailable.',
-        ErrorCode.GPU_ADAPTER_UNAVAILABLE,
+    await this._deviceManager.initialize();
+    const device = this._deviceManager.getDevice();
+    if (!device) {
+      throw new MotionError(
+        'requestDevice returned null; WebGPU unavailable.',
+        ErrorCode.GPU_DEVICE_UNAVAILABLE,
         ErrorSeverity.FATAL,
-        {
-          env: typeof navigator === 'undefined' ? 'no-navigator' : 'navigator-no-gpu',
-          source: 'WebGPUEngine.initialize',
-        },
+        { stage: 'device', source: 'WebGPUEngine.initialize' },
       );
-      errorHandler.handle(error);
-      throw error;
     }
 
-    try {
-      const gpu = (
-        navigator as unknown as {
-          gpu: {
-            requestAdapter: (options?: {
-              powerPreference?: GPUPowerPreference;
-            }) => Promise<GPUAdapter | null>;
-          };
-        }
-      ).gpu;
-      this.adapter = await gpu.requestAdapter({ powerPreference: this.config.powerPreference });
-
-      if (!this.adapter) {
-        const error = new MotionError(
-          'requestAdapter returned null; WebGPU unavailable.',
-          ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-          ErrorSeverity.FATAL,
-          { stage: 'adapter', source: 'WebGPUEngine.initialize' },
-        );
-        errorHandler.handle(error);
-        throw error;
+    this._pipelineManager.setDevice(device);
+    this._bufferManager.setDevice(device);
+    await this._pipelineManager.initialize();
+    await this._bufferManager.initialize();
+    if (this._readbackManagerInstance && 'initialize' in this._readbackManagerInstance) {
+      const manager = this._readbackManagerInstance as ReadbackManager;
+      if (typeof manager.initialize === 'function') {
+        await manager.initialize();
       }
-
-      const canTimestamp =
-        this.config.timestampQuery && this.adapter.features.has('timestamp-query');
-
-      this.device = await this.adapter.requestDevice({
-        requiredFeatures: canTimestamp ? ['timestamp-query'] : [],
-      });
-
-      if (!this.device) {
-        const error = new MotionError(
-          'requestDevice returned null; WebGPU unavailable.',
-          ErrorCode.GPU_DEVICE_UNAVAILABLE,
-          ErrorSeverity.FATAL,
-          { stage: 'device', source: 'WebGPUEngine.initialize' },
-        );
-        errorHandler.handle(error);
-        throw error;
-      }
-
-      this.queue = this.device.queue;
-      this._deviceAvailable = true;
-      this._isInitialized = true;
-
-      return true;
-    } catch (error) {
-      const motionError = new MotionError(
-        'Failed to initialize WebGPU device',
-        ErrorCode.GPU_INIT_FAILED,
-        ErrorSeverity.FATAL,
-        {
-          stage: 'device',
-          source: 'WebGPUEngine.initialize',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
-      this.device = null;
-      this.queue = null;
-      throw motionError;
     }
+    void device.lost.then(() => {
+      this._pipelineManager.clearPipelineCache(device);
+      clearDeviceScopedPassCaches(device);
+    });
+    this._timingHelper = getTimingHelper(device);
+    this._deviceAvailable = true;
+    this._isInitialized = true;
+    return true;
   }
 
   // ============================================================================
@@ -202,77 +133,23 @@ export class WebGPUEngine {
   // ============================================================================
 
   createBuffer(size: number, usage: GPUBufferUsageFlags, label?: string): GPUBuffer | null {
-    if (!this.device) return null;
-
-    const buffer = this.device.createBuffer({
-      size,
-      usage,
-      mappedAtCreation: false,
-      label,
-    });
-
-    const allocationId = `${label || 'unnamed'}-${Date.now()}-${Math.random()}`;
-    this.buffers.set(allocationId, {
-      buffer,
-      size,
-      usage,
-      createdAt: Date.now(),
-      label,
-    });
-
-    this.metrics.buffersAllocated += 1;
-    this.metrics.totalBufferMemory += size;
-
-    return buffer;
+    return this._bufferManager.createBuffer(size, usage, label);
   }
 
   writeBuffer(buffer: GPUBuffer, data: Float32Array, offset = 0): boolean {
-    if (!this.queue) return false;
-    try {
-      this.queue.writeBuffer(buffer, offset, data.buffer, data.byteOffset, data.byteLength);
-      return true;
-    } catch (error) {
-      const motionError = new MotionError(
-        'Buffer write failed',
-        ErrorCode.GPU_BUFFER_WRITE_FAILED,
-        ErrorSeverity.ERROR,
-        {
-          stage: 'writeBuffer',
-          source: 'WebGPUEngine.writeBuffer',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
-      return false;
-    }
+    return this._bufferManager.writeBuffer(buffer, data, offset);
   }
 
   getBufferStats() {
-    return {
-      allocationCount: this.buffers.size,
-      totalMemory: this.metrics.totalBufferMemory,
-      details: Array.from(this.buffers.values()).map((alloc) => ({
-        label: alloc.label,
-        size: alloc.size,
-        usage: alloc.usage,
-        createdAt: alloc.createdAt,
-      })),
-    };
+    return this._bufferManager.getBufferStats();
   }
 
   getMetrics(): ComputeMetrics {
-    return { ...this.metrics };
+    return this._bufferManager.getMetrics();
   }
 
   resetMetrics(): void {
-    this.metrics = {
-      dispatchCount: 0,
-      totalDispatchTime: 0,
-      averageDispatchTime: 0,
-      lastDispatchTime: 0,
-      buffersAllocated: 0,
-      totalBufferMemory: 0,
-    };
+    this._bufferManager.resetMetrics();
   }
 
   // ============================================================================
@@ -283,41 +160,7 @@ export class WebGPUEngine {
     shaderCode: string;
     bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
   }): Promise<boolean> {
-    if (!this.device) return false;
-
-    try {
-      const shaderModule = this.device.createShaderModule({
-        code: cfg.shaderCode,
-      });
-
-      const bindGroupLayout = this.device.createBindGroupLayout({
-        entries: cfg.bindGroupLayoutEntries,
-      });
-
-      const pipelineLayout = this.device.createPipelineLayout({
-        bindGroupLayouts: [bindGroupLayout],
-      });
-
-      this.computePipeline = this.device.createComputePipeline({
-        layout: pipelineLayout,
-        compute: { module: shaderModule, entryPoint: 'main' },
-      });
-
-      return true;
-    } catch (error) {
-      const motionError = new MotionError(
-        'Failed to initialize compute pipeline',
-        ErrorCode.GPU_PIPELINE_FAILED,
-        ErrorSeverity.FATAL,
-        {
-          stage: 'pipeline',
-          source: 'WebGPUEngine.initComputePipeline',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
-      throw motionError;
-    }
+    return this._pipelineManager.initComputePipeline(cfg);
   }
 
   async executeCompute(
@@ -326,130 +169,41 @@ export class WebGPUEngine {
     workgroupCountY = 1,
     workgroupCountZ = 1,
   ): Promise<boolean> {
-    if (!this.device || !this.queue || !this.computePipeline) {
-      return false;
-    }
-
-    const startTime = performance.now();
-
-    try {
-      const bindGroup = this.device.createBindGroup({
-        layout: this.computePipeline.getBindGroupLayout(0),
-        entries: buffers.map((buffer, index) => ({
-          binding: index,
-          resource: { buffer },
-        })),
-      });
-
-      const commandEncoder = this.device.createCommandEncoder();
-      const passEncoder = commandEncoder.beginComputePass();
-
-      passEncoder.setPipeline(this.computePipeline);
-      passEncoder.setBindGroup(0, bindGroup);
-      passEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY, workgroupCountZ);
-      passEncoder.end();
-
-      this.queue.submit([commandEncoder.finish()]);
-
-      const dispatchTime = performance.now() - startTime;
-      this.metrics.dispatchCount += 1;
-      this.metrics.totalDispatchTime += dispatchTime;
-      this.metrics.lastDispatchTime = dispatchTime;
-      this.metrics.averageDispatchTime =
-        this.metrics.totalDispatchTime / this.metrics.dispatchCount;
-
-      return true;
-    } catch (error) {
-      const motionError = new MotionError(
-        'Compute dispatch failed',
-        ErrorCode.GPU_PIPELINE_FAILED,
-        ErrorSeverity.ERROR,
-        {
-          stage: 'dispatch',
-          source: 'WebGPUEngine.executeCompute',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
-      return false;
-    }
+    return this._pipelineManager.executeCompute(
+      buffers,
+      workgroupCountX,
+      workgroupCountY,
+      workgroupCountZ,
+    );
   }
 
   // ============================================================================
   // Pipeline Caching
   // ============================================================================
 
-  private _getBucket(cacheId: string): PipelineBucket {
-    const id = cacheId || 'default';
-    let b = this.pipelineBuckets.get(id);
-    if (!b) {
-      b = {
-        pipelineCache: new Map(),
-        cacheKey: null,
-        device: null,
-      };
-      this.pipelineBuckets.set(id, b);
-    }
-    return b;
-  }
-
   cachePipeline(
+    device: GPUDevice,
     workgroupSize: WorkgroupSize,
     pipeline: GPUComputePipeline,
     cacheId = 'default',
   ): void {
-    this._getBucket(cacheId).pipelineCache.set(workgroupSize, pipeline);
+    this._pipelineManager.cachePipeline(device, workgroupSize, pipeline, cacheId);
   }
 
   async getPipelineForWorkgroup(
+    device: GPUDevice,
     workgroupHint: number,
     cacheId = 'default',
   ): Promise<GPUComputePipeline | null> {
-    const selected = this._selectWorkgroupSize(workgroupHint);
-    const bucket = this._getBucket(cacheId);
-    const pipelineCache = bucket.pipelineCache;
-    const { WORKGROUP } = WebGPUConstants;
-
-    return (
-      pipelineCache.get(selected) ??
-      pipelineCache.get(WORKGROUP.SIZE_DEFAULT) ??
-      pipelineCache.get(WORKGROUP.SIZE_MEDIUM) ??
-      pipelineCache.get(WORKGROUP.SIZE_SMALL) ??
-      pipelineCache.get(WORKGROUP.SIZE_XLARGE) ??
-      null
-    );
+    return this._pipelineManager.getPipelineForWorkgroup(device, workgroupHint, cacheId);
   }
 
-  clearPipelineCache(): void {
-    for (const b of this.pipelineBuckets.values()) {
-      b.pipelineCache.clear();
-      b.cacheKey = null;
-      b.device = null;
-    }
+  clearPipelineCache(device?: GPUDevice): void {
+    this._pipelineManager.clearPipelineCache(device);
   }
 
-  private _selectWorkgroupSize(workgroupHint: number): WorkgroupSize {
-    const { WORKGROUP } = WebGPUConstants;
-
-    if (!Number.isFinite(workgroupHint) || workgroupHint <= 0)
-      return WORKGROUP.SIZE_DEFAULT as WorkgroupSize;
-    if (
-      workgroupHint === WORKGROUP.SIZE_SMALL ||
-      workgroupHint === WORKGROUP.SIZE_MEDIUM ||
-      workgroupHint === WORKGROUP.SIZE_DEFAULT ||
-      workgroupHint === WORKGROUP.SIZE_XLARGE
-    ) {
-      return workgroupHint as WorkgroupSize;
-    }
-
-    const entityCount = Math.floor(workgroupHint);
-    if (entityCount >= WORKGROUP.ENTITY_COUNT_XLARGE_THRESHOLD)
-      return WORKGROUP.SIZE_XLARGE as WorkgroupSize;
-    if (entityCount < WORKGROUP.ENTITY_COUNT_SMALL_THRESHOLD)
-      return WORKGROUP.SIZE_SMALL as WorkgroupSize;
-    if (entityCount < WORKGROUP.ENTITY_COUNT_MEDIUM_THRESHOLD)
-      return WORKGROUP.SIZE_MEDIUM as WorkgroupSize;
-    return WORKGROUP.SIZE_DEFAULT as WorkgroupSize;
+  selectWorkgroupSize(workgroupHint: number): WorkgroupSize {
+    return this._pipelineManager.selectWorkgroupSize(workgroupHint);
   }
 
   // ============================================================================
@@ -507,27 +261,45 @@ export class WebGPUEngine {
   setTimingHelper(helper: TimingHelper | null) {
     this._timingHelper = helper;
   }
-  setStagingPool(pool: StagingBufferPool | null) {
-    this._stagingPool = pool;
+  setBufferManager(manager: BufferManager) {
+    this._bufferManager = manager;
   }
-  setReadbackManager(manager: AsyncReadbackManager | null) {
-    this._readbackManager = manager;
+  setStagingPool(pool: StagingBufferPool | null) {
+    this._bufferManager.setStagingPool(pool);
   }
   setPersistentBufferManager(manager: PersistentGPUBufferManager | null) {
-    this._persistentBufferManager = manager;
+    this._bufferManager.setPersistentBufferManager(manager);
+  }
+  setDeviceManager(manager: DeviceManager) {
+    this._deviceManager = manager;
+  }
+  setPipelineManager(manager: PipelineManager) {
+    this._pipelineManager = manager;
+  }
+  setReadbackManager(manager: AsyncReadbackManager | null) {
+    this._readbackManagerInstance = manager;
   }
 
   get timingHelper() {
     return this._timingHelper;
   }
   get stagingPool() {
-    return this._stagingPool;
+    return this._bufferManager.getStagingPool();
   }
   get readbackManager() {
-    return this._readbackManager;
+    return this._readbackManagerInstance;
   }
   get persistentBufferManager() {
-    return this._persistentBufferManager;
+    return this._bufferManager.getPersistentBufferManager();
+  }
+  get pipelineManager() {
+    return this._pipelineManager;
+  }
+  get bufferManagerInstance() {
+    return this._bufferManager;
+  }
+  get deviceManagerInstance() {
+    return this._deviceManager;
   }
 
   // ============================================================================
@@ -540,7 +312,7 @@ export class WebGPUEngine {
   }
 
   endFrame(): void {
-    this._persistentBufferManager?.nextFrame();
+    this._bufferManager.getPersistentBufferManager()?.nextFrame();
   }
 
   // ============================================================================
@@ -548,20 +320,20 @@ export class WebGPUEngine {
   // ============================================================================
 
   dispose(): void {
-    for (const alloc of this.buffers.values()) {
-      try {
-        alloc.buffer.destroy();
-      } catch {}
+    const device = this._deviceManager.getDevice();
+    if (device) {
+      this._pipelineManager.clearPipelineCache(device);
+      clearDeviceScopedPassCaches(device);
     }
-    this.buffers.clear();
-
-    this.clearPipelineCache();
-
-    this._persistentBufferManager?.dispose();
-
-    this.device = null;
-    this.queue = null;
-    this.adapter = null;
+    this._pipelineManager.destroy();
+    this._bufferManager.destroy();
+    if (this._readbackManagerInstance && 'destroy' in this._readbackManagerInstance) {
+      const manager = this._readbackManagerInstance as ReadbackManager;
+      if (typeof manager.destroy === 'function') {
+        manager.destroy();
+      }
+    }
+    this._deviceManager.destroy();
     this.initPromise = null;
     this._isInitialized = false;
     this._deviceAvailable = false;
@@ -572,7 +344,6 @@ export class WebGPUEngine {
     this._outputFormatStatsCounter = 0;
     this._latestAsyncCullingFrameByArchetype.clear();
     this._physicsParams.fill(0);
-    this.computePipeline = null;
   }
 
   // ============================================================================
@@ -580,15 +351,16 @@ export class WebGPUEngine {
   // ============================================================================
 
   getGPUDevice(): GPUDevice | null {
-    return this.device;
+    return this._deviceManager.getDevice();
   }
 
   getGPUQueue(): GPUQueue | null {
-    return this.queue;
+    return this._deviceManager.getQueue();
   }
 
   ensureDevice(): GPUDevice {
-    if (!this.device) {
+    const device = this._deviceManager.getDevice();
+    if (!device) {
       throw new MotionError(
         'WebGPU device not available.',
         ErrorCode.GPU_DEVICE_UNAVAILABLE,
@@ -596,7 +368,7 @@ export class WebGPUEngine {
         { stage: 'device', source: 'WebGPUEngine.ensureDevice' },
       );
     }
-    return this.device;
+    return device;
   }
 
   // ============================================================================
@@ -615,11 +387,15 @@ export class WebGPUEngine {
     this._latestAsyncCullingFrameByArchetype.clear();
     this._physicsParams.fill(0);
     this._timingHelper = null;
-    this._stagingPool = null;
-    this._readbackManager = null;
-    this._persistentBufferManager = null;
+    this._readbackManagerInstance = null;
     this.resetMetrics();
   }
+}
+
+function clearDeviceScopedPassCaches(device: GPUDevice): void {
+  clearOutputFormatPipelineCache(device);
+  clearViewportCullingPipelineCache(device);
+  clearKeyframePipelineCache(device);
 }
 
 // ============================================================================

@@ -7,8 +7,16 @@
 
 import type { ViewportCullingBatchDescriptor } from '@g-motion/shared';
 import type { WebGPUFrameEncoder } from '../../command-encoder';
-import { cullingCompactBindGroupLayout, getCullingCompactPipeline } from './culling-pipeline';
+import { getCullingCompactPipeline } from './culling-pipeline';
 import { collectViewportCullingCPUInputs } from './culling-types';
+
+// Callers must enqueue mapPromise with AsyncReadbackManager and pass release for cleanup.
+export type ViewportCullingAsyncReadback = {
+  entityCountMax: number;
+  outputBuffer: GPUBuffer;
+  readback: GPUBuffer;
+  mapPromise: Promise<void>;
+};
 
 export async function runViewportCullingCompactionPassAsync(
   device: GPUDevice,
@@ -20,16 +28,12 @@ export async function runViewportCullingCompactionPassAsync(
   rawStride: number,
   frame?: WebGPUFrameEncoder,
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void,
-): Promise<{
-  entityCountMax: number;
-  outputBuffer: GPUBuffer;
-  readback: GPUBuffer;
-  mapPromise: Promise<void>;
-} | null> {
-  const pipeline = await getCullingCompactPipeline(device);
-  if (!pipeline || !cullingCompactBindGroupLayout) {
+): Promise<ViewportCullingAsyncReadback | null> {
+  const state = await getCullingCompactPipeline(device);
+  if (!state) {
     return null;
   }
+  const { pipeline, bindGroupLayout } = state;
 
   const { entityCount, renderStatesBufferSize, boundsBufferSize, scratch, frustumF32, paramsU32 } =
     collectViewportCullingCPUInputs({
@@ -93,7 +97,7 @@ export async function runViewportCullingCompactionPassAsync(
   queue.writeBuffer(visibleCountGPU, 0, new Uint32Array([0]).buffer as ArrayBuffer, 0, 4);
 
   const bindGroup = device.createBindGroup({
-    layout: cullingCompactBindGroupLayout,
+    layout: bindGroupLayout,
     entries: [
       { binding: 0, resource: { buffer: renderStatesGPU } },
       { binding: 1, resource: { buffer: boundsGPU } },
