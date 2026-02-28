@@ -1,5 +1,5 @@
 import { expect, test, vi, beforeEach } from 'vitest';
-import { createDebugger, _clearDebuggerCache } from '../src';
+import { createDebugger, _clearDebuggerCache } from '../src/debug';
 
 beforeEach(() => {
   _clearDebuggerCache();

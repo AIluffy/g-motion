@@ -1,7 +1,7 @@
-import { panic } from '@g-motion/shared';
+import { STANDARD_GPU_CHANNEL_PROPERTIES, panic } from '@g-motion/shared';
 import { OUTPUT_FORMAT } from './output-format-shader';
 
-const STANDARD_TRANSFORM_PROPERTIES = ['x', 'y', 'rotate', 'scaleX', 'scaleY', 'opacity'] as const;
+const STANDARD_TRANSFORM_PROPERTIES = STANDARD_GPU_CHANNEL_PROPERTIES;
 const MATRIX2D_SENTINEL_PREFIX = '__matrix2d';
 const MATRIX3D_SENTINEL_PREFIX = '__matrix3d';
 

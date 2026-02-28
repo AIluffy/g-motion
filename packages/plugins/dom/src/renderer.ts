@@ -1,5 +1,10 @@
 import { SystemDef, SystemContext, RendererDef } from '@g-motion/core';
-import { createDebugger, resolveDomElements } from '@g-motion/shared';
+import {
+  TRANSFORM_TYPED_KEYS,
+  buildTransformTypedBuffers,
+  createDebugger,
+  resolveDomElements,
+} from '@g-motion/shared';
 import { DomStyleBatcher, initializeElementForGPU } from './domStyleBatcher';
 import {
   buildTransformString,
@@ -45,23 +50,7 @@ const defaultConfig: Required<DOMRendererConfig> = {
   enableObjectTargetCache: false,
 };
 
-const transformTypedKeys = [
-  'x',
-  'y',
-  'z',
-  'translateX',
-  'translateY',
-  'translateZ',
-  'rotate',
-  'rotateX',
-  'rotateY',
-  'rotateZ',
-  'scale',
-  'scaleX',
-  'scaleY',
-  'scaleZ',
-  'perspective',
-] as const;
+const transformTypedKeys = TRANSFORM_TYPED_KEYS;
 
 // Cache for DOM element lookups to avoid repeated querySelector calls
 const _elementCache = new WeakMap<object, HTMLElement>();
@@ -150,11 +139,10 @@ function resolveCachedElement(target: any): HTMLElement | null {
 }
 
 function buildTransformTypedBuffersForArchetype(archetype: any): TransformTypedBuffers {
-  const buffers: TransformTypedBuffers = {};
-  for (const key of transformTypedKeys) {
-    (buffers as any)[key] = (archetype as any).getTypedBuffer?.('Transform', key);
-  }
-  return buffers;
+  return buildTransformTypedBuffers(
+    (component, field) => (archetype as any).getTypedBuffer?.(component, field),
+    transformTypedKeys,
+  );
 }
 
 function applyDomRenderFromArchetype(

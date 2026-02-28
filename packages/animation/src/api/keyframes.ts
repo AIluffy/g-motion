@@ -1,30 +1,12 @@
 import { TimelineData, Keyframe } from '@g-motion/core';
-import { createDebugger } from '@g-motion/shared';
+import { DOM_TRANSFORM_KEYS, createDebugger } from '@g-motion/shared';
 import { ResolvedMarkOptions, TargetType } from './mark';
 import type { VisualTarget } from './visualTarget';
 import { defaultRegistry, ValueType } from '@g-motion/values';
 
 const warn = createDebugger('Keyframes', 'warn');
 
-const domTransformKeys = new Set([
-  'x',
-  'y',
-  'z',
-  'translateX',
-  'translateY',
-  'translateZ',
-  'rotate',
-  'rotateX',
-  'rotateY',
-  'rotateZ',
-  'scale',
-  'scaleX',
-  'scaleY',
-  'scaleZ',
-  'skewX',
-  'skewY',
-  'perspective',
-]);
+const domTransformKeys = new Set<string>(DOM_TRANSFORM_KEYS as readonly string[]);
 
 function getOrCreateTrack(tracks: TimelineData, key: string): Keyframe[] {
   let track = tracks.get(key);

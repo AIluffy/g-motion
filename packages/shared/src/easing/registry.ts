@@ -5,7 +5,7 @@
  * for use in GPU shaders. Custom easings get IDs starting from 31.
  */
 
-import { panic } from './error';
+import { panic } from '../error';
 
 // Built-in easings: name → id (0-30)
 const BUILTIN_EASINGS = {

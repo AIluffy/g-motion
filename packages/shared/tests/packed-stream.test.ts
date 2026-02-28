@@ -4,7 +4,7 @@ import {
   encodePackedFrame,
   PackedStreamDecoder,
   type PackedFrame,
-} from '../src/packedStream';
+} from '../src/stream/packedStream';
 
 function toBytes(str: string): Uint8Array {
   const arr = new Uint8Array(str.length);

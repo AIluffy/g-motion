@@ -3,6 +3,8 @@
  * This module consolidates types that were previously scattered across packages.
  */
 
+import type { TransformProperties } from '../transform/types';
+
 export type ComponentValue = Record<string, unknown>;
 
 export type ComponentType = 'float32' | 'float64' | 'int32' | 'string' | 'object';
@@ -151,16 +153,7 @@ export class TimelineTracksMap extends Map<string, Track> {
 /**
  * Transform component for spatial animations
  */
-export interface TransformData {
-  x?: number;
-  y?: number;
-  scaleX?: number;
-  scaleY?: number;
-  scale?: number;
-  rotate?: number;
-  translateX?: number;
-  translateY?: number;
-}
+export type TransformData = TransformProperties;
 
 /**
  * Render component for storing interpolated values

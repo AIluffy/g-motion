@@ -55,8 +55,9 @@ temp/
 
 # Generated files
 *.d.ts
+*.d.ts.map
 .tsbuildinfo
-**/**/tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Optional npm cache directory
 .npm

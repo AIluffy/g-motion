@@ -4,28 +4,17 @@
  * Reusable functions for common archetype operations to reduce code duplication
  */
 
+import {
+  TRANSFORM_TYPED_KEYS,
+  buildTransformTypedBuffers,
+  type TransformTypedBuffers,
+} from '@g-motion/shared';
 import { Archetype } from '../archetype';
 
 /**
  * Transform component field names
  */
-export const TRANSFORM_FIELDS = [
-  'x',
-  'y',
-  'z',
-  'translateX',
-  'translateY',
-  'translateZ',
-  'rotate',
-  'rotateX',
-  'rotateY',
-  'rotateZ',
-  'scale',
-  'scaleX',
-  'scaleY',
-  'scaleZ',
-  'perspective',
-] as const;
+export const TRANSFORM_FIELDS = TRANSFORM_TYPED_KEYS;
 
 /**
  * Extract all typed buffers for Transform component fields
@@ -42,16 +31,11 @@ export const TRANSFORM_FIELDS = [
  * const xValue = typedBuffers.x?.[entityIndex] ?? 0;
  * ```
  */
-export function extractTransformTypedBuffers(
-  archetype: Archetype,
-): Record<string, Float32Array | Float64Array | Int32Array | undefined> {
-  const buffers: Record<string, Float32Array | Float64Array | Int32Array | undefined> = {};
-
-  for (const field of TRANSFORM_FIELDS) {
-    buffers[field] = archetype.getTypedBuffer('Transform', field);
-  }
-
-  return buffers;
+export function extractTransformTypedBuffers(archetype: Archetype): TransformTypedBuffers {
+  return buildTransformTypedBuffers(
+    (component, field) => archetype.getTypedBuffer(component, field),
+    TRANSFORM_FIELDS,
+  );
 }
 
 /**

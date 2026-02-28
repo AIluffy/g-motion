@@ -4,6 +4,7 @@
  */
 
 import { MotionStatus } from '@g-motion/core';
+import type { TransformProperties } from '@g-motion/shared';
 
 export interface MotionStateComponentData extends Record<string, unknown> {
   status: MotionStatus;
@@ -17,25 +18,7 @@ export interface MotionStateComponentData extends Record<string, unknown> {
   tickPriority?: number;
 }
 
-export interface TransformComponentData extends Record<string, unknown> {
-  x?: number;
-  y?: number;
-  z?: number;
-  translateX?: number;
-  translateY?: number;
-  translateZ?: number;
-  rotate?: number;
-  rotateX?: number;
-  rotateY?: number;
-  rotateZ?: number;
-  scale?: number;
-  scaleX?: number;
-  scaleY?: number;
-  scaleZ?: number;
-  skewX?: number;
-  skewY?: number;
-  perspective?: number;
-}
+export interface TransformComponentData extends TransformProperties, Record<string, unknown> {}
 
 export interface RenderComponentData extends Record<string, unknown> {
   rendererId: string;

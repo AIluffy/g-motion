@@ -19,7 +19,7 @@
  * ```
  */
 
-import { createDebugger } from '@g-motion/shared';
+import { DEFAULT_HALF_FLOAT_COMPONENTS, createDebugger } from '@g-motion/shared';
 
 const debug = createDebugger('HalfFloat');
 
@@ -331,26 +331,7 @@ export interface BufferTypeConfig {
   useHalfFloat?: boolean;
 }
 
-/**
- * Default components suitable for half-float encoding
- */
-export const DEFAULT_HALF_FLOAT_COMPONENTS = [
-  'x',
-  'y',
-  'z',
-  'translateX',
-  'translateY',
-  'translateZ',
-  'rotateX',
-  'rotateY',
-  'rotateZ',
-  'rotate',
-  'scaleX',
-  'scaleY',
-  'scaleZ',
-  'scale',
-  'opacity',
-] as const;
+export { DEFAULT_HALF_FLOAT_COMPONENTS };
 
 /**
  * Check if a component should use half-float encoding

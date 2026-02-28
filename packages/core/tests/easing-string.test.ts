@@ -3,7 +3,7 @@ import {
   getEasingId,
   registerGpuEasing,
   __resetCustomEasings,
-} from '../../shared/src/easing-registry';
+} from '../../shared/src/easing/registry';
 
 describe('GPU-Only Easing Registry', () => {
   beforeEach(() => {

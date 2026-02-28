@@ -1,4 +1,4 @@
-import { resolveDomElements } from '@g-motion/shared';
+import { GPU_CAPABLE_PROPERTIES, resolveDomElements } from '@g-motion/shared';
 import { TargetType } from './mark';
 
 export type VisualTargetKind = 'dom' | 'object' | 'primitive';
@@ -13,24 +13,7 @@ export interface VisualTarget {
   getNativeTarget(): unknown;
 }
 
-const gpuCapableProps = new Set([
-  'x',
-  'y',
-  'z',
-  'translateX',
-  'translateY',
-  'translateZ',
-  'scale',
-  'scaleX',
-  'scaleY',
-  'scaleZ',
-  'rotate',
-  'rotateX',
-  'rotateY',
-  'rotateZ',
-  'perspective',
-  'opacity',
-]);
+const gpuCapableProps = new Set<string>(GPU_CAPABLE_PROPERTIES as readonly string[]);
 
 type VisualTargetGPUConfig = Partial<Record<VisualTargetKind, string[]>>;
 

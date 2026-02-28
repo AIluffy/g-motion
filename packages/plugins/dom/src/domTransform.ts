@@ -1,7 +1,7 @@
-export type TransformTypedBuffers = Record<
-  string,
-  Float32Array | Float64Array | Int32Array | undefined
->;
+import { EXCLUDED_STYLE_KEYS } from '@g-motion/shared';
+import type { TransformTypedBuffers } from '@g-motion/shared';
+
+export type { TransformTypedBuffers };
 
 export type TransformTyped = {
   index: number;
@@ -22,25 +22,7 @@ export type TransformResolvedValues = {
   sz?: number;
 };
 
-export const excludedStyleKeys: Record<string, true> = {
-  __primitive: true,
-  transform: true,
-  x: true,
-  y: true,
-  z: true,
-  translateX: true,
-  translateY: true,
-  translateZ: true,
-  rotate: true,
-  rotateX: true,
-  rotateY: true,
-  rotateZ: true,
-  scaleX: true,
-  scaleY: true,
-  scaleZ: true,
-  scale: true,
-  perspective: true,
-};
+export const excludedStyleKeys: Record<string, true> = EXCLUDED_STYLE_KEYS;
 
 export function resolveTransformValues(
   transform: any,

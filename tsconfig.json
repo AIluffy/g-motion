@@ -28,6 +28,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["packages/*/src/**/*", "packages/*/tests/**/*", "apps/web/src/**/*", "packages/shared/src/easing-registry.ts"],
+  "include": ["packages/*/src/**/*", "packages/*/tests/**/*", "apps/web/src/**/*", "packages/shared/src/easing/registry.ts"],
   "exclude": ["**/node_modules", "**/dist", "**/build", "**/.turbo"]
 }

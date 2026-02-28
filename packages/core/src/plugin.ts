@@ -1,11 +1,11 @@
-import type { ComponentDef, ComponentValue } from '@g-motion/shared';
+import type { ComponentDef, ComponentValue, TransformTypedBuffers } from '@g-motion/shared';
 
-export type { ComponentDef, ComponentType, ComponentValue } from '@g-motion/shared';
-
-export type TransformTypedBuffers = Record<
-  string,
-  Float32Array | Float64Array | Int32Array | undefined
->;
+export type {
+  ComponentDef,
+  ComponentType,
+  ComponentValue,
+  TransformTypedBuffers,
+} from '@g-motion/shared';
 
 export interface SystemDef {
   name: string;
