@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { FrameSampler } from '../../src';
 
-describe('FrameSampler (utils)', () => {
+describe('FrameSampler (shared)', () => {
   it('supports fractional fps time/frame conversions', () => {
     const sampler = new FrameSampler(23.976);
     const pos = sampler.timeToFramePosition(1000);

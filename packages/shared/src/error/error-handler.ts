@@ -1,4 +1,4 @@
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '../debug';
 import type { ErrorMonitor } from './monitor';
 import type { ErrorCode } from './severity';
 import { ErrorSeverity, MotionError } from './severity';

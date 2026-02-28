@@ -1,7 +1,7 @@
 import { getGPUMetricsProvider } from '../../metrics-provider';
 import { getPipelineForWorkgroup, selectWorkgroupSize } from '../../pipeline';
 import type { TimingHelper, TimingToken } from '../../timing-helper';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import type { WebGPUFrameEncoder } from '../../command-encoder';
 
 const warn = createDebugger('WebGPUDispatch', 'warn');

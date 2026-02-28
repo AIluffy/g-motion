@@ -1,5 +1,5 @@
 import { WebGPUConstants } from '@g-motion/shared';
-import { createDebugger, getNowMs } from '@g-motion/utils';
+import { createDebugger, getNowMs } from '@g-motion/shared';
 import type { GPUMetricsProvider, WebGPUEngine } from '@g-motion/webgpu';
 import {
   enqueueGPUResults,

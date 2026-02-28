@@ -1,5 +1,5 @@
 import { SystemDef, SystemContext, RendererDef } from '@g-motion/core';
-import { createDebugger, resolveDomElements } from '@g-motion/utils';
+import { createDebugger, resolveDomElements } from '@g-motion/shared';
 import { DomStyleBatcher, initializeElementForGPU } from './domStyleBatcher';
 import {
   buildTransformString,

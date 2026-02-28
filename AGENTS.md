@@ -17,136 +17,62 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 <!-- OPENSPEC:END -->
 
-# Agent Guidelines for Motion
+# Motion 仓库简明协作指南（packages）
 
-This file provides guidelines for AI agents working on the Motion animation engine codebase.
+## 1. 仓库定位
+- 这是一个 `pnpm workspace + turbo` 的动画引擎 monorepo，核心代码在 `packages/` 与 `packages/plugins/`。
+- 主执行链路：`@g-motion/animation` 组装轨道与实体 -> `@g-motion/core` 调度系统 -> `@g-motion/webgpu` 计算 -> 回写渲染（如 DOM）。
+- 物理插件（spring/inertia）为 GPU-only 设计，无 CPU fallback。
 
-## Essential Commands
+## 2. 包职责与依赖方向
+- `@g-motion/utils`: 通用工具（debug、time、math、DOM target 解析）。
+- `@g-motion/shared`: 共享类型/常量/错误与 easing registry。
+- `@g-motion/values`: 值解析与插值 parser 注册（color/transform/gradient/path 等）。
+- `@g-motion/webgpu`: WebGPU engine、shader pass、dispatch、readback、metrics。
+- `@g-motion/core`: ECS Runtime（World/Archetype/Scheduler/System）与系统编排。
+- `@g-motion/animation`: 对外 API（`motion/animate`），注册系统并驱动执行。
+- `@g-motion/plugin-dom`: DOM 渲染插件（Transform 组件 + dom renderer）。
+- `@g-motion/plugin-spring` / `@g-motion/plugin-inertia`: 物理组件与 WGSL shader，导入时自动 `registerPlugin(...)`。
 
-### Running Commands
+推荐依赖层级：`utils/shared/values -> webgpu/core -> animation -> plugins(dom)`。
+
+## 3. 开发命令
 ```bash
-# Install dependencies
 pnpm install
-
-# Build all packages
 pnpm build
 pnpm build:packages
-pnpm build:apps
-
-# Build a specific package
-pnpm --filter @g-motion/core run build
-pnpm --filter @g-motion/plugin-dom run build
-
-# Run tests
-pnpm test                                    # all packages
-pnpm test:watch                              # watch mode
-pnpm --filter @g-motion/core test            # core package only
-pnpm --filter @g-motion/core test --run tests/timeline.test.ts  # single test file
-
-# Run benchmarks
-pnpm bench
-pnpm --filter @g-motion/core run bench
-
-# Lint check
+pnpm test
 pnpm lint
-pnpm lint:fix                                # auto-fix issues
-
-# Format code
-pnpm format                                  # check formatting
-pnpm format:fix                              # apply formatting
-
-# Type check
+pnpm format
 pnpm type-check
+
+# 按包执行
+pnpm --filter @g-motion/core run build
+pnpm --filter @g-motion/core test
+pnpm --filter @g-motion/core run bench
 ```
 
-## Code Style Guidelines
+## 4. 代码约束（以当前配置为准）
+- TypeScript 全局 `strict: true`，同时启用 `noImplicitAny/noUnusedLocals/noUnusedParameters`。
+- 格式化：2 空格、单引号、分号、trailing comma（见 `.oxfmtrc.json`）。
+- Lint 重点：`no-var`、`prefer-const`、`prefer-arrow-callback`；`no-console` 为 warn。
+- 包构建统一使用 `rslib`；大部分包输出 `esm + cjs`，插件包输出 `esm`。
 
-### TypeScript
-- Keep `strict: true` enabled; never use `any` unless absolutely necessary
-- NoImplicitAny, strictNullChecks, noUnusedLocals, noUnusedParameters enabled
-- Use centralized types from `@g-motion/core/types`—avoid duplicate definitions
-- Export types in `packages/core/src/types.ts` for shared use
+## 5. 变更原则（针对 packages）
+- 优先在既有层内修改，避免跨层反向依赖（尤其不要让底层包依赖 animation/plugin）。
+- 修改系统调度相关逻辑时，确认顺序链路仍为：`Time -> Timeline -> Roving -> BatchSampling -> WebGPU -> GPUResultApply -> ActiveEntityMonitor -> Render`。
+- 涉及 WGSL 的包（`core/webgpu/plugin-spring/plugin-inertia`）保持 `?raw` 导入模式与对应 `rslib` rule 一致。
+- 新增公共 API 时，同步更新对应包 `src/index.ts` 导出与 README 示例。
 
-### Imports
-- Use workspace protocol for internal packages: `"@g-motion/core": "workspace:*"`
-- Group imports: external → internal → aliased
-- Avoid default exports; use named exports for better IDE support
+## 6. 测试要求
+- 行为变更必须补 `tests/**/*.test.ts`。
+- Node 环境测试：`core/shared/utils/values/webgpu`。
+- JSDOM 环境测试：`animation` 与 `plugins/*`。
+- 性能相关改动补充基准（已有目录：`packages/*/benchmarks/`）。
 
-### Formatting (oxlint + oxfmt)
-- 2-space indentation
-- Single quotes for strings
-- Semicolons required
-- prefer-const and prefer-arrow-callback enforced
-- no-var and no-console (warned)
-
-### File Organization (Hard Requirements)
-- **Component files**: ≤50 lines; split data vs logic if larger
-- **System files**: Each system needs its own folder with:
-  - `index.ts` (≤150 lines)
-  - `pipeline.ts` (≤80 lines)
-  - `*.compute.wgsl` shaders (≤80 lines)
-- **Any file >500 lines must be split** before PR
-- Scheduler only orders systems (≤150 lines); no business logic inside
-- Shader logic separate from JS: one shader per file; no inline WGSL
-
-### Naming Conventions
-- **Components**: PascalCase (e.g., `MotionState`, `Timeline`)
-- **Systems**: camelCase with `System` suffix (e.g., `RenderSystem`)
-- **Constants**: SCREAMING_SNAKE_CASE (e.g., `ARCHETYPE_DEFAULTS`)
-- **Private/internal**: prefix with `_` (e.g., `_internalState`)
-
-### Performance
-- **Zero per-frame allocations** in core systems (Archetype, scheduler, batch/webgpu)
-- Use `BatchBufferCache` for buffer reuse
-- Access shared resources via `AppContext` singleton (not globalThis)
-- Keep component buffers contiguous (SoA layout)
-
-
-### Testing
-- Add Vitest coverage for any behavior change
-- Performance changes require benchmark tests in `packages/*/benchmarks/`
-- Place tests in `tests/` folder with `.test.ts` extension
-
-### Git & Documentation
-- Update examples in `apps/examples` when public API changes
-- Add optimization docs to `session/` for major features
-- Store all summary documents in the `session/` folder
-- Read relevant spec in `specs/001-motion-engine` before major work
-
-## Project Structure
-
-### Key Packages
-- `@g-motion/core`: ECS runtime, WebGPU systems, core components
-- `@g-motion/animation`: Public `motion()` API, interpolation
-- `@g-motion/utils`: Shared utilities
-- `@g-motion/plugin-dom`: DOM rendering
-- `@g-motion/plugin-spring`: Spring physics
-- `@g-motion/plugin-inertia`: Inertia/decay physics
-
-### Core Patterns
-- **Plugin authoring**: Register components + systems via `MotionApp.registerSystem()`
-- **ECS**: Entity = numeric ID, Components = data schemas, Systems = pure functions
-- **Renderer types**: DOM, Canvas, WebGL, WebGPU—isolated per target
-- **Archetype**: O(1) entity lookup via reverse index map; SoA layout for cache locality
-- **WebGPU**: GPU-first compute; no CPU fallback
-
-## References
-
-### Documentation
-- [CONTRIBUTING.md](../CONTRIBUTING.md): Detailed contributing guidelines
-- [ARCHITECTURE.md](../ARCHITECTURE.md): System architecture and design principles
-- [PRODUCT.md](../PRODUCT.md): Vision, goals, and API overview
-- [README.md](../README.md): Quick start and package overview
-
-### Specs & Guides
-- [specs/001-motion-engine](../specs/001-motion-engine): Design specifications
-- [session/README.md](../session/README.md): Optimization documentation entry point
-- [session/QUICK_REFERENCE.md](../session/QUICK_REFERENCE.md): Performance summary
-
-### Key File Locations
-- Core types: `packages/core/src/types.ts`
-- AppContext: `packages/core/src/context.ts`
-- Archetype: `packages/core/src/archetype.ts`
-- ErrorHandler: `packages/core/src/error-handler.ts`
-- Timeline component: `packages/core/src/components/timeline.ts`
-- BatchBufferCache: `packages/core/src/systems/batch/buffer-cache.ts`
+## 7. 常用定位
+- Core 入口：`packages/core/src/index.ts`
+- World/Scheduler：`packages/core/src/world.ts`, `packages/core/src/scheduler.ts`
+- 动画入口：`packages/animation/src/index.ts`, `packages/animation/src/api/builder.ts`
+- WebGPU 入口：`packages/webgpu/src/index.ts`
+- DOM 插件入口：`packages/plugins/dom/src/index.ts`

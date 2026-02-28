@@ -5,7 +5,7 @@
  * Kept separate to avoid polluting internal pass modules.
  */
 
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 
 const debugIO = createDebugger('WebGPU IO');
 

@@ -1,5 +1,5 @@
 import { MotionStatus, TimelineData, World, WorldProvider } from '@g-motion/core';
-import { getNowMs } from '@g-motion/utils';
+import { getNowMs } from '@g-motion/shared';
 import { BatchTemplate, runBatchAnimation } from '../batch-runner';
 import { applyAdjust } from './adjust';
 import { AnimationControl } from './control';

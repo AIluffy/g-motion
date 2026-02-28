@@ -15,7 +15,7 @@ import {
   ParserRegistrationOptions,
   DetectionResult,
 } from './types';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 
 const warn = createDebugger('ValueParserRegistry', 'warn');
 

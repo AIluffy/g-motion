@@ -8,7 +8,7 @@
 import outputFormatShaderCode from './shaders/output-format.wgsl?raw';
 import batchOutputShaderCode from './shaders/batch-output.wgsl?raw';
 import soaOutputShaderCode from './shaders/soa-output.wgsl?raw';
-import { clamp01 } from '@g-motion/utils';
+import { clamp01 } from '@g-motion/shared';
 
 // WGSL shader for output format conversion
 export const OUTPUT_FORMAT_SHADER = outputFormatShaderCode;

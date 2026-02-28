@@ -20,7 +20,7 @@ import type {
   ArcCommand,
 } from './types';
 import { normalizePath, normalizePaths } from './normalize';
-import { lerp } from '@g-motion/utils';
+import { lerp } from '@g-motion/shared';
 
 /**
  * Interpolate between two path commands of the same type

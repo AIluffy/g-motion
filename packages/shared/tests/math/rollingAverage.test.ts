@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { NonNegativeRollingAverage } from '../../src';
 
-describe('NonNegativeRollingAverage (utils)', () => {
+describe('NonNegativeRollingAverage (shared)', () => {
   it('ignores NaN, Infinity and negative values', () => {
     const avg = new NonNegativeRollingAverage(3);
     avg.addSample(NaN);

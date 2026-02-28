@@ -27,9 +27,6 @@
     "dev": "rslib build --watch",
     "test": "vitest run"
   },
-  "dependencies": {
-    "@g-motion/utils": "workspace:*"
-  },
   "devDependencies": {
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",

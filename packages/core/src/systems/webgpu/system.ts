@@ -20,7 +20,7 @@ import type {
   PhysicsBatchDescriptor,
 } from '@g-motion/shared';
 import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import {
   __resetKeyframePassesForTests,
   __resetOutputFormatPassForTests,

@@ -11,7 +11,7 @@ import type {
   Track,
 } from '@g-motion/shared';
 import { getEasingId, TimelineTracksMap } from '@g-motion/shared';
-import { getNowMs } from '@g-motion/utils';
+import { getNowMs } from '@g-motion/shared';
 import {
   consumeForcedGPUStateSyncEntityIdsSet,
   getGPUChannelMappingRegistry,

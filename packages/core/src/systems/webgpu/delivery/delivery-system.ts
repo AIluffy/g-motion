@@ -15,7 +15,7 @@ import {
   isStandardTransformChannels,
 } from '@g-motion/webgpu';
 import type { ChannelMapping } from '@g-motion/webgpu';
-import { isDev } from '@g-motion/utils';
+import { isDev } from '@g-motion/shared';
 import { getRendererCode } from '../../../renderer-code';
 import { MotionError, ErrorCode, ErrorSeverity } from '@g-motion/shared';
 import { applyGPUResultPacket } from './apply-results';

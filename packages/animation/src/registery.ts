@@ -12,7 +12,7 @@ import {
   WebGPUComputeSystem,
   World,
 } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 
 const debug = createDebugger('Animation');
 

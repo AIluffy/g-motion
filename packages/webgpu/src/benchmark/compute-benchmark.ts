@@ -1,4 +1,4 @@
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import type { BenchmarkResult, ComparativeBenchmarkResult } from './types';
 import { calculateBenchmarkResult } from './stats';
 import { formatBenchmarkReport } from './report';

@@ -8,7 +8,7 @@
 
 import type { GradientValue, GradientStop } from './types';
 import { interpolateRgb } from '../color';
-import { lerp } from '@g-motion/utils';
+import { lerp } from '@g-motion/shared';
 
 /**
  * Normalize stops to have explicit positions

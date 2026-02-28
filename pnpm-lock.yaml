@@ -139,9 +139,6 @@ importers:
       '@g-motion/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@g-motion/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
     devDependencies:
       oxlint:
         specifier: ^1.31.0
@@ -167,9 +164,6 @@ importers:
       '@g-motion/shared':
         specifier: workspace:*
         version: link:../shared
-      '@g-motion/utils':
-        specifier: workspace:*
-        version: link:../utils
       '@g-motion/values':
         specifier: workspace:*
         version: link:../values
@@ -192,9 +186,6 @@ importers:
       '@g-motion/shared':
         specifier: workspace:*
         version: link:../shared
-      '@g-motion/utils':
-        specifier: workspace:*
-        version: link:../utils
       '@g-motion/webgpu':
         specifier: workspace:*
         version: link:../webgpu
@@ -223,9 +214,9 @@ importers:
       '@g-motion/core':
         specifier: workspace:*
         version: link:../../core
-      '@g-motion/utils':
+      '@g-motion/shared':
         specifier: workspace:*
-        version: link:../../utils
+        version: link:../../shared
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -245,9 +236,9 @@ importers:
       '@g-motion/core':
         specifier: workspace:*
         version: link:../../core
-      '@g-motion/utils':
+      '@g-motion/shared':
         specifier: workspace:*
-        version: link:../../utils
+        version: link:../../shared
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -270,9 +261,9 @@ importers:
       '@g-motion/core':
         specifier: workspace:*
         version: link:../../core
-      '@g-motion/utils':
+      '@g-motion/shared':
         specifier: workspace:*
-        version: link:../../utils
+        version: link:../../shared
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -291,25 +282,6 @@ importers:
         version: 4.0.15(@types/node@24.10.1)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/shared:
-    dependencies:
-      '@g-motion/utils':
-        specifier: workspace:*
-        version: link:../utils
-    devDependencies:
-      '@rslib/core':
-        specifier: ^0.18.3
-        version: 0.18.3(typescript@5.9.3)
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.10.1
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.14
-        version: 4.0.15(@types/node@24.10.1)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/utils:
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -326,9 +298,9 @@ importers:
 
   packages/values:
     dependencies:
-      '@g-motion/utils':
+      '@g-motion/shared':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../shared
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -351,9 +323,6 @@ importers:
       '@g-motion/shared':
         specifier: workspace:*
         version: link:../shared
-      '@g-motion/utils':
-        specifier: workspace:*
-        version: link:../utils
     devDependencies:
       '@rslib/core':
         specifier: ^0.18.3
@@ -2532,6 +2501,7 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}

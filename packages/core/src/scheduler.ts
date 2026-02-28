@@ -1,4 +1,4 @@
-import { getNowMs } from '@g-motion/utils';
+import { getNowMs } from '@g-motion/shared';
 import {
   getGPUResultQueueLength,
   getPendingReadbackCount,

@@ -9,7 +9,7 @@
 import type { ColorValue } from './types';
 import { hexToRgba, hslToRgb } from './convert';
 import { NAMED_COLORS } from './named';
-import { clamp, clamp01 } from '@g-motion/utils';
+import { clamp, clamp01 } from '@g-motion/shared';
 
 // Regex patterns for color detection
 export const HEX_PATTERN = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;

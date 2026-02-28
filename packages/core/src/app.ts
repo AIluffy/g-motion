@@ -1,5 +1,5 @@
 import { ErrorCode, ErrorSeverity, MotionError, registerGpuEasing } from '@g-motion/shared';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import { getAppContext } from './context';
 import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
 import { MotionApp, MotionAppConfig } from './plugin';

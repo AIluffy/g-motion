@@ -1,4 +1,4 @@
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 
 const warn = createDebugger('Benchmark', 'warn');
 

@@ -11,7 +11,7 @@
 import type { TransformProperties, TransformOrigin } from './types';
 import { parseTransformString } from './utils';
 import { axisAngleToQuaternion, quaternionToAxisAngle, slerp } from './quaternion';
-import { lerp } from '@g-motion/utils';
+import { lerp } from '@g-motion/shared';
 
 /**
  * Transform composer for independent transform properties

@@ -13,7 +13,7 @@ import {
   isDomElement,
   isNodeList,
   resolveDomElements,
-} from '@g-motion/utils';
+} from '@g-motion/shared';
 
 export type MarkOptions = {
   to?: any | ((index: number, entityId: number, target?: any) => any);

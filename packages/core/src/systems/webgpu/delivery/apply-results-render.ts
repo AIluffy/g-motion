@@ -1,4 +1,4 @@
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import type { ChannelMapping, GPUResultPacket } from '@g-motion/webgpu';
 import {
   buildMatrix2DTransformString,

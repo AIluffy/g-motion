@@ -1,5 +1,5 @@
 import type { MotionApp, MotionPlugin } from '@g-motion/core';
-import { createDebugger, createDomTargetResolver } from '@g-motion/utils';
+import { createDebugger, createDomTargetResolver } from '@g-motion/shared';
 import { registerTargetResolver, TargetResolver, TargetType } from '@g-motion/animation';
 import { TransformComponent } from './components/transform';
 import { createDOMRenderer, DOMRendererConfig } from './renderer';

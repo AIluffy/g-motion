@@ -1,4 +1,4 @@
-import { resolveDomElements } from '@g-motion/utils';
+import { resolveDomElements } from '@g-motion/shared';
 import { TargetType } from './mark';
 
 export type VisualTargetKind = 'dom' | 'object' | 'primitive';

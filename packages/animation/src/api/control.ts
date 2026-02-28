@@ -1,5 +1,5 @@
 import { MotionStatus } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import type { World } from '@g-motion/core';
 import { BatchCoordinator } from './control/batchCoordinator';
 import { AnimationCoordinator } from './control/completionHandler';

@@ -257,4 +257,4 @@ export function getTimingHelper(device: GPUDevice): TimingHelper {
   return sharedTimingHelper;
 }
 
-export { NonNegativeRollingAverage } from '@g-motion/utils';
+export { NonNegativeRollingAverage } from '@g-motion/shared';

@@ -1,6 +1,6 @@
 import { ErrorCode, errorHandler, ErrorSeverity, MotionError } from '@g-motion/shared';
 import { WebGPUConstants } from '@g-motion/shared';
-import { getNowMs } from '@g-motion/utils';
+import { getNowMs } from '@g-motion/shared';
 
 export interface PendingReadback {
   archetypeId: string;

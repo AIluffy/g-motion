@@ -7,7 +7,7 @@
  * - Interp pipeline: Interpolates values from search results
  */
 
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import {
   KEYFRAME_ENTRY_EXPAND_SHADER,
   KEYFRAME_INTERP_FROM_SEARCH_SHADER,

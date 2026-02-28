@@ -1,5 +1,5 @@
 import { MotionStatus, computeStartTimeForTimelineTime } from '@g-motion/core';
-import { getNowMs } from '@g-motion/utils';
+import { getNowMs } from '@g-motion/shared';
 import { TimelineComponentData } from '@g-motion/shared';
 import type { MotionStateComponentData } from '../../component-types';
 import type { BatchCoordinator } from './batchCoordinator';

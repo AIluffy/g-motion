@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@g-motion/core": "workspace:*",
-    "@g-motion/utils": "workspace:*"
+    "@g-motion/shared": "workspace:*"
   },
   "devDependencies": {
     "@rslib/core": "^0.18.3",

@@ -1,5 +1,5 @@
 import { TimelineData, Keyframe } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import { ResolvedMarkOptions, TargetType } from './mark';
 import type { VisualTarget } from './visualTarget';
 import { defaultRegistry, ValueType } from '@g-motion/values';

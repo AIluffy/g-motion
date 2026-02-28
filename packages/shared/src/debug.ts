@@ -28,7 +28,7 @@ export function isDev(): boolean {
   return false;
 }
 
-type DebugLevel = 'debug' | 'info' | 'warn' | 'error';
+export type DebugLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<DebugLevel, number> = {
   debug: 10,
@@ -145,14 +145,3 @@ export function _clearDebuggerCache(): void {
 
 // Convenience default debugger for quick use
 export const debug = createDebugger('Core');
-
-// Re-export types for external use
-export type { DebugLevel };
-
-export * from './targetResolver';
-export * from './time/frameSampler';
-export * from './time/now';
-export * from './math/rollingAverage';
-export * from './math/interpolation';
-export * from './dom';
-export * from './packedStream';

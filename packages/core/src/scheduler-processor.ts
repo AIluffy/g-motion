@@ -1,5 +1,5 @@
 import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
-import { createDebugger, getNowMs } from '@g-motion/utils';
+import { createDebugger, getNowMs } from '@g-motion/shared';
 import { getPersistentGPUBufferManager } from '@g-motion/webgpu';
 import { getErrorHandler } from './context';
 import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';

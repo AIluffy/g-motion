@@ -1,4 +1,4 @@
-import { isDev } from '@g-motion/utils';
+import { isDev } from '@g-motion/shared';
 import { ErrorCode, ErrorSeverity } from '@g-motion/shared';
 import { SystemContext, SystemDef } from '../index';
 import { getRendererName } from '../renderer-code';

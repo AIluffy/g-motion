@@ -6,7 +6,7 @@
 
 import type { OutputFormatPoolStats, PooledBufferMeta } from './types';
 import { nextPow2 } from './types';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 
 const warn = createDebugger('OutputFormatBufferPool', 'warn');
 

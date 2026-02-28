@@ -28,7 +28,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@g-motion/utils": "workspace:*"
+    "@g-motion/shared": "workspace:*"
   },
   "devDependencies": {
     "fast-check": "^4.4.0",

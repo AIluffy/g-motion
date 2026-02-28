@@ -9,7 +9,7 @@ import {
 } from '../../culling-shader';
 import type { ViewportCullingBatchDescriptor } from '@g-motion/shared';
 import { resolveViewportBounds } from './viewport-bounds';
-import { getNowMs } from '@g-motion/utils';
+import { getNowMs } from '@g-motion/shared';
 
 export { ENTITY_BOUNDS_STRIDE, FRUSTUM_PLANES_FLOATS, RENDER_STATE_EX_STRIDE };
 

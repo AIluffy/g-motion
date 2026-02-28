@@ -4,7 +4,7 @@ import {
   ErrorMonitor,
   createErrorHandlerFromContext,
 } from '@g-motion/shared';
-import { createDebugger } from '@g-motion/utils';
+import { createDebugger } from '@g-motion/shared';
 import type { ShaderDef } from './plugin';
 import { ComputeBatchProcessor } from './systems/batch';
 
