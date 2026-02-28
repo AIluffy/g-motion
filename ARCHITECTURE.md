@@ -172,16 +172,6 @@ Interactive example gallery with React + TanStack Router.
 - `src/components/`: Shared UI components
 - Demonstrates: DOM animations, batch animations, spring/inertia, GPU acceleration
 
-### apps/web
-Minimal web application demo.
-
-**Tech Stack**:
-- Vite 7.2.6
-- TypeScript 5.9.3
-- Uses @g-motion/core
-
-**Purpose**: Lightweight demo and performance testing
-
 ## Data Model (ECS)
 - Entity: numeric id.
 - Component: plain data schema registered in ComponentRegistry.
