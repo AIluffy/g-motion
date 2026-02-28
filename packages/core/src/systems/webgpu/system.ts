@@ -19,8 +19,8 @@ import type {
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
 } from '@g-motion/shared';
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
-import { createDebugger } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
+import { createWarn } from '@g-motion/shared';
 import {
   __resetKeyframePassesForTests,
   __resetOutputFormatPassForTests,
@@ -75,7 +75,7 @@ export {
 export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
 
 const engine = getWebGPUEngine();
-const warn = createDebugger('WebGPUComputeSystem', 'warn');
+const warn = createWarn('WebGPUComputeSystem');
 
 export function __resetWebGPUComputeSystemForTests(): void {
   engine.resetForTests();
@@ -124,21 +124,15 @@ export const WebGPUComputeSystem: SystemDef = {
         webgpuAvailable: false,
         gpuInitialized: false,
       });
-      throw new MotionError(
-        'WebGPU is not available. This application requires WebGPU.',
-        ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-        ErrorSeverity.FATAL,
-      );
+      panic('WebGPU is not available. This application requires WebGPU.');
     }
 
     const device = engine.getGPUDevice();
     if (!device) {
-      throw new MotionError(
-        'WebGPU device not available.',
-        ErrorCode.GPU_DEVICE_UNAVAILABLE,
-        ErrorSeverity.FATAL,
-        { stage: 'device', source: 'WebGPUComputeSystem' },
-      );
+      panic('WebGPU device not available.', {
+        stage: 'device',
+        source: 'WebGPUComputeSystem',
+      });
     }
 
     try {

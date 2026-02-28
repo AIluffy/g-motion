@@ -85,6 +85,8 @@ describe('Error Validation Tests', () => {
 
     test('warns when both time and duration provided', () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'development';
 
       motion({ value: 0 }).mark({ to: { value: 100 }, at: 100, duration: 200 });
 
@@ -93,6 +95,7 @@ describe('Error Validation Tests', () => {
         expect.stringContaining("Using 'time', ignoring 'duration'"),
       );
 
+      process.env.NODE_ENV = originalEnv;
       consoleWarnSpy.mockRestore();
     });
 

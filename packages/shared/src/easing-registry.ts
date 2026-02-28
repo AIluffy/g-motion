@@ -5,7 +5,7 @@
  * for use in GPU shaders. Custom easings get IDs starting from 31.
  */
 
-import { ErrorCode, ErrorSeverity, MotionError } from './error';
+import { panic } from './error';
 
 // Built-in easings: name → id (0-30)
 const BUILTIN_EASINGS = {
@@ -125,10 +125,8 @@ export function getEasingId(name?: string): number {
 export function registerGpuEasing(wgslFn: string): string {
   const match = wgslFn.match(/fn\s+(\w+)\s*\(/);
   if (!match) {
-    throw new MotionError(
+    panic(
       'Invalid WGSL easing: missing function declaration (expected: fn name(t: f32) -> f32 { ... })',
-      ErrorCode.INVALID_PARAMETER,
-      ErrorSeverity.ERROR,
       { wgslFn },
     );
   }

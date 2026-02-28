@@ -1,11 +1,5 @@
-import {
-  InertiaOptions,
-  Keyframe,
-  SpringOptions,
-  TimelineData,
-  getErrorHandler,
-} from '@g-motion/core';
-import { Easing, ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { InertiaOptions, Keyframe, SpringOptions, TimelineData } from '@g-motion/core';
+import { Easing, createWarn, panic } from '@g-motion/shared';
 import {
   createDebugger,
   isArrayLike,
@@ -39,6 +33,7 @@ export enum TargetType {
 }
 
 const debugResolveTargets = createDebugger('Animation:resolveTargets');
+const warnTargets = createWarn('Targets');
 
 export function resolveTimeValue(
   opts: MarkOptions,
@@ -227,25 +222,14 @@ function createTargetErrorHandlers(params: {
   root: TargetScopeRoot;
   strict: boolean;
   options?: TargetResolutionOptions;
-  handler: ReturnType<typeof getErrorHandler>;
 }): {
-  handleTargetError: (
-    message: string,
-    code: ErrorCode,
-    severity: ErrorSeverity,
-    context: Record<string, unknown>,
-  ) => void;
+  handleTargetError: (message: string, context: Record<string, unknown>, fatal: boolean) => void;
   handleSelectorDomEnvMissing: (selector: string, reason: string) => void;
   handleSelectorResolutionError: (selector: string, reason: string) => void;
 } {
-  const { input, root, strict, options, handler } = params;
+  const { input, root, strict, options } = params;
 
-  const handleTargetError = (
-    message: string,
-    code: ErrorCode,
-    severity: ErrorSeverity,
-    context: Record<string, unknown>,
-  ) => {
+  const handleTargetError = (message: string, context: Record<string, unknown>, fatal: boolean) => {
     const shape = {
       inputType: typeof input,
       isArray: Array.isArray(input),
@@ -253,17 +237,18 @@ function createTargetErrorHandlers(params: {
       isNodeListLike: isNodeList(input),
       isArrayLikeInput: isArrayLike(input),
     };
-    const error = new MotionError(message, code, severity, { ...shape, ...context });
-    handler.handle(error);
+    const payload = { ...shape, ...context };
+    if (fatal) {
+      panic(message, payload);
+    } else {
+      warnTargets(message, payload);
+    }
   };
 
   const handleSelectorDomEnvMissing = (selector: string, reason: string) => {
-    const severity = strict ? ErrorSeverity.FATAL : ErrorSeverity.WARNING;
     const { rootKind, hasQuerySelectorAll } = getRootDiagnostics(root ?? null);
     handleTargetError(
       'DOM environment missing for selector resolution',
-      ErrorCode.DOM_ENV_MISSING,
-      severity,
       {
         selector,
         root: root ?? null,
@@ -271,6 +256,7 @@ function createTargetErrorHandlers(params: {
         rootKind,
         hasQuerySelectorAll,
       },
+      strict,
     );
     if (options?.onSelectorError) {
       options.onSelectorError(selector, reason);
@@ -283,8 +269,6 @@ function createTargetErrorHandlers(params: {
     const { rootKind, hasQuerySelectorAll } = getRootDiagnostics(root ?? null);
     handleTargetError(
       'Invalid selector or error during selector resolution',
-      ErrorCode.INVALID_SELECTOR,
-      ErrorSeverity.WARNING,
       {
         selector,
         root,
@@ -292,6 +276,7 @@ function createTargetErrorHandlers(params: {
         rootKind,
         hasQuerySelectorAll,
       },
+      strict,
     );
     if (options?.onSelectorError) {
       options.onSelectorError(selector, reason);
@@ -362,26 +347,20 @@ function pushResolvedTarget(params: {
   strict: boolean;
   seen: Set<unknown>;
   result: ResolvedTarget[];
-  handleTargetError: (
-    message: string,
-    code: ErrorCode,
-    severity: ErrorSeverity,
-    context: Record<string, unknown>,
-  ) => void;
+  handleTargetError: (message: string, context: Record<string, unknown>, fatal: boolean) => void;
 }): void {
   const { value, input, root, strict, seen, result, handleTargetError } = params;
   if (value == null) {
     const { rootKind } = getRootDiagnostics(root ?? null);
     handleTargetError(
       'Resolved target is null or undefined',
-      ErrorCode.TARGET_NULL,
-      ErrorSeverity.WARNING,
       {
         input,
         root: root ?? null,
         rootKind,
         strictTargets: strict,
       },
+      strict,
     );
     return;
   }
@@ -410,12 +389,7 @@ function addTargetsFromValue(params: {
   strict: boolean;
   seen: Set<unknown>;
   result: ResolvedTarget[];
-  handleTargetError: (
-    message: string,
-    code: ErrorCode,
-    severity: ErrorSeverity,
-    context: Record<string, unknown>,
-  ) => void;
+  handleTargetError: (message: string, context: Record<string, unknown>, fatal: boolean) => void;
   handleSelectorDomEnvMissing: (selector: string, reason: string) => void;
   handleSelectorResolutionError: (selector: string, reason: string) => void;
 }): void {
@@ -509,7 +483,6 @@ export function resolveTargets(
     return resolvedByNamespace;
   }
 
-  const handler = getErrorHandler();
   logRootOptionDiagnostics(options, input);
 
   const { handleTargetError, handleSelectorDomEnvMissing, handleSelectorResolutionError } =
@@ -518,7 +491,6 @@ export function resolveTargets(
       root: root ?? null,
       strict,
       options,
-      handler,
     });
 
   addTargetsFromValue({
@@ -535,12 +507,15 @@ export function resolveTargets(
   });
 
   if (input != null && result.length === 0) {
-    const severity = strict ? ErrorSeverity.FATAL : ErrorSeverity.WARNING;
     debugResolveTargets('No valid targets resolved from input', { input, root });
-    handleTargetError('No valid targets resolved from input', ErrorCode.TARGETS_EMPTY, severity, {
-      input,
-      root,
-    });
+    handleTargetError(
+      'No valid targets resolved from input',
+      {
+        input,
+        root,
+      },
+      strict,
+    );
   }
   return result;
 }

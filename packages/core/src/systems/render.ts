@@ -1,5 +1,4 @@
-import { isDev } from '@g-motion/shared';
-import { ErrorCode, ErrorSeverity } from '@g-motion/shared';
+import { createWarn } from '@g-motion/shared';
 import { SystemContext, SystemDef } from '../index';
 import { getRendererName } from '../renderer-code';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
@@ -26,6 +25,7 @@ const missingRendererWarned = new Set<string>();
 const rendererGroupCache = getRendererGroupCache();
 const componentNamesScratch: string[] = [];
 const componentBuffersScratch: Array<Array<ComponentValue | undefined>> = [];
+const warn = createWarn('RenderSystem');
 
 function hasAnyTransformTypedBuffers(transformTypedBuffers: TransformTypedBuffers): boolean {
   for (const k in transformTypedBuffers) {
@@ -57,29 +57,18 @@ function markGroupRenderedVersion(renderBuffer: Array<unknown>, indices: Int32Ar
   }
 }
 
-function handleGroupUpdateError(
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
-  groupKey: string | number,
-  archetypeId: string,
-  e: unknown,
-): void {
-  errorHandler.create(
-    `Renderer '${String(groupKey)}' update failed; skipping group.`,
-    ErrorCode.SYSTEM_UPDATE_FAILED,
-    isDev() ? ErrorSeverity.ERROR : ErrorSeverity.WARNING,
-    {
-      systemName: 'RenderSystem',
-      rendererId: String(groupKey),
-      archetypeId,
-      originalError: e instanceof Error ? e.message : String(e),
-    },
-  );
+function handleGroupUpdateError(groupKey: string | number, archetypeId: string, e: unknown): void {
+  warn(`Renderer '${String(groupKey)}' update failed; skipping group.`, {
+    systemName: 'RenderSystem',
+    rendererId: String(groupKey),
+    archetypeId,
+    originalError: e instanceof Error ? e.message : String(e),
+  });
 }
 
 function collectActiveGroups(
   archetype: Archetype,
   app: NonNullable<SystemContext['services']['app']>,
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
   renderBuffer: Array<unknown>,
   typedRendererCode: Float32Array | Float64Array | Int32Array | undefined,
   activeGroups: Map<string | number, ReturnType<typeof rendererGroupCache.getOrCreate>>,
@@ -99,12 +88,10 @@ function collectActiveGroups(
       const warnKey = `${archetype.id}:${rendererName}`;
       if (!missingRendererWarned.has(warnKey)) {
         missingRendererWarned.add(warnKey);
-        errorHandler.create(
-          `Renderer '${rendererName}' not found; skipping updates.`,
-          ErrorCode.RENDERER_NOT_FOUND,
-          isDev() ? ErrorSeverity.ERROR : ErrorSeverity.WARNING,
-          { rendererId: rendererName, archetypeId: archetype.id },
-        );
+        warn(`Renderer '${rendererName}' not found; skipping updates.`, {
+          rendererId: rendererName,
+          archetypeId: archetype.id,
+        });
       }
       render.renderedVersion = version;
       continue;
@@ -132,7 +119,6 @@ function processGroupBatch(
   transformTypedBuffers: TransformTypedBuffers,
   renderBuffer: Array<unknown>,
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
 ): void {
   try {
     const ctxBatch: RendererBatchContext = {
@@ -148,7 +134,7 @@ function processGroupBatch(
     renderer.postFrame?.();
     markGroupRenderedVersion(renderBuffer, activeData.indices);
   } catch (e) {
-    handleGroupUpdateError(errorHandler, groupKey, archetypeId, e);
+    handleGroupUpdateError(groupKey, archetypeId, e);
     markGroupRenderedVersion(renderBuffer, activeData.indices);
   }
 }
@@ -161,7 +147,6 @@ function processGroupFast(
   transformTypedBuffers: TransformTypedBuffers,
   renderBuffer: Array<unknown>,
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
   archetypeId: string,
 ): void {
   try {
@@ -189,7 +174,7 @@ function processGroupFast(
     }
     renderer.postFrame?.();
   } catch (e) {
-    handleGroupUpdateError(errorHandler, groupKey, archetypeId, e);
+    handleGroupUpdateError(groupKey, archetypeId, e);
     markGroupRenderedVersion(renderBuffer, activeData.indices);
   }
 }
@@ -202,7 +187,6 @@ function processGroupDefault(
   renderBuffer: Array<unknown>,
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
   componentsScratch: Record<string, ComponentsScratchValue>,
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
   archetypeId: string,
 ): void {
   try {
@@ -226,7 +210,7 @@ function processGroupDefault(
     }
     renderer.postFrame?.();
   } catch (e) {
-    handleGroupUpdateError(errorHandler, groupKey, archetypeId, e);
+    handleGroupUpdateError(groupKey, archetypeId, e);
     markGroupRenderedVersion(renderBuffer, activeData.indices);
   }
 }
@@ -240,7 +224,6 @@ function processActiveGroups(
   renderBuffer: Array<unknown>,
   activeGroups: Map<string | number, ReturnType<typeof rendererGroupCache.getOrCreate>>,
   componentsScratch: Record<string, ComponentsScratchValue>,
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
 ): void {
   for (const [groupKey, group] of activeGroups) {
     if (group.count === 0) continue;
@@ -259,7 +242,6 @@ function processActiveGroups(
         transformTypedBuffers,
         renderBuffer,
         activeData,
-        errorHandler,
       );
       continue;
     }
@@ -273,7 +255,6 @@ function processActiveGroups(
         transformTypedBuffers,
         renderBuffer,
         activeData,
-        errorHandler,
         archetype.id,
       );
       continue;
@@ -287,7 +268,6 @@ function processActiveGroups(
       renderBuffer,
       activeData,
       componentsScratch,
-      errorHandler,
       archetype.id,
     );
   }
@@ -296,7 +276,6 @@ function processActiveGroups(
 function updateArchetype(
   world: NonNullable<SystemContext['services']['world']>,
   app: NonNullable<SystemContext['services']['app']>,
-  errorHandler: NonNullable<SystemContext['services']['errorHandler']>,
   archetype: Archetype,
 ): void {
   const renderBuffer = archetype.getBuffer('Render');
@@ -315,7 +294,7 @@ function updateArchetype(
   >();
   const typedRendererCode = archetype.getTypedBuffer('Render', 'rendererCode');
 
-  collectActiveGroups(archetype, app, errorHandler, renderBuffer, typedRendererCode, activeGroups);
+  collectActiveGroups(archetype, app, renderBuffer, typedRendererCode, activeGroups);
 
   processActiveGroups(
     world,
@@ -326,7 +305,6 @@ function updateArchetype(
     renderBuffer,
     activeGroups,
     componentsScratch,
-    errorHandler,
   );
 }
 
@@ -336,13 +314,12 @@ export const RenderSystem: SystemDef = {
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
     const app = ctx?.services.app;
-    const errorHandler = ctx?.services.errorHandler;
-    if (!world || !app || !errorHandler) {
+    if (!world || !app) {
       return;
     }
 
     for (const archetype of world.getArchetypes()) {
-      updateArchetype(world, app, errorHandler, archetype);
+      updateArchetype(world, app, archetype);
     }
 
     rendererGroupCache.nextFrame();

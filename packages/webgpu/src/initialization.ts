@@ -1,4 +1,4 @@
-import { ErrorCode, ErrorHandler, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import { AsyncReadbackManager } from './async-readback';
 import type { WebGPUEngine } from './engine';
 import type { GPUMetricsProvider } from './metrics-provider';
@@ -13,7 +13,6 @@ type CustomGpuEasing = { name: string; wgslFn: string; id: number };
 
 export type WebGPUInitializationDeps = {
   metricsProvider: GPUMetricsProvider;
-  errorHandler: ErrorHandler;
   getCustomGpuEasings: () => ReadonlyArray<CustomGpuEasing>;
   getCustomEasingVersion: () => number;
 };
@@ -47,23 +46,16 @@ export async function initWebGPUCompute(
   engine: WebGPUEngine,
   deps: WebGPUInitializationDeps,
 ): Promise<{ success: boolean; deviceAvailable: boolean; shaderVersion: number }> {
-  const { metricsProvider, errorHandler, getCustomGpuEasings, getCustomEasingVersion } = deps;
+  const { metricsProvider, getCustomGpuEasings, getCustomEasingVersion } = deps;
   const initOk = await engine.initialize();
   const device = engine.getGPUDevice();
   if (!initOk || !device) {
-    const error = new MotionError(
-      'WebGPU not available.',
-      ErrorCode.GPU_DEVICE_UNAVAILABLE,
-      ErrorSeverity.FATAL,
-      {
-        initOk,
-        hasDevice: !!device,
-        stage: 'device',
-        source: 'initWebGPUCompute',
-      },
-    );
-    errorHandler.handle(error);
-    throw error;
+    panic('WebGPU not available.', {
+      initOk,
+      hasDevice: !!device,
+      stage: 'device',
+      source: 'initWebGPUCompute',
+    });
   }
 
   const success = await precompileWorkgroupPipelines(
@@ -83,18 +75,11 @@ export async function initWebGPUCompute(
       enabled: true,
     });
   } else {
-    const error = new MotionError(
-      'WebGPU compute pipeline initialization failed.',
-      ErrorCode.GPU_PIPELINE_FAILED,
-      ErrorSeverity.FATAL,
-      {
-        shaderVersion,
-        stage: 'pipeline',
-        source: 'initWebGPUCompute',
-      },
-    );
-    errorHandler.handle(error);
-    throw error;
+    panic('WebGPU compute pipeline initialization failed.', {
+      shaderVersion,
+      stage: 'pipeline',
+      source: 'initWebGPUCompute',
+    });
   }
 
   return { success: true, deviceAvailable: true, shaderVersion };
@@ -105,7 +90,7 @@ export async function ensureWebGPUInitialized(params: {
   deps: WebGPUInitializationDeps;
 }): Promise<void> {
   const { engine, deps } = params;
-  const { metricsProvider, errorHandler, getCustomEasingVersion } = deps;
+  const { metricsProvider, getCustomEasingVersion } = deps;
 
   if (engine.isInitialized) return;
 
@@ -123,13 +108,7 @@ export async function ensureWebGPUInitialized(params: {
   }
 
   if (!maybeGpu) {
-    const error = new MotionError(
-      'WebGPU is not supported in this environment.',
-      ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-      ErrorSeverity.FATAL,
-    );
-    errorHandler.handle(error);
-    throw error;
+    panic('WebGPU is not supported in this environment.');
   }
 
   try {
@@ -137,24 +116,12 @@ export async function ensureWebGPUInitialized(params: {
     engine.setDeviceAvailable(true);
     engine.setShaderVersion(initResult.shaderVersion);
   } catch {
-    const error = new MotionError(
-      'Failed to initialize WebGPU. GPU may be unavailable or blocked.',
-      ErrorCode.GPU_INIT_FAILED,
-      ErrorSeverity.FATAL,
-    );
-    errorHandler.handle(error);
-    throw error;
+    panic('Failed to initialize WebGPU. GPU may be unavailable or blocked.');
   }
 
   const device = engine.getGPUDevice();
   if (!device) {
-    const error = new MotionError(
-      'WebGPU device is not available.',
-      ErrorCode.GPU_DEVICE_UNAVAILABLE,
-      ErrorSeverity.FATAL,
-    );
-    errorHandler.handle(error);
-    throw error;
+    panic('WebGPU device is not available.');
   }
 
   engine.setTimingHelper(getTimingHelper(device));

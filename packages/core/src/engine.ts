@@ -46,7 +46,6 @@ class MotionEngineImpl implements MotionEngine {
     const appContext = getAppContext();
     const batchProcessor = appContext.getBatchProcessor();
     const metrics = getGPUMetricsProvider();
-    const errorHandler = appContext.getErrorHandler();
 
     this.services = {
       world: this.world,
@@ -55,7 +54,6 @@ class MotionEngineImpl implements MotionEngine {
       config: this.world.config,
       batchProcessor,
       metrics,
-      errorHandler,
       appContext,
     };
 
@@ -184,7 +182,6 @@ class MotionEngineImpl implements MotionEngine {
     } catch {}
 
     this.services.batchProcessor = this.services.appContext.getBatchProcessor();
-    this.services.errorHandler = this.services.appContext.getErrorHandler();
   }
 }
 

@@ -1,4 +1,4 @@
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import { OUTPUT_FORMAT } from './output-format-shader';
 
 const STANDARD_TRANSFORM_PROPERTIES = ['x', 'y', 'rotate', 'scaleX', 'scaleY', 'opacity'] as const;
@@ -54,21 +54,16 @@ export class GPUChannelMappingRegistry {
    */
   registerBatchChannels(table: BatchChannelTable): void {
     if (!Number.isFinite(table.stride) || table.stride <= 0) {
-      throw new MotionError(
-        'GPU channel table stride must be a positive integer.',
-        ErrorCode.BATCH_VALIDATION_FAILED,
-        ErrorSeverity.FATAL,
-        { batchId: table.batchId, stride: table.stride },
-      );
+      panic('GPU channel table stride must be a positive integer.', {
+        batchId: table.batchId,
+        stride: table.stride,
+      });
     }
 
     if (!Array.isArray(table.channels) || table.channels.length === 0) {
-      throw new MotionError(
-        'GPU channel table must define at least one channel.',
-        ErrorCode.BATCH_VALIDATION_FAILED,
-        ErrorSeverity.FATAL,
-        { batchId: table.batchId },
-      );
+      panic('GPU channel table must define at least one channel.', {
+        batchId: table.batchId,
+      });
     }
 
     const firstChannel = table.channels[0];
@@ -76,39 +71,31 @@ export class GPUChannelMappingRegistry {
       table.channels.length === 1 && firstChannel && firstChannel.property === '__primitive';
 
     if (isPrimitiveTable && table.stride !== 1) {
-      throw new MotionError(
-        'Primitive GPU channel table must use stride=1 for __primitive output.',
-        ErrorCode.BATCH_VALIDATION_FAILED,
-        ErrorSeverity.FATAL,
-        { batchId: table.batchId, stride: table.stride },
-      );
+      panic('Primitive GPU channel table must use stride=1 for __primitive output.', {
+        batchId: table.batchId,
+        stride: table.stride,
+      });
     }
 
     const rawChannels = table.rawChannels ?? table.channels;
     if (!Array.isArray(rawChannels) || rawChannels.length === 0) {
-      throw new MotionError(
-        'GPU channel table must define at least one raw channel.',
-        ErrorCode.BATCH_VALIDATION_FAILED,
-        ErrorSeverity.FATAL,
-        { batchId: table.batchId },
-      );
+      panic('GPU channel table must define at least one raw channel.', {
+        batchId: table.batchId,
+      });
     }
     if (table.rawStride !== undefined) {
       if (!Number.isFinite(table.rawStride) || table.rawStride <= 0) {
-        throw new MotionError(
-          'GPU channel table rawStride must be a positive integer.',
-          ErrorCode.BATCH_VALIDATION_FAILED,
-          ErrorSeverity.FATAL,
-          { batchId: table.batchId, rawStride: table.rawStride },
-        );
+        panic('GPU channel table rawStride must be a positive integer.', {
+          batchId: table.batchId,
+          rawStride: table.rawStride,
+        });
       }
       if (table.rawStride !== rawChannels.length) {
-        throw new MotionError(
-          'GPU channel table rawStride must match rawChannels.length.',
-          ErrorCode.BATCH_VALIDATION_FAILED,
-          ErrorSeverity.FATAL,
-          { batchId: table.batchId, rawStride: table.rawStride, rawChannels: rawChannels.length },
-        );
+        panic('GPU channel table rawStride must match rawChannels.length.', {
+          batchId: table.batchId,
+          rawStride: table.rawStride,
+          rawChannels: rawChannels.length,
+        });
       }
     }
 

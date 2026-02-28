@@ -2,7 +2,7 @@ import type { ComponentRegistry } from './registry';
 import type { EntityManager } from './entity';
 import { Archetype, ArchetypeInternal, type ComponentValue } from './archetype';
 import { ARCHETYPE_DEFAULTS } from './constants';
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import type { ComponentDef } from './plugin';
 
 type ComponentData = Record<string, ComponentValue | undefined>;
@@ -162,12 +162,7 @@ export class ArchetypeManager {
       for (const name of componentNames) {
         const def = this.registry.get(name);
         if (!def) {
-          throw new MotionError(
-            `Component ${name} not registered`,
-            ErrorCode.COMPONENT_NOT_REGISTERED,
-            ErrorSeverity.FATAL,
-            { componentName: name },
-          );
+          panic(`Component ${name} not registered`, { componentName: name });
         }
         defs.set(name, def);
       }

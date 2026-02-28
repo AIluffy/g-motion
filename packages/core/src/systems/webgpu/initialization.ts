@@ -4,20 +4,13 @@
  * Handles asynchronous GPU device creation, validation, and pipeline setup.
  */
 
-import {
-  ErrorCode,
-  ErrorSeverity,
-  getCustomEasingVersion,
-  getCustomGpuEasings,
-  MotionError,
-} from '@g-motion/shared';
+import { getCustomEasingVersion, getCustomGpuEasings, panic } from '@g-motion/shared';
 import type { WebGPUEngine } from '@g-motion/webgpu';
 import {
   buildInterpolationShader,
   getGPUMetricsProvider,
   precompileWorkgroupPipelines,
 } from '@g-motion/webgpu';
-import { getErrorHandler } from '../../context';
 
 const bindGroupLayoutEntries = [
   {
@@ -43,19 +36,12 @@ export async function initWebGPUCompute(
   const initOk = await engine.initialize();
   const device = engine.getGPUDevice();
   if (!initOk || !device) {
-    const error = new MotionError(
-      'WebGPU not available.',
-      ErrorCode.GPU_DEVICE_UNAVAILABLE,
-      ErrorSeverity.FATAL,
-      {
-        initOk,
-        hasDevice: !!device,
-        stage: 'device',
-        source: 'initWebGPUCompute',
-      },
-    );
-    getErrorHandler().handle(error);
-    throw error;
+    panic('WebGPU not available.', {
+      initOk,
+      hasDevice: !!device,
+      stage: 'device',
+      source: 'initWebGPUCompute',
+    });
   }
 
   const success = await precompileWorkgroupPipelines(
@@ -75,18 +61,11 @@ export async function initWebGPUCompute(
       enabled: true,
     });
   } else {
-    const error = new MotionError(
-      'WebGPU compute pipeline initialization failed.',
-      ErrorCode.GPU_PIPELINE_FAILED,
-      ErrorSeverity.FATAL,
-      {
-        shaderVersion,
-        stage: 'pipeline',
-        source: 'initWebGPUCompute',
-      },
-    );
-    getErrorHandler().handle(error);
-    throw error;
+    panic('WebGPU compute pipeline initialization failed.', {
+      shaderVersion,
+      stage: 'pipeline',
+      source: 'initWebGPUCompute',
+    });
   }
 
   return { success: true, deviceAvailable: true, shaderVersion };

@@ -1,4 +1,4 @@
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import { WorldProvider } from '@g-motion/core';
 
 /**
@@ -17,12 +17,7 @@ class EngineConfig {
    */
   setSpeed(speed: number): void {
     if (!Number.isFinite(speed) || speed <= 0) {
-      throw new MotionError(
-        `[Motion Engine] Speed must be a positive number, got: ${speed}`,
-        ErrorCode.INVALID_PARAMETER,
-        ErrorSeverity.FATAL,
-        { speed },
-      );
+      panic(`[Motion Engine] Speed must be a positive number, got: ${speed}`, { speed });
     }
     this.getWorld().config.globalSpeed = speed;
   }

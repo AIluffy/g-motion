@@ -1,4 +1,4 @@
-import { ErrorCode, errorHandler, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { createWarn } from '@g-motion/shared';
 import { WebGPUConstants } from '@g-motion/shared';
 import { getNowMs } from '@g-motion/shared';
 
@@ -41,6 +41,7 @@ export class AsyncReadbackManager {
   private readonly defaultTimeoutMs: number = WebGPUConstants.GPU.DEFAULT_READBACK_TIMEOUT_MS;
   private completedCount = 0;
   private expiredCount = 0;
+  private readonly warn = createWarn('AsyncReadback');
 
   reset(): void {
     this.clear();
@@ -245,22 +246,14 @@ export class AsyncReadbackManager {
         if (expired) this.expiredCount += 1;
         toRemove.push(i);
       } catch (e) {
-        try {
-          const error = new MotionError(
-            `[AsyncReadback] Extraction failed for '${p.archetypeId}'`,
-            ErrorCode.READBACK_FAILED,
-            ErrorSeverity.WARNING,
-            {
-              archetypeId: p.archetypeId,
-              byteSize: p.byteSize,
-              stride: p.stride,
-              hasChannels: !!p.channels,
-              entityCount: (p.entityIds as any).length,
-              originalError: e instanceof Error ? e.message : String(e),
-            },
-          );
-          errorHandler.handle(error);
-        } catch {}
+        this.warn(`[AsyncReadback] Extraction failed for '${p.archetypeId}'`, {
+          archetypeId: p.archetypeId,
+          byteSize: p.byteSize,
+          stride: p.stride,
+          hasChannels: !!p.channels,
+          entityCount: (p.entityIds as any).length,
+          originalError: e instanceof Error ? e.message : String(e),
+        });
 
         try {
           p.stagingBuffer.unmap();

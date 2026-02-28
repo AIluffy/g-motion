@@ -1,7 +1,8 @@
 import type { BatchEntity, BatchKeyframe, BatchMetadata } from './types';
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
-import { getErrorHandler } from '../../context';
+import { createWarn, panic } from '@g-motion/shared';
 import type { BatchStatistics } from './batchStatistics';
+
+const warn = createWarn('BatchCollector');
 
 export class EntityBatchCollector {
   private entityBatches: Map<string, BatchEntity[]> = new Map();
@@ -14,12 +15,7 @@ export class EntityBatchCollector {
 
   createBatch(batchId: string, entities: BatchEntity[]): BatchMetadata {
     if (entities.length === 0) {
-      throw new MotionError(
-        'Cannot create batch with zero entities',
-        ErrorCode.BATCH_EMPTY,
-        ErrorSeverity.FATAL,
-        { batchId },
-      );
+      panic('Cannot create batch with zero entities', { batchId });
     }
 
     this.entityBatches.set(batchId, entities);
@@ -34,14 +30,7 @@ export class EntityBatchCollector {
 
   addKeyframes(batchId: string, keyframes: BatchKeyframe[]): boolean {
     if (!this.entityBatches.has(batchId)) {
-      try {
-        getErrorHandler().create(
-          `Batch '${batchId}' not found`,
-          ErrorCode.BATCH_NOT_FOUND,
-          ErrorSeverity.WARNING,
-          { batchId },
-        );
-      } catch {}
+      warn(`Batch '${batchId}' not found`, { batchId });
       return false;
     }
 
@@ -70,12 +59,7 @@ export class EntityBatchCollector {
     if (!entities) {
       const message = `Batch '${batchId}' not found`;
       errors.push(message);
-      try {
-        getErrorHandler().create(message, ErrorCode.BATCH_NOT_FOUND, ErrorSeverity.FATAL, {
-          batchId,
-        });
-      } catch {}
-      return { valid: false, errors };
+      panic(message, { batchId });
     }
 
     const keyframes = this.keyframeBatches.get(batchId);
@@ -88,20 +72,13 @@ export class EntityBatchCollector {
     }
 
     if (errors.length > 0) {
-      try {
-        getErrorHandler().create(
-          'Batch validation failed',
-          ErrorCode.BATCH_VALIDATION_FAILED,
-          ErrorSeverity.FATAL,
-          {
-            batchId,
-            entityCount: entities.length,
-            keyframeCount: this.keyframeBatches.get(batchId)?.length ?? 0,
-            maxBatchSize: this.maxBatchSize,
-            errors: [...errors],
-          },
-        );
-      } catch {}
+      panic('Batch validation failed', {
+        batchId,
+        entityCount: entities.length,
+        keyframeCount: this.keyframeBatches.get(batchId)?.length ?? 0,
+        maxBatchSize: this.maxBatchSize,
+        errors: [...errors],
+      });
     }
 
     return {

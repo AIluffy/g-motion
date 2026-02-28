@@ -5,7 +5,7 @@
  * into a single unified engine with a clean API.
  */
 
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import type { AsyncReadbackManager } from './async-readback';
 import { BufferManager } from './buffer-manager';
 import { DeviceManager } from './device-manager';
@@ -100,12 +100,10 @@ export class WebGPUEngine {
     await this._deviceManager.initialize();
     const device = this._deviceManager.getDevice();
     if (!device) {
-      throw new MotionError(
-        'requestDevice returned null; WebGPU unavailable.',
-        ErrorCode.GPU_DEVICE_UNAVAILABLE,
-        ErrorSeverity.FATAL,
-        { stage: 'device', source: 'WebGPUEngine.initialize' },
-      );
+      panic('requestDevice returned null; WebGPU unavailable.', {
+        stage: 'device',
+        source: 'WebGPUEngine.initialize',
+      });
     }
 
     this._pipelineManager.setDevice(device);
@@ -361,12 +359,10 @@ export class WebGPUEngine {
   ensureDevice(): GPUDevice {
     const device = this._deviceManager.getDevice();
     if (!device) {
-      throw new MotionError(
-        'WebGPU device not available.',
-        ErrorCode.GPU_DEVICE_UNAVAILABLE,
-        ErrorSeverity.FATAL,
-        { stage: 'device', source: 'WebGPUEngine.ensureDevice' },
-      );
+      panic('WebGPU device not available.', {
+        stage: 'device',
+        source: 'WebGPUEngine.ensureDevice',
+      });
     }
     return device;
   }

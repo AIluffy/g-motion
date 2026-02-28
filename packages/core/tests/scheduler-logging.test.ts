@@ -9,6 +9,7 @@ import {
   setPendingReadbackCount,
 } from '@g-motion/webgpu';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { panic } from '@g-motion/shared';
 import { AppContext } from '../src/context';
 import { SystemDef } from '../src/plugin';
 import { SystemScheduler } from '../src/scheduler';
@@ -17,17 +18,11 @@ import { WorldProvider } from '../src/worldProvider';
 
 describe('SystemScheduler Logging', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-  let originalDebugFlag: boolean | undefined;
   let world: World;
 
   beforeEach(() => {
     AppContext.reset();
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    // Save original __MOTION_DEBUG__ flag
-    originalDebugFlag = (globalThis as any).__MOTION_DEBUG__;
-    // Ensure debug is off by default
-    delete (globalThis as any).__MOTION_DEBUG__;
-
     // Create a world for testing
     world = new World();
     WorldProvider.withWorld(world, () => {});
@@ -35,12 +30,6 @@ describe('SystemScheduler Logging', () => {
 
   afterEach(() => {
     consoleWarnSpy.mockRestore();
-    // Restore original flag
-    if (originalDebugFlag !== undefined) {
-      (globalThis as any).__MOTION_DEBUG__ = originalDebugFlag;
-    } else {
-      delete (globalThis as any).__MOTION_DEBUG__;
-    }
     AppContext.reset();
   });
 
@@ -57,7 +46,6 @@ describe('SystemScheduler Logging', () => {
       config: world.config,
       batchProcessor: AppContext.getInstance().getBatchProcessor(),
       metrics: {} as any,
-      errorHandler: AppContext.getInstance().getErrorHandler(),
       appContext: AppContext.getInstance(),
     });
     const testSystem: SystemDef = {
@@ -87,7 +75,7 @@ describe('SystemScheduler Logging', () => {
     });
   });
 
-  test('should log system errors via ErrorHandler', () => {
+  test('should log system errors in development', () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'development';
 
@@ -99,7 +87,6 @@ describe('SystemScheduler Logging', () => {
       config: world.config,
       batchProcessor: AppContext.getInstance().getBatchProcessor(),
       metrics: {} as any,
-      errorHandler: AppContext.getInstance().getErrorHandler(),
       appContext: AppContext.getInstance(),
     });
     let errorThrown = false;
@@ -124,9 +111,9 @@ describe('SystemScheduler Logging', () => {
       setTimeout(() => {
         scheduler.stop();
 
-        // Should have logged the error via ErrorHandler (WARNING severity)
+        // Should have logged the error in development
         expect(consoleWarnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('[Motion][ErrorHandler]'),
+          expect.stringContaining('[Motion][SchedulerProcessor]'),
           expect.stringContaining("System 'ErrorSystem' update failed"),
           expect.objectContaining({ systemName: 'ErrorSystem' }),
         );
@@ -137,7 +124,7 @@ describe('SystemScheduler Logging', () => {
     });
   });
 
-  test('should not log errors in production unless __MOTION_DEBUG__ is enabled', () => {
+  test('should not log errors in production', () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
@@ -149,7 +136,6 @@ describe('SystemScheduler Logging', () => {
       config: world.config,
       batchProcessor: AppContext.getInstance().getBatchProcessor(),
       metrics: {} as any,
-      errorHandler: AppContext.getInstance().getErrorHandler(),
       appContext: AppContext.getInstance(),
     });
     const errorSystem: SystemDef = {
@@ -170,8 +156,8 @@ describe('SystemScheduler Logging', () => {
       setTimeout(() => {
         scheduler.stop();
 
-        // Should still log via ErrorHandler in production (no special production behavior)
-        expect(consoleWarnSpy).toHaveBeenCalled();
+        // Should not log in production
+        expect(consoleWarnSpy).not.toHaveBeenCalled();
 
         process.env.NODE_ENV = originalEnv;
         resolve();
@@ -191,7 +177,6 @@ describe('SystemScheduler Logging', () => {
       config: world.config,
       batchProcessor: AppContext.getInstance().getBatchProcessor(),
       metrics: {} as any,
-      errorHandler: AppContext.getInstance().getErrorHandler(),
       appContext: AppContext.getInstance(),
     });
     let errorThrown = false;
@@ -237,6 +222,57 @@ describe('SystemScheduler Logging', () => {
     });
   });
 
+  test('should stop scheduler on fatal errors', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    const originalQueueMicrotask = globalThis.queueMicrotask;
+    const queuedErrors: unknown[] = [];
+    globalThis.queueMicrotask = (cb: () => void) => {
+      try {
+        cb();
+      } catch (err) {
+        queuedErrors.push(err);
+      }
+    };
+
+    const scheduler = new SystemScheduler();
+    scheduler.setServices({
+      world,
+      scheduler,
+      app: {} as any,
+      config: world.config,
+      batchProcessor: AppContext.getInstance().getBatchProcessor(),
+      metrics: {} as any,
+      appContext: AppContext.getInstance(),
+    });
+
+    const fatalSystem: SystemDef = {
+      name: 'FatalSystem',
+      order: 1,
+      update: () => {
+        panic('Fatal error in system', { systemName: 'FatalSystem' });
+      },
+    };
+
+    scheduler.add(fatalSystem);
+    scheduler.start();
+    scheduler.setActiveEntityCount(1);
+
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        scheduler.stop();
+        expect(scheduler.isRunning).toBe(false);
+        expect(queuedErrors.length).toBeGreaterThan(0);
+        expect(queuedErrors[0]).toBeInstanceOf(Error);
+        expect((queuedErrors[0] as Error).message).toContain('Fatal error in system');
+
+        globalThis.queueMicrotask = originalQueueMicrotask;
+        process.env.NODE_ENV = originalEnv;
+        resolve();
+      }, 50);
+    });
+  });
+
   test('should keep running to apply late GPU results after finishing', () => {
     const scheduler = new SystemScheduler();
     scheduler.setServices({
@@ -246,7 +282,6 @@ describe('SystemScheduler Logging', () => {
       config: world.config,
       batchProcessor: AppContext.getInstance().getBatchProcessor(),
       metrics: {} as any,
-      errorHandler: AppContext.getInstance().getErrorHandler(),
       appContext: AppContext.getInstance(),
     });
 

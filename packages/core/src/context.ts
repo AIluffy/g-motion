@@ -1,9 +1,4 @@
-import {
-  BatchContext,
-  ErrorHandler,
-  ErrorMonitor,
-  createErrorHandlerFromContext,
-} from '@g-motion/shared';
+import { BatchContext } from '@g-motion/shared';
 import { createDebugger } from '@g-motion/shared';
 import type { ShaderDef } from './plugin';
 import { ComputeBatchProcessor } from './systems/batch';
@@ -11,13 +6,8 @@ import { ComputeBatchProcessor } from './systems/batch';
 const warn = createDebugger('AppContext', 'warn');
 
 export type BatchProcessorFactory = (options?: { maxBatchSize?: number }) => ComputeBatchProcessor;
-export type ErrorHandlerFactory = (context: AppContext) => ErrorHandler;
-export type ErrorMonitorFactory = (context: AppContext) => ErrorMonitor;
-
 export interface AppContextFactories {
   createBatchProcessor?: BatchProcessorFactory;
-  createErrorHandler?: ErrorHandlerFactory;
-  createErrorMonitor?: ErrorMonitorFactory;
 }
 
 /**
@@ -31,8 +21,6 @@ export class AppContext {
 
   private batchProcessor: ComputeBatchProcessor | null = null;
   private batchContext: BatchContext = {};
-  private errorHandler: ErrorHandler | null = null;
-  private errorMonitor: ErrorMonitor | null = null;
   private shaderRegistry: Map<string, ShaderDef> | null = null;
 
   private factories: Required<AppContextFactories>;
@@ -47,8 +35,6 @@ export class AppContext {
         new ComputeBatchProcessor({
           maxBatchSize: options?.maxBatchSize ?? 1024,
         }),
-      createErrorHandler: (context) => createErrorHandlerFromContext(context),
-      createErrorMonitor: (_context) => new ErrorMonitor(),
     };
   }
 
@@ -111,34 +97,6 @@ export class AppContext {
     this.batchContext = {};
   }
 
-  /**
-   * Get or create the error handler
-   */
-  getErrorHandler(): ErrorHandler {
-    if (!this.errorHandler) {
-      this.errorHandler = this.factories.createErrorHandler(this);
-    }
-    return this.errorHandler;
-  }
-
-  /**
-   * Set the error handler (useful for testing)
-   */
-  setErrorHandler(handler: ErrorHandler | null): void {
-    this.errorHandler = handler;
-  }
-
-  getErrorMonitor(): ErrorMonitor {
-    if (!this.errorMonitor) {
-      this.errorMonitor = this.factories.createErrorMonitor(this);
-    }
-    return this.errorMonitor;
-  }
-
-  setErrorMonitor(monitor: ErrorMonitor | null): void {
-    this.errorMonitor = monitor;
-  }
-
   getShaderRegistry(): Map<string, ShaderDef> {
     if (!this.shaderRegistry) {
       this.shaderRegistry = new Map();
@@ -162,8 +120,6 @@ export class AppContext {
     }
     this.batchProcessor = null;
     this.batchContext = {};
-    this.errorHandler = null;
-    this.errorMonitor = null;
     this.shaderRegistry = null;
   }
 }
@@ -178,10 +134,4 @@ export function getAppContext(): AppContext {
 /**
  * Get the global error handler
  */
-export function getErrorHandler(): ErrorHandler {
-  return AppContext.getInstance().getErrorHandler();
-}
-
-export function getErrorMonitor(): ErrorMonitor {
-  return AppContext.getInstance().getErrorMonitor();
-}
+// Error handling is intentionally minimal; no global error handler provided.

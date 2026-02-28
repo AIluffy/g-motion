@@ -7,8 +7,11 @@ import type { ChannelMapping } from '@g-motion/webgpu';
 
 describe('GPUResultApplySystem validation', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let originalEnv: string | undefined;
 
   beforeEach(() => {
+    originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
     AppContext.reset();
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -16,6 +19,7 @@ describe('GPUResultApplySystem validation', () => {
   afterEach(() => {
     consoleWarnSpy.mockRestore();
     AppContext.reset();
+    process.env.NODE_ENV = originalEnv;
   });
 
   test('does not warn for stride=1 with a single mapped channel', () => {
@@ -30,7 +34,6 @@ describe('GPUResultApplySystem validation', () => {
     GPUResultApplySystem.update(0, {
       services: {
         world: { getEntityArchetype: () => undefined } as any,
-        errorHandler: AppContext.getInstance().getErrorHandler(),
       },
     } as any);
 
@@ -52,12 +55,11 @@ describe('GPUResultApplySystem validation', () => {
     GPUResultApplySystem.update(0, {
       services: {
         world: { getEntityArchetype: () => undefined } as any,
-        errorHandler: AppContext.getInstance().getErrorHandler(),
       },
     } as any);
 
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[Motion][ErrorHandler]'),
+      expect.stringContaining('[Motion][GPUResultApplySystem]'),
       expect.stringContaining('GPU result packet uses stride=1'),
       expect.objectContaining({
         archetypeId: 'TestArchetype::dom',

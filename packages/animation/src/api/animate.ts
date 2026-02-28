@@ -1,4 +1,4 @@
-import { ErrorCode, ErrorSeverity, MotionError, type Easing } from '@g-motion/shared';
+import { panic, type Easing } from '@g-motion/shared';
 import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
@@ -44,12 +44,11 @@ function resolveKeyframeCount(keys: string[], to: Record<string, unknown>): numb
     if (keyframeCount === 0) {
       keyframeCount = v.length;
     } else if (v.length !== keyframeCount) {
-      throw new MotionError(
-        'All keyframe arrays must have the same length',
-        ErrorCode.INVALID_PARAMETER,
-        ErrorSeverity.FATAL,
-        { property: key, expectedLength: keyframeCount, actualLength: v.length },
-      );
+      panic('All keyframe arrays must have the same length', {
+        property: key,
+        expectedLength: keyframeCount,
+        actualLength: v.length,
+      });
     }
   }
   return keyframeCount;

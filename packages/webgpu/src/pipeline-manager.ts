@@ -1,10 +1,6 @@
-import {
-  ErrorCode,
-  errorHandler,
-  ErrorSeverity,
-  MotionError,
-  WebGPUConstants,
-} from '@g-motion/shared';
+import { createWarn, panic, WebGPUConstants } from '@g-motion/shared';
+
+const warn = createWarn('PipelineManager');
 
 const WORKGROUP_SIZES = [
   WebGPUConstants.WORKGROUP.SIZE_SMALL,
@@ -191,18 +187,11 @@ export class PipelineManager {
 
       return true;
     } catch (error) {
-      const motionError = new MotionError(
-        'Failed to initialize compute pipeline',
-        ErrorCode.GPU_PIPELINE_FAILED,
-        ErrorSeverity.FATAL,
-        {
-          stage: 'pipeline',
-          source: 'PipelineManager.initComputePipeline',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
-      throw motionError;
+      panic('Failed to initialize compute pipeline', {
+        stage: 'pipeline',
+        source: 'PipelineManager.initComputePipeline',
+        originalError: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -244,17 +233,11 @@ export class PipelineManager {
 
       return true;
     } catch (error) {
-      const motionError = new MotionError(
-        'Compute dispatch failed',
-        ErrorCode.GPU_PIPELINE_FAILED,
-        ErrorSeverity.ERROR,
-        {
-          stage: 'dispatch',
-          source: 'PipelineManager.executeCompute',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
+      warn('Compute dispatch failed', {
+        stage: 'dispatch',
+        source: 'PipelineManager.executeCompute',
+        originalError: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }

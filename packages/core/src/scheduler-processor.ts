@@ -1,11 +1,9 @@
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
-import { createDebugger, getNowMs } from '@g-motion/shared';
+import { createWarn, getNowMs, isFatalError } from '@g-motion/shared';
 import { getPersistentGPUBufferManager } from '@g-motion/webgpu';
-import { getErrorHandler } from './context';
 import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
 import { FrameSampler } from './utils';
 
-const warn = createDebugger('SchedulerProcessor', 'warn');
+const warn = createWarn('SchedulerProcessor');
 
 export class SchedulerProcessor {
   private engineFrame = 0;
@@ -29,26 +27,13 @@ export class SchedulerProcessor {
   }): void {
     const { dtMs, services, systems, getWorld } = params;
 
-    const reportSystemUpdateFailed = (
-      errorHandler: ReturnType<typeof getErrorHandler>,
-      systemName: string,
-      originalError: unknown,
-    ): void => {
-      try {
-        errorHandler.create(
-          `System '${systemName}' update failed`,
-          ErrorCode.SYSTEM_UPDATE_FAILED,
-          ErrorSeverity.WARNING,
-          {
-            systemName,
-            originalError:
-              originalError instanceof Error ? originalError.message : String(originalError),
-            dt: dtMs,
-          },
-        );
-      } catch (handlerError) {
-        warn('Error handler failed for system update:', handlerError);
-      }
+    const reportSystemUpdateFailed = (systemName: string, originalError: unknown): void => {
+      warn(`System '${systemName}' update failed`, {
+        systemName,
+        originalError:
+          originalError instanceof Error ? originalError.message : String(originalError),
+        dt: dtMs,
+      });
     };
 
     this.engineFrame++;
@@ -82,27 +67,26 @@ export class SchedulerProcessor {
         const result = system.update(dtMs, ctx) as unknown;
         if (result && typeof (result as Promise<void>).catch === 'function') {
           (result as Promise<void>).catch((e) => {
-            const errorHandler = services.errorHandler ?? getErrorHandler();
-            if (e instanceof MotionError) {
-              try {
-                errorHandler.handle(e);
-              } catch (handlerError) {
-                warn('Error handler failed:', handlerError);
-              }
-              if (e.isFatal()) {
-                services.scheduler.stop();
-                queueMicrotask(() => {
-                  throw e;
-                });
-              }
+            if (isFatalError(e)) {
+              services.scheduler.stop();
+              queueMicrotask(() => {
+                throw e;
+              });
               return;
             }
 
-            reportSystemUpdateFailed(errorHandler, system.name, e);
+            reportSystemUpdateFailed(system.name, e);
           });
         }
       } catch (e) {
-        reportSystemUpdateFailed(services.errorHandler ?? getErrorHandler(), system.name, e);
+        if (isFatalError(e)) {
+          services.scheduler.stop();
+          queueMicrotask(() => {
+            throw e;
+          });
+        } else {
+          reportSystemUpdateFailed(system.name, e);
+        }
       } finally {
         const systemDuration = getNowMs() - systemStart;
         this.metricsCounter++;

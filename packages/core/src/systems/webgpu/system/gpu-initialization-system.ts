@@ -1,4 +1,3 @@
-import { getErrorHandler } from '../../../context';
 import type { MotionAppConfig } from '../../../plugin';
 import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
 import { getOutputFormatBufferPoolStats } from '@g-motion/webgpu';
@@ -11,7 +10,6 @@ import {
 
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,
-  errorHandler: getErrorHandler(),
   getCustomGpuEasings,
   getCustomEasingVersion,
 });

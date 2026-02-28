@@ -3,7 +3,7 @@ import type {
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
 } from '@g-motion/shared';
-import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import { selectWorkgroupSize } from '@g-motion/webgpu';
 import type { BatchStatistics } from './batchStatistics';
 import type { EntityIdLeasePool } from './entityIdLeasePool';
@@ -30,12 +30,10 @@ export class GPUBatchDispatcher {
     },
   ): GPUBatchDescriptor {
     if (entityCount === 0) {
-      throw new MotionError(
-        `Cannot create batch for archetype ${archetypeId} with zero entities`,
-        ErrorCode.BATCH_EMPTY,
-        ErrorSeverity.FATAL,
-        { archetypeId, entityCount },
-      );
+      panic(`Cannot create batch for archetype ${archetypeId} with zero entities`, {
+        archetypeId,
+        entityCount,
+      });
     }
 
     const workgroupHint = this.selectWorkgroup(entityCount);
@@ -88,12 +86,11 @@ export class GPUBatchDispatcher {
     } = input;
 
     if (entityCount === 0 || slotCount === 0) {
-      throw new MotionError(
-        `Cannot create physics batch for archetype ${archetypeId} with zero entities`,
-        ErrorCode.BATCH_EMPTY,
-        ErrorSeverity.FATAL,
-        { archetypeId, entityCount, slotCount },
-      );
+      panic(`Cannot create physics batch for archetype ${archetypeId} with zero entities`, {
+        archetypeId,
+        entityCount,
+        slotCount,
+      });
     }
 
     const hint =

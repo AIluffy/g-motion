@@ -42,12 +42,10 @@ pnpm add @g-motion/webgpu
 ```ts
 import { getWebGPUEngine, ensureWebGPUInitialized, ensureWebGPUPipelines } from '@g-motion/webgpu';
 import { getGPUMetricsProvider } from '@g-motion/webgpu';
-import { errorHandler } from '@g-motion/shared';
 
 const engine = getWebGPUEngine();
 const deps = {
   metricsProvider: getGPUMetricsProvider(),
-  errorHandler,
   getCustomGpuEasings: () => [],
   getCustomEasingVersion: () => 0,
 };

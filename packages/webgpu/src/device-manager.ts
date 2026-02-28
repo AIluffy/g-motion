@@ -1,4 +1,4 @@
-import { ErrorCode, errorHandler, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import type { WebGPUEngineConfig } from './engine';
 
 export class DeviceManager {
@@ -31,17 +31,10 @@ export class DeviceManager {
 
   private async initializeInternal(): Promise<void> {
     if (typeof navigator === 'undefined' || !(navigator as unknown as { gpu?: unknown }).gpu) {
-      const error = new MotionError(
-        'navigator.gpu not available; WebGPU unavailable.',
-        ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-        ErrorSeverity.FATAL,
-        {
-          env: typeof navigator === 'undefined' ? 'no-navigator' : 'navigator-no-gpu',
-          source: 'DeviceManager.initialize',
-        },
-      );
-      errorHandler.handle(error);
-      throw error;
+      panic('navigator.gpu not available; WebGPU unavailable.', {
+        env: typeof navigator === 'undefined' ? 'no-navigator' : 'navigator-no-gpu',
+        source: 'DeviceManager.initialize',
+      });
     }
 
     try {
@@ -57,14 +50,10 @@ export class DeviceManager {
       this.adapter = await gpu.requestAdapter({ powerPreference: this.config.powerPreference });
 
       if (!this.adapter) {
-        const error = new MotionError(
-          'requestAdapter returned null; WebGPU unavailable.',
-          ErrorCode.GPU_ADAPTER_UNAVAILABLE,
-          ErrorSeverity.FATAL,
-          { stage: 'adapter', source: 'DeviceManager.initialize' },
-        );
-        errorHandler.handle(error);
-        throw error;
+        panic('requestAdapter returned null; WebGPU unavailable.', {
+          stage: 'adapter',
+          source: 'DeviceManager.initialize',
+        });
       }
 
       const canTimestamp =
@@ -75,32 +64,22 @@ export class DeviceManager {
       });
 
       if (!this.device) {
-        const error = new MotionError(
-          'requestDevice returned null; WebGPU unavailable.',
-          ErrorCode.GPU_DEVICE_UNAVAILABLE,
-          ErrorSeverity.FATAL,
-          { stage: 'device', source: 'DeviceManager.initialize' },
-        );
-        errorHandler.handle(error);
-        throw error;
+        panic('requestDevice returned null; WebGPU unavailable.', {
+          stage: 'device',
+          source: 'DeviceManager.initialize',
+        });
       }
 
       this.queue = this.device.queue;
     } catch (error) {
-      const motionError = new MotionError(
-        'Failed to initialize WebGPU device',
-        ErrorCode.GPU_INIT_FAILED,
-        ErrorSeverity.FATAL,
-        {
-          stage: 'device',
-          source: 'DeviceManager.initialize',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
+      const originalError = error instanceof Error ? error.message : String(error);
       this.device = null;
       this.queue = null;
-      throw motionError;
+      panic('Failed to initialize WebGPU device', {
+        stage: 'device',
+        source: 'DeviceManager.initialize',
+        originalError,
+      });
     }
   }
 

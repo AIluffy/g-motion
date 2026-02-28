@@ -96,7 +96,6 @@ export interface EngineServices {
   config: MotionAppConfig;
   batchProcessor: import('./systems/batch').ComputeBatchProcessor;
   metrics: import('@g-motion/webgpu').GPUMetricsProvider;
-  errorHandler: import('@g-motion/shared').ErrorHandler;
   appContext: import('./context').AppContext;
 }
 

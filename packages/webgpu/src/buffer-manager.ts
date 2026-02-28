@@ -1,4 +1,4 @@
-import { ErrorCode, errorHandler, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { createWarn } from '@g-motion/shared';
 import type { BufferAllocation, ComputeMetrics } from './engine';
 import {
   getPersistentGPUBufferManager,
@@ -20,6 +20,7 @@ export class BufferManager {
   };
   private stagingPool: StagingBufferPool | null = null;
   private persistentBufferManager: PersistentGPUBufferManager | null = null;
+  private readonly warn = createWarn('BufferManager');
 
   async initialize(): Promise<void> {
     if (!this.device) return;
@@ -100,17 +101,11 @@ export class BufferManager {
       queue.writeBuffer(buffer, offset, data.buffer, data.byteOffset, data.byteLength);
       return true;
     } catch (error) {
-      const motionError = new MotionError(
-        'Buffer write failed',
-        ErrorCode.GPU_BUFFER_WRITE_FAILED,
-        ErrorSeverity.ERROR,
-        {
-          stage: 'writeBuffer',
-          source: 'BufferManager.writeBuffer',
-          originalError: error instanceof Error ? error.message : String(error),
-        },
-      );
-      errorHandler.handle(motionError);
+      this.warn('Buffer write failed', {
+        stage: 'writeBuffer',
+        source: 'BufferManager.writeBuffer',
+        originalError: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }

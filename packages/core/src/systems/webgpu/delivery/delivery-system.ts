@@ -15,19 +15,18 @@ import {
   isStandardTransformChannels,
 } from '@g-motion/webgpu';
 import type { ChannelMapping } from '@g-motion/webgpu';
-import { isDev } from '@g-motion/shared';
+import { createWarn, isDev } from '@g-motion/shared';
 import { getRendererCode } from '../../../renderer-code';
-import { MotionError, ErrorCode, ErrorSeverity } from '@g-motion/shared';
 import { applyGPUResultPacket } from './apply-results';
 
 const s_gpuResultPacketsScratch: GPUResultPacket[] = [];
+const warn = createWarn('GPUResultApplySystem');
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',
   order: 28,
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
-    const errorHandler = ctx?.services.errorHandler;
     if (!world) return;
     const packets = drainGPUResultsInto(s_gpuResultPacketsScratch);
     if (!packets.length) return;
@@ -74,29 +73,17 @@ export const GPUResultApplySystem: SystemDef = {
         const isMatrix2D = isMatrix2DTransformChannels(channelsResolved);
         const isMatrix3D = isMatrix3DTransformChannels(channelsResolved);
 
-        if (isPrimitiveChannels && stride !== 1 && errorHandler) {
-          const error = new MotionError(
-            'GPU result packet has primitive channel mapping but stride is not 1.',
-            ErrorCode.BATCH_VALIDATION_FAILED,
-            ErrorSeverity.WARNING,
-            {
-              archetypeId: p.archetypeId,
-              stride,
-              channelCount: channelsResolved.length,
-            },
-          );
-          errorHandler.handle(error);
+        if (isPrimitiveChannels && stride !== 1) {
+          warn('GPU result packet has primitive channel mapping but stride is not 1.', {
+            archetypeId: p.archetypeId,
+            stride,
+            channelCount: channelsResolved.length,
+          });
         }
 
-        if (
-          stride === 1 &&
-          (channelsResolved.length !== 1 || channelsResolved[0]!.index !== 0) &&
-          errorHandler
-        ) {
-          const error = new MotionError(
+        if (stride === 1 && (channelsResolved.length !== 1 || channelsResolved[0]!.index !== 0)) {
+          warn(
             'GPU result packet uses stride=1 but channel mapping is not a single channel at index 0.',
-            ErrorCode.BATCH_VALIDATION_FAILED,
-            ErrorSeverity.WARNING,
             {
               archetypeId: p.archetypeId,
               stride,
@@ -104,49 +91,33 @@ export const GPUResultApplySystem: SystemDef = {
               channels: channelsResolved,
             },
           );
-          errorHandler.handle(error);
         }
 
-        if (isStandardTransform && stride !== channelsResolved.length && errorHandler) {
-          const error = new MotionError(
+        if (isStandardTransform && stride !== channelsResolved.length) {
+          warn(
             'GPU result packet has standard transform channel mapping but stride does not match channel count.',
-            ErrorCode.BATCH_VALIDATION_FAILED,
-            ErrorSeverity.WARNING,
             {
               archetypeId: p.archetypeId,
               stride,
               channelCount: channelsResolved.length,
             },
           );
-          errorHandler.handle(error);
         }
 
-        if (isMatrix2D && stride !== 6 && errorHandler) {
-          const error = new MotionError(
-            'GPU result packet has matrix2d channel mapping but stride is not 6.',
-            ErrorCode.BATCH_VALIDATION_FAILED,
-            ErrorSeverity.WARNING,
-            {
-              archetypeId: p.archetypeId,
-              stride,
-              channelCount: channelsResolved.length,
-            },
-          );
-          errorHandler.handle(error);
+        if (isMatrix2D && stride !== 6) {
+          warn('GPU result packet has matrix2d channel mapping but stride is not 6.', {
+            archetypeId: p.archetypeId,
+            stride,
+            channelCount: channelsResolved.length,
+          });
         }
 
-        if (isMatrix3D && stride !== 16 && errorHandler) {
-          const error = new MotionError(
-            'GPU result packet has matrix3d channel mapping but stride is not 16.',
-            ErrorCode.BATCH_VALIDATION_FAILED,
-            ErrorSeverity.WARNING,
-            {
-              archetypeId: p.archetypeId,
-              stride,
-              channelCount: channelsResolved.length,
-            },
-          );
-          errorHandler.handle(error);
+        if (isMatrix3D && stride !== 16) {
+          warn('GPU result packet has matrix3d channel mapping but stride is not 16.', {
+            archetypeId: p.archetypeId,
+            stride,
+            channelCount: channelsResolved.length,
+          });
         }
       }
 

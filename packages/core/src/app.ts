@@ -1,4 +1,4 @@
-import { ErrorCode, ErrorSeverity, MotionError, registerGpuEasing } from '@g-motion/shared';
+import { panic, registerGpuEasing } from '@g-motion/shared';
 import { createDebugger } from '@g-motion/shared';
 import { getAppContext } from './context';
 import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
@@ -37,10 +37,8 @@ export class App implements MotionApp {
 
     // Check for duplicate registration
     if (this.world.registry.has(name)) {
-      throw new MotionError(
+      panic(
         `[Motion] Component '${name}' is already registered. Consider using a unique namespace or unregister first.`,
-        ErrorCode.DUPLICATE_REGISTRATION,
-        ErrorSeverity.FATAL,
         { componentName: name },
       );
     }
