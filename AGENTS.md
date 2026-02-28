@@ -25,8 +25,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - 物理插件（spring/inertia）为 GPU-only 设计，无 CPU fallback。
 
 ## 2. 包职责与依赖方向
-- `@g-motion/utils`: 通用工具（debug、time、math、DOM target 解析）。
-- `@g-motion/shared`: 共享类型/常量/错误与 easing registry。
+- `@g-motion/shared`: 共享类型/常量/错误、easing registry 与通用工具（debug、time、math、DOM target 解析）。
 - `@g-motion/values`: 值解析与插值 parser 注册（color/transform/gradient/path 等）。
 - `@g-motion/webgpu`: WebGPU engine、shader pass、dispatch、readback、metrics。
 - `@g-motion/core`: ECS Runtime（World/Archetype/Scheduler/System）与系统编排。
@@ -34,7 +33,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - `@g-motion/plugin-dom`: DOM 渲染插件（Transform 组件 + dom renderer）。
 - `@g-motion/plugin-spring` / `@g-motion/plugin-inertia`: 物理组件与 WGSL shader，导入时自动 `registerPlugin(...)`。
 
-推荐依赖层级：`utils/shared/values -> webgpu/core -> animation -> plugins(dom)`。
+推荐依赖层级：`shared/values -> webgpu/core -> animation -> plugins(dom)`。
 
 ## 3. 开发命令
 ```bash
@@ -66,7 +65,7 @@ pnpm --filter @g-motion/core run bench
 
 ## 6. 测试要求
 - 行为变更必须补 `tests/**/*.test.ts`。
-- Node 环境测试：`core/shared/utils/values/webgpu`。
+- Node 环境测试：`core/shared/values/webgpu`。
 - JSDOM 环境测试：`animation` 与 `plugins/*`。
 - 性能相关改动补充基准（已有目录：`packages/*/benchmarks/`）。
 

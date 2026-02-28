@@ -92,13 +92,14 @@ Public animation API and interpolation systems.
 **Component Types** (`src/component-types.ts`):
 - Type definitions for animation-specific components
 
-### @g-motion/utils
-Shared utilities across packages.
+### @g-motion/shared
+Shared capabilities across packages.
 
+- Shared types/constants/error model/easing registry
 - Debug logging with namespaces (`createDebugger`)
-- Common helper functions
-- Type utilities
-- No external dependencies (sideEffects: false)
+- Time/math helpers and frame sampling
+- DOM target resolver and packed stream helpers
+- No external runtime dependencies (sideEffects: false)
 
 ## Plugin Packages
 
@@ -177,7 +178,7 @@ Minimal web application demo.
 **Tech Stack**:
 - Vite 7.2.6
 - TypeScript 5.9.3
-- Uses @g-motion/core + @g-motion/utils
+- Uses @g-motion/core
 
 **Purpose**: Lightweight demo and performance testing
 
