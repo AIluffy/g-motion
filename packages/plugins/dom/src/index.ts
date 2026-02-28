@@ -1,29 +1,58 @@
-import { MotionPlugin, MotionApp, app } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
+import type { MotionApp, MotionPlugin } from '@g-motion/core';
+import { createDebugger, createDomTargetResolver } from '@g-motion/shared';
+import { registerTargetResolver, TargetResolver, TargetType } from '@g-motion/animation';
 import { TransformComponent } from './components/transform';
-import { createDOMRenderer } from './renderer';
+import { createDOMRenderer, DOMRendererConfig } from './renderer';
 
 const debugLog = createDebugger('DOM');
 
-export const DOMPlugin: MotionPlugin = {
+export interface DOMPluginOptions {
+  /**
+   * Configuration for DOM renderer GPU acceleration
+   */
+  rendererConfig?: DOMRendererConfig;
+}
+
+const domTargetResolver: TargetResolver = createDomTargetResolver(TargetType.DOM);
+
+export const createDOMPlugin = (options: DOMPluginOptions = {}): MotionPlugin => ({
   name: 'DOMPlugin',
   version: '0.0.0',
-  setup(appInstance: MotionApp) {
-    // Register Transform component
-    appInstance.registerComponent('Transform', TransformComponent);
-    debugLog('Transform component registered');
+  manifest: {
+    setup(appInstance: MotionApp) {
+      try {
+        appInstance.registerComponent('Transform', TransformComponent);
+      } catch (err) {
+        if (
+          !(err instanceof Error) ||
+          !err.message.includes("Component 'Transform' is already registered")
+        ) {
+          throw err;
+        }
+      }
+      debugLog('Transform component registered');
 
-    // Register DOM renderer
-    appInstance.registerRenderer('dom', createDOMRenderer());
-    debugLog("Renderer 'dom' registered");
+      try {
+        appInstance.registerRenderer('dom', createDOMRenderer(options.rendererConfig));
+      } catch (err) {
+        if (
+          !(err instanceof Error) ||
+          !err.message.includes("Renderer 'dom' is already registered")
+        ) {
+          throw err;
+        }
+      }
+      debugLog("Renderer 'dom' registered with GPU acceleration:", options.rendererConfig);
+
+      if (typeof registerTargetResolver === 'function') {
+        registerTargetResolver(domTargetResolver);
+      }
+    },
   },
-};
+});
 
-// Auto-register the DOM plugin when this module is imported (only in browser environments)
-if (typeof window !== 'undefined' && typeof requestAnimationFrame !== 'undefined') {
-  debugLog('Auto-registering DOMPlugin');
-  DOMPlugin.setup(app);
-}
+// Default plugin instance with optimal GPU settings
+export const DOMPlugin: MotionPlugin = createDOMPlugin();
 
 export * from './components/transform';
 export * from './renderer';

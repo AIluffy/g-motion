@@ -15,7 +15,8 @@
     "dist"
   ],
   "dependencies": {
-    "@g-motion/utils": "workspace:*"
+    "@g-motion/shared": "workspace:*",
+    "@g-motion/webgpu": "workspace:*"
   },
   "scripts": {
     "build": "rslib build",

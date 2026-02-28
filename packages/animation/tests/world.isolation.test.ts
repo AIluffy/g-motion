@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { World, WorldProvider } from '@g-motion/core';
+import { World, WorldProvider, getEngineForWorld } from '@g-motion/core';
 import { motion } from '../src/api/builder';
 
 describe('WorldProvider multi-world isolation', () => {
@@ -15,16 +15,16 @@ describe('WorldProvider multi-world isolation', () => {
   it('isolates entities between different worlds', () => {
     // Animate in world1
     const ctrl1 = WorldProvider.withWorld(world1, () => {
-      return motion(0, { world: world1 })
-        .mark([{ to: 100, time: 500 }])
-        .animate();
+      return motion(0, { world: world1 as any })
+        .mark([{ to: 100, at: 500 }])
+        .play();
     });
 
     // Animate in world2
     const ctrl2 = WorldProvider.withWorld(world2, () => {
-      return motion(0, { world: world2 })
-        .mark([{ to: 200, time: 800 }])
-        .animate();
+      return motion(0, { world: world2 as any })
+        .mark([{ to: 200, at: 800 }])
+        .play();
     });
 
     // Verify entities are in different worlds
@@ -50,18 +50,21 @@ describe('WorldProvider multi-world isolation', () => {
     let world2Updates = 0;
 
     WorldProvider.withWorld(world1, () => {
-      motion(0, { world: world1 })
-        .mark([{ to: 100, time: 500 }])
-        .animate({ onUpdate: () => world1Updates++ });
+      motion(0, { world: world1 as any })
+        .mark([{ to: 100, at: 500 }])
+        .option({ onUpdate: () => world1Updates++ })
+        .play();
     });
 
     WorldProvider.withWorld(world2, () => {
-      motion(0, { world: world2 })
-        .mark([{ to: 200, time: 800 }])
-        .animate({ onUpdate: () => world2Updates++ });
+      motion(0, { world: world2 as any })
+        .mark([{ to: 200, at: 800 }])
+        .option({ onUpdate: () => world2Updates++ })
+        .play();
     });
 
-    // Start only world1 scheduler
+    // Attach engine to world1 only and start its scheduler
+    getEngineForWorld(world1);
     world1.scheduler.start();
 
     // Give some time for updates (note: in real tests you'd advance time manually)
@@ -90,9 +93,9 @@ describe('WorldProvider multi-world isolation', () => {
     const targets = [0, 1, 2];
 
     const ctrl = WorldProvider.withWorld(world1, () => {
-      return motion(targets, { world: world1 })
-        .mark([{ to: 100, time: 500, stagger: 50 }])
-        .animate();
+      return motion(targets, { world: world1 as any })
+        .mark([{ to: 100, at: 500, stagger: 50 }])
+        .play();
     });
 
     expect(ctrl.isBatchAnimation()).toBe(true);

@@ -1,15 +1,62 @@
-import { SystemDef } from './plugin';
-
+import { getNowMs } from '@g-motion/shared';
+import {
+  getGPUResultQueueLength,
+  getPendingReadbackCount,
+  setGPUResultWakeup,
+} from '@g-motion/webgpu';
+import { WebGPUConstants } from './constants';
+import type { EngineServices, SystemDef } from './plugin';
+import { SchedulerLoop } from './scheduler-loop';
+import { SchedulerProcessor } from './scheduler-processor';
 import { WorldProvider } from './worldProvider';
+
+const GPU_TAIL_KEEP_ALIVE_MS = WebGPUConstants.GPU.TAIL_KEEP_ALIVE_MS;
 
 export class SystemScheduler {
   private systems: SystemDef[] = [];
-  private isRunning = false;
-  private lastTime = 0;
-  private frameId = 0;
   private activeEntityCount = 0;
 
+  private services?: EngineServices;
+
+  private processor = new SchedulerProcessor();
+  private loopRunner = new SchedulerLoop({
+    hasServices: () => !!this.services,
+    getFrameDurationMs: () =>
+      this.services?.config.frameDuration ?? this.getWorld()?.config.frameDuration,
+    processFrame: (dtMs: number) => {
+      const services = this.services;
+      if (!services) return;
+      this.processor.processFrame({
+        dtMs,
+        services,
+        systems: this.systems,
+        getWorld: this.getWorld,
+      });
+    },
+    shouldContinue: (now: number, keepAliveUntil: number) => {
+      const hasPendingGPUWork = getPendingReadbackCount() > 0 || getGPUResultQueueLength() > 0;
+      return this.activeEntityCount > 0 || hasPendingGPUWork || now < keepAliveUntil;
+    },
+  });
+
+  get isRunning(): boolean {
+    return this.loopRunner.isRunning();
+  }
+
+  setServices(services: EngineServices): void {
+    this.services = services;
+    setGPUResultWakeup(this.wakeForGPUResults);
+  }
+
+  clearServices(): void {
+    this.services = undefined;
+    setGPUResultWakeup(undefined);
+  }
+
   private getWorld() {
+    if (this.services?.world) {
+      return this.services.world;
+    }
     try {
       return WorldProvider.useWorld();
     } catch {
@@ -17,28 +64,17 @@ export class SystemScheduler {
     }
   }
 
-  private capabilities = {
-    webgpu: false,
-  };
-
-  setCapability(cap: 'webgpu', value: boolean) {
-    this.capabilities[cap] = value;
-  }
-
-  getCapability(cap: 'webgpu') {
-    return this.capabilities[cap];
-  }
-
   setActiveEntityCount(count: number): void {
     this.activeEntityCount = count;
 
     // Auto-start if we have active entities but scheduler is not running
-    if (count > 0 && !this.isRunning) {
+    if (count > 0) {
       this.start();
     }
     // Auto-stop if no active entities and scheduler is running
-    else if (count === 0 && this.isRunning) {
-      this.stop();
+    else if (count === 0) {
+      const now = getNowMs();
+      this.loopRunner.extendKeepAlive(now + GPU_TAIL_KEEP_ALIVE_MS);
     }
   }
 
@@ -53,54 +89,21 @@ export class SystemScheduler {
   }
 
   start(): void {
-    if (this.isRunning) return;
-    this.isRunning = true;
-    this.lastTime = performance.now();
-    this.loop();
+    if (!this.services) return;
+    if (this.loopRunner.isRunning()) return;
+    this.processor.resetClock();
+    this.loopRunner.start();
   }
 
   ensureRunning(): void {
-    // Public method to ensure scheduler is running (called when entities are created)
-    if (!this.isRunning && this.activeEntityCount > 0) {
-      this.start();
-    }
+    this.start();
   }
 
   stop(): void {
-    this.isRunning = false;
-    if (this.frameId) {
-      cancelAnimationFrame(this.frameId);
-    }
+    this.loopRunner.stop();
   }
 
-  private loop = (): void => {
-    if (!this.isRunning) return;
-
-    const time = performance.now();
-    const dt = time - this.lastTime;
-
-    // FPS limiting: check if enough time has passed
-    const frameDuration = (this.getWorld()?.config as any)?.frameDuration;
-    if (frameDuration && dt < frameDuration) {
-      this.frameId = requestAnimationFrame(this.loop);
-      return; // Skip frame if not enough time has passed
-    }
-
-    this.lastTime = time;
-
-    // Safety cap for dt to prevent spiraling on lag spikes (e.g., tab background)
-    const safeDt = Math.min(dt, 100);
-
-    for (const system of this.systems) {
-      try {
-        // Systems iterate archetypes directly via World.getArchetypes()
-        // This is more efficient than a separate query system for our archetype-based ECS
-        system.update(safeDt);
-      } catch (e) {
-        console.error(`[Motion] System '${system.name}' error:`, e);
-      }
-    }
-
-    this.frameId = requestAnimationFrame(this.loop);
+  private wakeForGPUResults = (): void => {
+    this.loopRunner.wakeForGPUResults(GPU_TAIL_KEEP_ALIVE_MS);
   };
 }

@@ -7,9 +7,10 @@ export const WorldProvider = {
     defaultWorld = world;
   },
   useWorld(): World {
-    // Return injected world if present; otherwise fallback to singleton
-    if (defaultWorld) return defaultWorld;
-    return World.get();
+    if (!defaultWorld) {
+      defaultWorld = new World();
+    }
+    return defaultWorld;
   },
   withWorld<T>(world: World, fn: (world: World) => T): T {
     const prev = defaultWorld;

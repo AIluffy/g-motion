@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { App } from '@g-motion/core';
 import { World } from '@g-motion/core';
 import { motion } from '../src/api/builder';
@@ -15,19 +15,19 @@ describe('Error Validation Tests', () => {
   describe('Component Registration Validation', () => {
     test('throws on invalid component name', () => {
       expect(() => {
-        app.registerComponent('', { value: 'number' });
+        app.registerComponent('', { schema: { value: 'float32' } });
       }).toThrow(/Component name must be a non-empty string/);
 
       expect(() => {
-        app.registerComponent(null as any, { value: 'number' });
+        app.registerComponent(null as any, { schema: { value: 'float32' } });
       }).toThrow(/Component name must be a non-empty string/);
     });
 
     test('throws on duplicate component registration', () => {
-      app.registerComponent('TestComponent', { value: 'number' });
+      app.registerComponent('TestComponent', { schema: { value: 'float32' } });
 
       expect(() => {
-        app.registerComponent('TestComponent', { value: 'number' });
+        app.registerComponent('TestComponent', { schema: { value: 'float32' } });
       }).toThrow(/Component 'TestComponent' is already registered/);
     });
   });
@@ -67,7 +67,7 @@ describe('Error Validation Tests', () => {
 
     test('throws on negative time', () => {
       expect(() => {
-        motion({ value: 0 }).mark({ to: { value: 100 }, time: -50 });
+        motion({ value: 0 }).mark({ to: { value: 100 }, at: -50 });
       }).toThrow(/time must be non-negative/);
     });
 
@@ -86,9 +86,10 @@ describe('Error Validation Tests', () => {
     test('warns when both time and duration provided', () => {
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      motion({ value: 0 }).mark({ to: { value: 100 }, time: 100, duration: 200 });
+      motion({ value: 0 }).mark({ to: { value: 100 }, at: 100, duration: 200 });
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Motion][Validation]',
         expect.stringContaining("Using 'time', ignoring 'duration'"),
       );
 
@@ -111,7 +112,7 @@ describe('Error Validation Tests', () => {
           to: { value: 100 },
           duration: 100,
           easing: 123 as any,
-        });
+        } as any);
       }).toThrow(/easing must be a function or string name/);
     });
 
@@ -122,7 +123,7 @@ describe('Error Validation Tests', () => {
           duration: 100,
           ease: 'linear',
           easing: 'easeIn',
-        });
+        } as any);
       }).toThrow(/Provide either 'ease' or 'easing', not both/);
     });
 
@@ -182,7 +183,7 @@ describe('Error Validation Tests', () => {
 
     test('accepts valid time', () => {
       expect(() => {
-        motion({ value: 0 }).mark({ to: { value: 100 }, time: 500 });
+        motion({ value: 0 }).mark({ to: { value: 100 }, at: 500 });
       }).not.toThrow();
     });
 

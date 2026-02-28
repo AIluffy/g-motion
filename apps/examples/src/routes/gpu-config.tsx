@@ -1,6 +1,9 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, type AnimationControl } from '@g-motion/animation';
+import { motion, type AnimationControl, getGPUMetrics } from '@g-motion/animation';
+import { useAtom } from 'jotai';
+import { engineGpuModeAtom, gpuEasingEnabledAtom } from '@/state/engineState';
+import { useGpuThresholdRecommendation } from '@/state/useGpuThresholdRecommendation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,34 +19,15 @@ export const Route = createFileRoute('/gpu-config')({
   component: GPUConfigPage,
 });
 
-// Easing function implementations
-const easingFunctions = {
-  easeInQuad: (t: number) => t * t,
-  easeOutCubic: (t: number) => 1 - Math.pow(1 - t, 3),
-  easeInElastic: (t: number) => {
-    const c4 = (2 * Math.PI) / 3;
-    return t === 0 ? 0 : t === 1 ? 1 : -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
-  },
-  easeOutBounce: (t: number) => {
-    const n1 = 7.5625;
-    const d1 = 2.75;
-    if (t < 1 / d1) {
-      return n1 * t * t;
-    } else if (t < 2 / d1) {
-      return n1 * (t -= 1.5 / d1) * t + 0.75;
-    } else if (t < 2.5 / d1) {
-      return n1 * (t -= 2.25 / d1) * t + 0.9375;
-    } else {
-      return n1 * (t -= 2.625 / d1) * t + 0.984375;
-    }
-  },
-  easeInOutSine: (t: number) => -(Math.cos(Math.PI * t) - 1) / 2,
-  easeInBack: (t: number) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return c3 * t * t * t - c1 * t * t;
-  },
-};
+// Easing names for GPU-based animations
+const easingNames = [
+  'easeInQuad',
+  'easeOutCubic',
+  'easeInElastic',
+  'easeOutBounce',
+  'easeInOutSine',
+  'easeInBack',
+] as const;
 
 function GPUConfigPage() {
   const controlsRef = useRef<AnimationControl[]>([]);
@@ -51,14 +35,15 @@ function GPUConfigPage() {
   const [runKey, setRunKey] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
 
-  // GPU Configuration states
-  const [gpuMode, setGpuMode] = useState<'auto' | 'always' | 'never'>('auto');
-  const [gpuEasing, setGpuEasing] = useState(true);
-  const [threshold, setThreshold] = useState(1000);
+  // GPU Configuration states (shared via jotai)
+  const [gpuMode, setGpuMode] = useAtom(engineGpuModeAtom);
+  const [gpuEasing, setGpuEasing] = useAtom(gpuEasingEnabledAtom);
+  const { threshold, setThreshold, recommended, isLoading, isError, applyRecommendation } =
+    useGpuThresholdRecommendation();
   const [selectedEasing, setSelectedEasing] = useState<string>('easeInQuad');
 
   // Note: In a real application, you would configure the World before initializing the engine:
-  // World.get({
+  // const world = World.create({
   //   gpuCompute: gpuMode,
   //   gpuEasing: gpuEasing,
   //   webgpuThreshold: threshold,
@@ -66,7 +51,8 @@ function GPUConfigPage() {
   // For this demo, we show the configuration UI but the actual engine is already initialized
   // with default settings.
 
-  const easingMap = easingFunctions;
+  // For demo purposes, selectedEasing holds the easing name directly
+  // In a real app with per-entity easing, you'd store this on each entity
 
   const boxes = useMemo(() => Array.from({ length: count }, (_, i) => i), [count]);
   const positions = useMemo(
@@ -101,7 +87,8 @@ function GPUConfigPage() {
       controlsRef.current = [];
       setIsRunning(true);
 
-      const easing = easingMap[selectedEasing as keyof typeof easingMap] || easingMap.easeInQuad;
+      controlsRef.current = [];
+      setIsRunning(true);
 
       for (let i = 0; i < count; i++) {
         const dx = (Math.random() - 0.5) * width * 0.6;
@@ -113,11 +100,12 @@ function GPUConfigPage() {
           .mark([
             {
               to: { x: dx, y: dy, rotate },
-              time: duration,
-              easing,
+              at: duration,
+              ease: selectedEasing,
             },
           ])
-          .animate({ repeat: 1 });
+          .option({ repeat: 1 })
+          .play();
 
         controlsRef.current.push(control);
       }
@@ -131,9 +119,24 @@ function GPUConfigPage() {
   }, [runKey, selectedEasing]);
 
   const gpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
-  const metricsArr = (globalThis as any).__motionGPUMetrics;
-  const lastMetrics =
-    Array.isArray(metricsArr) && metricsArr.length > 0 ? metricsArr[metricsArr.length - 1] : null;
+  const [lastMetrics, setLastMetrics] = useState<{ entityCount: number; timestamp: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const id = window.setInterval(() => {
+      const metrics = getGPUMetrics();
+      if (!mounted || !Array.isArray(metrics) || metrics.length === 0) return;
+      const last = metrics[0];
+      setLastMetrics({ entityCount: last.entityCount, timestamp: last.timestamp });
+    }, 500);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(id);
+    };
+  }, []);
 
   return (
     <div className="page-shell">
@@ -207,6 +210,34 @@ function GPUConfigPage() {
               </p>
             </div>
 
+            {/* Threshold Recommendation */}
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-200">GPU Threshold</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  className="w-32 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-50"
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value) || 0)}
+                />
+                <Button
+                  type="button"
+                  onClick={applyRecommendation}
+                  disabled={isLoading || isError || recommended == null}
+                  className="text-xs"
+                >
+                  Use recommended
+                </Button>
+                <span className="text-xs text-slate-400">
+                  {isLoading && 'Loading recommendation…'}
+                  {isError && 'Failed to load recommendation'}
+                  {!isLoading && !isError && recommended != null
+                    ? `Suggested: ${recommended}`
+                    : null}
+                </span>
+              </div>
+            </div>
+
             {/* Threshold Control (only for auto mode) */}
             {gpuMode === 'auto' && (
               <div className="space-y-3">
@@ -232,7 +263,7 @@ function GPUConfigPage() {
             <div className="space-y-3">
               <label className="block text-sm font-medium text-slate-200">Easing Function</label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {Object.keys(easingMap).map((name) => (
+                {easingNames.map((name) => (
                   <button
                     key={name}
                     onClick={() => setSelectedEasing(name)}

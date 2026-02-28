@@ -1,82 +1,60 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  resolveEasing,
   getEasingId,
-  EASING_IDS,
-  EASING_FUNCTIONS,
-} from '../src/systems/easing-registry';
+  registerGpuEasing,
+  __resetCustomEasings,
+} from '../../shared/src/easing-registry';
 
-describe('String-based easing support', () => {
-  it('resolveEasing should convert string to function', () => {
-    const easingFn = resolveEasing('easeInOut');
-    expect(typeof easingFn).toBe('function');
-    expect(easingFn(0.5)).toBeCloseTo(0.5);
+describe('GPU-Only Easing Registry', () => {
+  beforeEach(() => {
+    __resetCustomEasings();
   });
 
-  it('resolveEasing should pass through function as-is', () => {
-    const customFn = (t: number) => t * t;
-    const resolved = resolveEasing(customFn);
-    expect(resolved).toBe(customFn);
+  describe('getEasingId', () => {
+    it('should return correct ID for built-in easings', () => {
+      expect(getEasingId('linear')).toBe(0);
+      expect(getEasingId('easeInQuad')).toBe(1);
+      expect(getEasingId('easeOutQuad')).toBe(2);
+      expect(getEasingId('easeInOutQuad')).toBe(3);
+      expect(getEasingId('easeInOutBounce')).toBe(30);
+    });
+
+    it('should resolve name aliases correctly', () => {
+      expect(getEasingId('linear')).toBe(0);
+      expect(getEasingId('easeIn')).toBe(1);
+      expect(getEasingId('easeOut')).toBe(2);
+      expect(getEasingId('easeInOut')).toBe(3);
+    });
+
+    it('should fallback to linear for unknown names', () => {
+      expect(getEasingId('invalidEasing')).toBe(0);
+      expect(getEasingId('notReal')).toBe(0);
+    });
+
+    it('should return linear for undefined', () => {
+      expect(getEasingId(undefined)).toBe(0);
+    });
+
+    it('should return correct ID for registered custom easings', () => {
+      registerGpuEasing('fn myCustom(t: f32) -> f32 { return t * t; }');
+      const customId = getEasingId('myCustom');
+      expect(customId).toBeGreaterThanOrEqual(31);
+    });
   });
 
-  it('resolveEasing should fallback to linear for invalid string', () => {
-    const easingFn = resolveEasing('invalidEasing');
-    expect(easingFn).toBe(EASING_FUNCTIONS.easeLinear);
-  });
+  describe('registerGpuEasing', () => {
+    it('should extract name from WGSL and return it', () => {
+      const name = registerGpuEasing('fn myEase(t: f32) -> f32 { return t * t; }');
+      expect(name).toBe('myEase');
+    });
 
-  it('resolveEasing should fallback to linear for undefined', () => {
-    const easingFn = resolveEasing(undefined);
-    expect(easingFn).toBe(EASING_FUNCTIONS.easeLinear);
-  });
+    it('should make registered easing available via getEasingId', () => {
+      registerGpuEasing('fn customEase(t: f32) -> f32 { return t; }');
+      expect(getEasingId('customEase')).toBeGreaterThan(30);
+    });
 
-  it('getEasingId should return correct ID for string', () => {
-    expect(getEasingId('linear')).toBe(EASING_IDS.easeLinear);
-    expect(getEasingId('easeInOut')).toBe(EASING_IDS.easeInOutQuad);
-    expect(getEasingId('easeOutBounce')).toBe(EASING_IDS.easeOutBounce);
-  });
-
-  it('getEasingId should return correct ID for named function', () => {
-    function easeInQuad(t: number) {
-      return t * t;
-    }
-    expect(getEasingId(easeInQuad)).toBe(EASING_IDS.easeInQuad);
-  });
-
-  it('getEasingId should fallback to linear for invalid string', () => {
-    expect(getEasingId('invalidEasing')).toBe(EASING_IDS.easeLinear);
-  });
-
-  it('all simplified easing names should resolve correctly', () => {
-    const easingNames = [
-      'linear',
-      'easeIn',
-      'easeOut',
-      'easeInOut',
-      'easeInSine',
-      'easeOutSine',
-      'easeInOutSine',
-      'easeInExpo',
-      'easeOutExpo',
-      'easeInOutExpo',
-      'easeInCirc',
-      'easeOutCirc',
-      'easeInOutCirc',
-      'easeInBack',
-      'easeOutBack',
-      'easeInOutBack',
-      'easeInElastic',
-      'easeOutElastic',
-      'easeInOutElastic',
-      'easeInBounce',
-      'easeOutBounce',
-      'easeInOutBounce',
-    ] as const;
-
-    easingNames.forEach((name) => {
-      const fn = resolveEasing(name);
-      expect(typeof fn).toBe('function');
-      expect(fn(0)).toBeCloseTo(0, 10); // All easings should start at 0
-      expect(fn(1)).toBeCloseTo(1, 10); // All easings should end at 1
+    it('should throw for invalid WGSL', () => {
+      expect(() => registerGpuEasing('invalid wgsl')).toThrow();
     });
   });
 });

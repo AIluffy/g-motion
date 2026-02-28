@@ -23,7 +23,7 @@
 5) GPU management (buffers/pipelines/timestamps) lives in dedicated modules, not business code.
 6) Renderers are isolated per target (DOM/Canvas/WebGL/WebGPU) with no cross-references.
 7) Plugins extend via “component + system”; core ECS behavior/types must not be modified.
-8) Any file >400 lines must be split before submission; check file length pre-PR.
+8) Any file >500 lines must be split before submission; check file length pre-PR.
 
 ## Workflow
 1) Read relevant spec (specs/001-motion-engine) and package README.

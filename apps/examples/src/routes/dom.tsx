@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { motion, AnimationControl } from '@g-motion/animation';
+import { motion, AnimationControl, animate } from '@g-motion/animation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -46,11 +46,38 @@ function DomDemo() {
     timerRef.current = window.setTimeout(() => setIsRunning(false), totalDuration * (repeat + 1));
 
     const control = motion(`#${boxId}`)
-      .mark([{ to: { x: 180, y: 0, scaleX: 1.05, rotate: 8 }, time: 600 }])
-      .mark([{ to: { x: 180, y: 24, scaleX: 1, scaleY: 1.02, rotate: -6 }, time: 1100 }])
-      .mark([{ to: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0 }, time: 1500 }])
-      .animate({ repeat });
+      .mark([{ to: { x: 180, y: 0, scaleX: 1.05, rotate: 8 }, at: 600 }])
+      .mark([{ to: { x: 180, y: 24, scaleX: 1, scaleY: 1.02, rotate: -6 }, at: 1100 }])
+      .mark([{ to: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotate: 0 }, at: 1500 }])
+      .option({ repeat })
+      .play();
 
+    controlRef.current = control;
+    setIsRunning(true);
+  };
+
+  const startOneShot = () => {
+    clearTimer();
+    controlRef.current?.stop();
+    const control = animate(
+      `#${boxId}`,
+      {
+        x: [0, 180, 0],
+        y: [0, 0, 0],
+        scaleX: [1, 1.05, 1],
+        scaleY: [1, 1, 1],
+        rotate: [0, 8, 0],
+      },
+      {
+        duration: 1500,
+        times: [0, 0.4, 1],
+        repeat: 1,
+        repeatType: 'reverse',
+        onComplete: () => {
+          setIsRunning(false);
+        },
+      },
+    );
     controlRef.current = control;
     setIsRunning(true);
   };
@@ -71,9 +98,9 @@ function DomDemo() {
 
     // Fan-out selector animates all matched elements
     motion('.multi-box')
-      .mark([{ to: { x: 100, y: 0 }, time: 400 }])
-      .mark([{ to: { x: 0, y: 0 }, time: 800 }])
-      .animate();
+      .mark([{ to: { x: 100, y: 0 }, at: 400 }])
+      .mark([{ to: { x: 0, y: 0 }, at: 800 }])
+      .play();
   };
 
   const stop = () => {
@@ -123,6 +150,9 @@ function DomDemo() {
               <div className="flex flex-col gap-2">
                 <Button onClick={start} disabled={isRunning}>
                   {isRunning ? 'Running…' : 'Start animation'}
+                </Button>
+                <Button variant="ghost" onClick={startOneShot} disabled={isRunning}>
+                  {isRunning ? 'Running…' : 'One-shot animate() with keyframes'}
                 </Button>
                 <Button variant="ghost" onClick={stop}>
                   Stop / reset

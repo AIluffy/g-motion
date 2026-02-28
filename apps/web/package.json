@@ -11,8 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@g-motion/core": "workspace:*",
-    "@g-motion/utils": "workspace:*"
+    "@g-motion/core": "workspace:*"
   },
   "devDependencies": {
     "oxlint": "workspace:*",

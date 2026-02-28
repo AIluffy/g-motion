@@ -3,20 +3,25 @@ import { motion } from '../src/index';
 
 describe('DOM targets', () => {
   it('routes selector with multiple matches to batch (mocked document)', () => {
-    // Ensure querySelectorAll exists and returns multiple matches
     if (typeof (global as any).document === 'undefined') {
       (global as any).document = {};
     }
-    (global as any).document.querySelectorAll = (sel: string) => (sel === '.box' ? [{}, {}] : []);
+    (global as any).document.querySelectorAll = (sel: string) =>
+      sel === '.box'
+        ? {
+            length: 2,
+            item: (index: number) => (index === 0 ? {} : {}),
+          }
+        : {
+            length: 0,
+            item: () => null,
+          };
 
     const control = motion('.box')
-      .mark([{ time: 100, to: { x: 10 } }])
-      .animate();
+      .mark([{ at: 100, to: { x: 10 } }])
+      .play();
 
-    // motion('.box') returns a BatchAnimationControl when multiple matches
-    // Verify it has multiple controls
-    // @ts-expect-error accessing test-only internals
-    const count = control.getCount ? control.getCount() : 1;
+    const count = control.getCount();
     expect(count).toBeGreaterThan(1);
   });
   let el: any;
@@ -40,8 +45,8 @@ describe('DOM targets', () => {
 
   it.skip('animates DOM element transform (pending real DOM renderer wiring)', async () => {
     motion('#box')
-      .mark([{ to: { x: 100 }, time: 100 }])
-      .animate();
+      .mark([{ to: { x: 100 }, at: 100 }])
+      .play();
 
     await new Promise((resolve) => setTimeout(resolve, 200));
 

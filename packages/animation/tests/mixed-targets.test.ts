@@ -11,12 +11,10 @@ describe('Mixed target arrays', () => {
     const targets = [42, obj, '.m'];
 
     const control = motion(targets)
-      .mark([{ time: 100, to: { value: 10 } }])
-      .animate();
+      .mark([{ at: 100, to: { value: 10 } }])
+      .play();
 
-    // Expect batch control with count equal or greater than number of inputs (selector expands)
-    // @ts-expect-error test-only introspection
-    const count = control.getCount ? control.getCount() : 1;
+    const count = control.getCount();
     expect(count).toBeGreaterThanOrEqual(3);
   });
 });

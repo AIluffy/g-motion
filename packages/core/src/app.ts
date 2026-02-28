@@ -1,32 +1,29 @@
-import { World, ComponentDef, SystemDef, RendererDef } from './index';
-import { registerEasingWithWGSL } from './systems/easing-registry';
-import { createDebugger } from '@g-motion/utils';
+import { ErrorCode, ErrorSeverity, MotionError, registerGpuEasing } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
+import { getAppContext } from './context';
+import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
 import { MotionApp, MotionAppConfig } from './plugin';
+import { getRendererCode } from './renderer-code';
+import type { World } from './world';
+import { WorldProvider } from './worldProvider';
 
 const debug = createDebugger('Core');
 
+export { getRendererCode, getRendererName } from './renderer-code';
+
 // App facade implementing MotionApp interface
 export class App implements MotionApp {
-  private config: MotionAppConfig;
   private renderers = new Map<string, RendererDef>();
-  private easings = new Map<string, (t: number) => number>();
 
   constructor(
     private world: World,
     config: MotionAppConfig = {},
   ) {
-    this.config = {
-      webgpuThreshold: 1000,
-      gpuCompute: 'auto',
-      gpuEasing: true,
-      ...config,
-    };
-
-    // Validate gpuCompute mode if provided
-    if (this.config.gpuCompute && !['auto', 'always', 'never'].includes(this.config.gpuCompute)) {
-      throw new Error(
-        `Invalid gpuCompute mode: ${this.config.gpuCompute}. Must be 'auto', 'always', or 'never'.`,
-      );
+    if (config && Object.keys(config).length > 0) {
+      this.world.setConfig({
+        ...this.world.config,
+        ...config,
+      });
     }
   }
 
@@ -40,9 +37,11 @@ export class App implements MotionApp {
 
     // Check for duplicate registration
     if (this.world.registry.has(name)) {
-      throw new Error(
-        `[Motion] Component '${name}' is already registered. ` +
-          `Consider using a unique namespace or unregister first.`,
+      throw new MotionError(
+        `[Motion] Component '${name}' is already registered. Consider using a unique namespace or unregister first.`,
+        ErrorCode.DUPLICATE_REGISTRATION,
+        ErrorSeverity.FATAL,
+        { componentName: name },
       );
     }
 
@@ -76,73 +75,144 @@ export class App implements MotionApp {
       );
     }
 
+    getRendererCode(name);
+
     this.renderers.set(name, renderer);
     debug('Registered renderer', name);
   }
 
-  registerEasing(name: string, fn: (t: number) => number): void {
-    this.easings.set(name, fn);
-    debug('Registered easing', name);
+  /**
+   * Register a custom easing for GPU computation.
+   * The function name is extracted from the WGSL.
+   *
+   * @param wgslFn - Full WGSL function definition (e.g., 'fn myEase(t: f32) -> f32 { return t * t; }')
+   * @returns The registered easing name
+   */
+  registerGpuEasing(wgslFn: string): string {
+    const name = registerGpuEasing(wgslFn);
+    debug('Registered GPU easing', name);
+    return name;
   }
 
-  registerGpuEasing(name: string, fn: (t: number) => number, wgslFn: string): void {
-    this.easings.set(name, fn);
-    registerEasingWithWGSL(name, fn, wgslFn);
-    debug('Registered GPU easing', name);
+  registerShader(shader: ShaderDef): void {
+    const registry = getAppContext().getShaderRegistry();
+    registry.set(shader.name, shader);
+    debug('Registered shader', shader.name);
   }
 
   getConfig(): MotionAppConfig {
-    return this.config;
+    return this.world.config;
   }
 
   getRenderer(name: string): RendererDef | undefined {
     return this.renderers.get(name);
   }
-
-  getEasing(name: string): ((t: number) => number) | undefined {
-    return this.easings.get(name);
-  }
 }
 
-export const app = new App(World.get());
+export function registerBuiltInRenderers(app: App): void {
+  function callUpdateFn(fn: ((val: any) => void) | undefined, props: Record<string, any>): void {
+    if (!fn) return;
 
-// Register built-in renderers
-app.registerRenderer('callback', {
-  update(_entity: number, target: any, components: any) {
-    const props = components.Render?.props;
-    if (!props) return;
-
-    if (target.onUpdate) {
-      // If there's a single property, pass it directly
-      if (Object.keys(props).length === 1) {
-        const value = Object.values(props)[0];
-        target.onUpdate(value);
-      } else {
-        target.onUpdate(props);
+    let firstKey: string | undefined;
+    for (const k in props) {
+      if (Object.prototype.hasOwnProperty.call(props, k)) {
+        if (firstKey === undefined) {
+          firstKey = k;
+          continue;
+        }
+        fn(props);
+        return;
       }
     }
-  },
-});
 
-app.registerRenderer('primitive', {
-  update(_entity: number, target: any, components: any) {
-    const props = components.Render?.props;
-    if (!props) return;
+    if (firstKey === undefined) return;
+    fn(props[firstKey]);
+  }
 
-    if (props.__primitive !== undefined) {
-      target.value = props.__primitive;
-      if (target.onUpdate) {
-        target.onUpdate(props.__primitive);
+  function applyPropsToTarget(target: any, props: Record<string, any>): void {
+    if (
+      target &&
+      typeof target === 'object' &&
+      typeof target.set === 'function' &&
+      typeof target.get === 'function'
+    ) {
+      for (const key in props) {
+        if (Object.prototype.hasOwnProperty.call(props, key)) {
+          target.set(key, props[key]);
+        }
       }
+      return;
     }
-  },
-});
-
-app.registerRenderer('object', {
-  update(_entity: number, target: any, components: any) {
-    const props = components.Render?.props;
-    if (!props) return;
-
     Object.assign(target, props);
-  },
-});
+  }
+
+  app.registerRenderer('callback', {
+    update(_entity: number, target: any, components: any) {
+      const props = components.Render?.props;
+      if (!props) return;
+
+      callUpdateFn(target.onUpdate, props);
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as { props?: Record<string, unknown> } | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      callUpdateFn(target.onUpdate, props);
+    },
+  });
+
+  app.registerRenderer('primitive', {
+    update(_entity: number, target: any, components: any) {
+      const props = components.Render?.props;
+      if (!props) return;
+
+      if (props.__primitive !== undefined) {
+        target.value = props.__primitive;
+        if (target.onUpdate) {
+          target.onUpdate(props.__primitive);
+        }
+      }
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as { props?: Record<string, any> } | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      if (props.__primitive !== undefined) {
+        target.value = props.__primitive;
+        if (target.onUpdate) {
+          target.onUpdate(props.__primitive);
+        }
+      }
+    },
+  });
+
+  app.registerRenderer('object', {
+    update(_entity: number, target: any, components: any) {
+      const renderComp = components.Render as
+        | { props?: Record<string, any>; onUpdate?: (val: any) => void }
+        | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      applyPropsToTarget(target, props);
+      callUpdateFn(renderComp?.onUpdate, props);
+    },
+    updateWithAccessor(_entity: number, target: any, getComponent: (name: string) => any) {
+      const renderComp = getComponent('Render') as
+        | { props?: Record<string, any>; onUpdate?: (val: any) => void }
+        | undefined;
+      const props = renderComp?.props;
+      if (!props) return;
+
+      applyPropsToTarget(target, props);
+      callUpdateFn(renderComp?.onUpdate, props);
+    },
+  });
+}
+
+export const appWorld = WorldProvider.useWorld();
+export const app = new App(appWorld);
+
+registerBuiltInRenderers(app);

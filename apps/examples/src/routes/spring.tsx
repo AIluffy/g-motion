@@ -1,7 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimationControl } from '@g-motion/animation';
-import '@g-motion/plugin-spring'; // Auto-register spring plugin
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -53,7 +52,7 @@ function SpringDemo() {
           spring: springConfig,
         },
       ])
-      .animate();
+      .play();
 
     controlsRef.current.set(boxId, control);
     setRunningAnimations((prev) => new Set(prev).add(boxId));

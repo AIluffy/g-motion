@@ -1,19 +1,12 @@
-import { World } from '@g-motion/core';
+import { ErrorCode, ErrorSeverity, MotionError } from '@g-motion/shared';
+import { WorldProvider } from '@g-motion/core';
 
 /**
  * Global engine configuration object for controlling animation behavior
  */
 class EngineConfig {
-  private world?: World;
-
-  /**
-   * Get or initialize the World instance
-   */
-  private getWorld(): World {
-    if (!this.world) {
-      this.world = World.get();
-    }
-    return this.world;
+  private getWorld() {
+    return WorldProvider.useWorld();
   }
 
   /**
@@ -24,23 +17,18 @@ class EngineConfig {
    */
   setSpeed(speed: number): void {
     if (!Number.isFinite(speed) || speed <= 0) {
-      throw new Error(`[Motion Engine] Speed must be a positive number, got: ${speed}`);
+      throw new MotionError(
+        `[Motion Engine] Speed must be a positive number, got: ${speed}`,
+        ErrorCode.INVALID_PARAMETER,
+        ErrorSeverity.FATAL,
+        { speed },
+      );
     }
-
-    const world = this.getWorld();
-    const config = world.config;
-
-    // Store speed multiplier in config for systems to use
-    (config as any).globalSpeed = speed;
+    this.getWorld().config.globalSpeed = speed;
   }
 
-  /**
-   * Get current global animation speed
-   * @returns Current speed multiplier
-   */
   getSpeed(): number {
-    const world = this.getWorld();
-    return (world.config as any).globalSpeed ?? 1;
+    return this.getWorld().config.globalSpeed ?? 1;
   }
 
   /**
@@ -54,98 +42,76 @@ class EngineConfig {
     if (!Number.isFinite(fps) || fps <= 0) {
       throw new Error(`[Motion Engine] FPS must be a positive number, got: ${fps}`);
     }
-
-    const world = this.getWorld();
-    const config = world.config;
-
-    // Store target FPS in config
-    (config as any).targetFps = fps;
-    (config as any).frameDuration = 1000 / fps;
+    const config = this.getWorld().config;
+    config.targetFps = fps;
+    config.frameDuration = 1000 / fps;
   }
 
-  /**
-   * Get target FPS setting
-   * @returns Target FPS (default: 60)
-   */
   getFps(): number {
-    const world = this.getWorld();
-    return (world.config as any).targetFps ?? 60;
+    return this.getWorld().config.targetFps ?? 60;
   }
 
-  /**
-   * Force GPU acceleration mode
-   * @param mode - GPU compute mode: 'auto' | 'always' | 'never'
-   *   - 'auto': Use GPU when entity count exceeds threshold (default)
-   *   - 'always': Always use GPU regardless of entity count
-   *   - 'never': Never use GPU, always use CPU
-   * @example
-   * engine.forceGpu('always'); // Always use GPU
-   * engine.forceGpu('never');  // Disable GPU, use CPU only
-   */
-  forceGpu(mode: 'auto' | 'always' | 'never'): void {
-    if (!['auto', 'always', 'never'].includes(mode)) {
-      throw new Error(
-        `[Motion Engine] Invalid GPU mode: ${mode}. Must be 'auto', 'always', or 'never'.`,
-      );
+  setSamplingMode(mode: 'time' | 'frame'): void {
+    if (!['time', 'frame'].includes(mode)) {
+      throw new Error(`[Motion Engine] Invalid sampling mode: ${mode}`);
     }
-
     const world = this.getWorld();
-    world.config.gpuCompute = mode;
+    (world.config as any).samplingMode = mode;
   }
 
-  /**
-   * Get current GPU mode
-   * @returns GPU compute mode ('auto' | 'always' | 'never')
-   */
-  getGpuMode(): 'auto' | 'always' | 'never' {
+  getSamplingMode(): 'time' | 'frame' {
     const world = this.getWorld();
-    return world.config.gpuCompute ?? 'auto';
+    return ((world.config as any).samplingMode ?? 'time') as any;
   }
 
-  /**
-   * Set GPU activation threshold (only affects 'auto' mode)
-   * @param threshold - Number of entities before GPU activation (default: 1000)
-   * @example
-   * engine.setGpuThreshold(500); // Activate GPU at 500+ entities
-   */
-  setGpuThreshold(threshold: number): void {
-    if (!Number.isFinite(threshold) || threshold < 0) {
-      throw new Error(
-        `[Motion Engine] GPU threshold must be a non-negative number, got: ${threshold}`,
-      );
+  setSamplingFps(fps: number): void {
+    if (!Number.isFinite(fps) || fps <= 0) {
+      throw new Error(`[Motion Engine] samplingFps must be a positive number, got: ${fps}`);
     }
-
     const world = this.getWorld();
-    world.config.webgpuThreshold = threshold;
+    (world.config as any).samplingFps = fps;
+    (world.config as any).samplingMode = (world.config as any).samplingMode ?? 'frame';
   }
 
-  /**
-   * Get GPU activation threshold
-   * @returns Current threshold value
-   */
-  getGpuThreshold(): number {
+  getSamplingFps(): number {
     const world = this.getWorld();
-    return world.config.webgpuThreshold ?? 1000;
+    const config = world.config as any;
+    return Number(config.samplingFps ?? config.targetFps ?? 60);
   }
 
-  /**
-   * Enable or disable GPU-accelerated easing functions
-   * @param enabled - Whether to use GPU for easing calculations
-   * @example
-   * engine.setGpuEasing(false); // Use CPU for easing
-   */
-  setGpuEasing(enabled: boolean): void {
+  setMetricsSamplingRate(rate: number): void {
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new Error(`[Motion Engine] metricsSamplingRate must be positive, got: ${rate}`);
+    }
     const world = this.getWorld();
-    world.config.gpuEasing = enabled;
+    (world.config as any).metricsSamplingRate = Math.floor(rate);
   }
 
-  /**
-   * Check if GPU easing is enabled
-   * @returns True if GPU easing is enabled
-   */
-  getGpuEasing(): boolean {
+  getMetricsSamplingRate(): number {
     const world = this.getWorld();
-    return world.config.gpuEasing ?? true;
+    return Number((world.config as any).metricsSamplingRate ?? 1);
+  }
+
+  setWorkSlicing(options: {
+    enabled?: boolean;
+    interpolationArchetypesPerFrame?: number;
+    batchSamplingArchetypesPerFrame?: number;
+  }): void {
+    const world = this.getWorld();
+    const current = (world.config as any).workSlicing || {};
+    (world.config as any).workSlicing = {
+      ...current,
+      ...options,
+    };
+  }
+
+  getWorkSlicing(): {
+    enabled?: boolean;
+    interpolationArchetypesPerFrame?: number;
+    batchSamplingArchetypesPerFrame?: number;
+  } {
+    const world = this.getWorld();
+    return ((world.config as any).workSlicing || {}) as any;
   }
 
   /**
@@ -155,17 +121,18 @@ class EngineConfig {
    * engine.configure({
    *   speed: 2,
    *   fps: 30,
-   *   gpuMode: 'always',
-   *   gpuThreshold: 500,
-   *   gpuEasing: true
    * });
    */
   configure(config: {
     speed?: number;
     fps?: number;
-    gpuMode?: 'auto' | 'always' | 'never';
-    gpuThreshold?: number;
-    gpuEasing?: boolean;
+    metricsSamplingRate?: number;
+    sampling?: { mode?: 'time' | 'frame'; fps?: number };
+    workSlicing?: {
+      enabled?: boolean;
+      interpolationArchetypesPerFrame?: number;
+      batchSamplingArchetypesPerFrame?: number;
+    };
   }): void {
     if (config.speed !== undefined) {
       this.setSpeed(config.speed);
@@ -173,14 +140,17 @@ class EngineConfig {
     if (config.fps !== undefined) {
       this.setFps(config.fps);
     }
-    if (config.gpuMode !== undefined) {
-      this.forceGpu(config.gpuMode);
+    if (config.metricsSamplingRate !== undefined) {
+      this.setMetricsSamplingRate(config.metricsSamplingRate);
     }
-    if (config.gpuThreshold !== undefined) {
-      this.setGpuThreshold(config.gpuThreshold);
+    if (config.sampling?.mode !== undefined) {
+      this.setSamplingMode(config.sampling.mode);
     }
-    if (config.gpuEasing !== undefined) {
-      this.setGpuEasing(config.gpuEasing);
+    if (config.sampling?.fps !== undefined) {
+      this.setSamplingFps(config.sampling.fps);
+    }
+    if (config.workSlicing !== undefined) {
+      this.setWorkSlicing(config.workSlicing);
     }
   }
 
@@ -191,16 +161,20 @@ class EngineConfig {
   getConfig(): {
     speed: number;
     fps: number;
-    gpuMode: 'auto' | 'always' | 'never';
-    gpuThreshold: number;
-    gpuEasing: boolean;
+    metricsSamplingRate: number;
+    sampling: { mode: 'time' | 'frame'; fps: number };
+    workSlicing: {
+      enabled?: boolean;
+      interpolationArchetypesPerFrame?: number;
+      batchSamplingArchetypesPerFrame?: number;
+    };
   } {
     return {
       speed: this.getSpeed(),
       fps: this.getFps(),
-      gpuMode: this.getGpuMode(),
-      gpuThreshold: this.getGpuThreshold(),
-      gpuEasing: this.getGpuEasing(),
+      metricsSamplingRate: this.getMetricsSamplingRate(),
+      sampling: { mode: this.getSamplingMode(), fps: this.getSamplingFps() },
+      workSlicing: this.getWorkSlicing(),
     };
   }
 
@@ -211,9 +185,13 @@ class EngineConfig {
     this.configure({
       speed: 1,
       fps: 60,
-      gpuMode: 'auto',
-      gpuThreshold: 1000,
-      gpuEasing: true,
+      metricsSamplingRate: 1,
+      sampling: { mode: 'time', fps: 60 },
+      workSlicing: {
+        enabled: false,
+        interpolationArchetypesPerFrame: 0,
+        batchSamplingArchetypesPerFrame: 0,
+      },
     });
   }
 }
@@ -230,15 +208,10 @@ class EngineConfig {
  * // Control FPS
  * engine.setFps(30); // Cap at 30 FPS
  *
- * // Force GPU mode
- * engine.forceGpu('always'); // Always use GPU
- *
  * // Configure multiple settings
  * engine.configure({
  *   speed: 1.5,
  *   fps: 60,
- *   gpuMode: 'auto',
- *   gpuThreshold: 500
  * });
  */
 export const engine = new EngineConfig();

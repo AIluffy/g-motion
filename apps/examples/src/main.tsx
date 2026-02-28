@@ -1,15 +1,55 @@
+import { WorldProvider, createEngine, type MotionEngine } from '@g-motion/core';
+import { DOMPlugin } from '@g-motion/plugin-dom';
+import { inertiaPlugin } from '@g-motion/plugin-inertia';
+import { springPlugin } from '@g-motion/plugin-spring';
+import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
-import { RouterProvider, createRouter } from '@tanstack/react-router';
+import { Provider as JotaiProvider } from 'jotai';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen.ts';
 
-// Import DOM plugin to auto-register it
-import '@g-motion/plugin-dom';
+const globalKey = '__gMotionExamplesEngine';
 
-import './styles.css';
+const existingEngine = (globalThis as any)[globalKey] as MotionEngine | undefined;
+
+const engine: MotionEngine =
+  existingEngine && !existingEngine.disposed ? existingEngine : createEngine();
+WorldProvider.setDefault(engine.world);
+
+if (existingEngine && !existingEngine.disposed) {
+  engine.reset({
+    soft: true,
+    configOverride: {
+      workSlicing: {
+        enabled: true,
+        interpolationArchetypesPerFrame: 8,
+        batchSamplingArchetypesPerFrame: 8,
+      },
+    },
+  });
+} else {
+  engine.use(DOMPlugin);
+  engine.use(springPlugin);
+  engine.use(inertiaPlugin);
+  (globalThis as any)[globalKey] = engine;
+}
+
+engine.reset({
+  soft: true,
+  configOverride: {
+    workSlicing: {
+      enabled: true,
+      interpolationArchetypesPerFrame: 8,
+      batchSamplingArchetypesPerFrame: 8,
+    },
+  },
+});
+
 import reportWebVitals from './reportWebVitals.ts';
+import './styles.css';
 
 // Create a new router instance
 const router = createRouter({
@@ -32,11 +72,23 @@ declare module '@tanstack/react-router' {
 const rootElement = document.getElementById('app');
 if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);
+  const queryClient = new QueryClient();
   root.render(
     <StrictMode>
-      <RouterProvider router={router} />
+      <QueryClientProvider client={queryClient}>
+        <JotaiProvider>
+          <RouterProvider router={router} />
+        </JotaiProvider>
+      </QueryClientProvider>
     </StrictMode>,
   );
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    engine.dispose();
+    delete (globalThis as any)[globalKey];
+  });
 }
 
 // If you want to start measuring performance in your app, pass a function

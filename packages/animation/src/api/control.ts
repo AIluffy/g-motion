@@ -1,14 +1,29 @@
-import { World, MotionStatus, WorldProvider } from '@g-motion/core';
+import { MotionStatus } from '@g-motion/core';
+import { createDebugger } from '@g-motion/shared';
+import type { World } from '@g-motion/core';
+import { BatchCoordinator } from './control/batchCoordinator';
+import { AnimationCoordinator } from './control/completionHandler';
+import { FrameNavigator } from './control/frameNavigator';
+import { PlaybackController } from './control/playbackController';
+
+const warn = createDebugger('AnimationControl', 'warn');
+
+type WorldWithAnimationCoordinator = World & {
+  __motionAnimationCoordinator?: AnimationCoordinator;
+};
+
+function getAnimationCoordinator(world: World): AnimationCoordinator {
+  const w = world as WorldWithAnimationCoordinator;
+  if (!w.__motionAnimationCoordinator) {
+    w.__motionAnimationCoordinator = new AnimationCoordinator();
+  }
+  return w.__motionAnimationCoordinator;
+}
 
 export class AnimationControl {
-  private entityIds: number[];
-  private controls: AnimationControl[];
-  private isBatch: boolean;
-  private injectedWorld?: World;
-
-  private getWorld(): World {
-    return this.injectedWorld ?? WorldProvider.useWorld();
-  }
+  private coordinator: BatchCoordinator;
+  private playback: PlaybackController;
+  private frames: FrameNavigator;
 
   constructor(
     entityId: number | number[],
@@ -16,205 +31,68 @@ export class AnimationControl {
     isBatch = false,
     world?: World,
   ) {
-    if (Array.isArray(entityId)) {
-      this.entityIds = entityId;
-      this.controls = controls || [];
-      this.isBatch = isBatch;
-    } else {
-      this.entityIds = [entityId];
-      this.controls = [];
-      this.isBatch = false;
-    }
-    this.injectedWorld = world;
-  }
-
-  /** For backward compatibility - get primary entity ID */
-  private get entityId(): number {
-    return this.entityIds[0];
+    this.coordinator = new BatchCoordinator({ entityId, controls, isBatch, world });
+    this.playback = new PlaybackController(this.coordinator);
+    this.frames = new FrameNavigator(this.coordinator);
   }
 
   stop() {
-    if (this.isBatch && this.controls.length > 0) {
-      // Batch operation
-      for (const control of this.controls) {
-        control.stop();
-      }
-      return;
-    }
-
-    const world = this.getWorld();
-    for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      if (state) {
-        state.status = MotionStatus.Finished;
-      }
-    }
+    this.playback.stop();
   }
 
   pause() {
-    if (this.isBatch && this.controls.length > 0) {
-      // Batch operation
-      for (const control of this.controls) {
-        control.pause();
-      }
-      return;
-    }
-
-    const world = this.getWorld();
-    for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      if (state && state.status === MotionStatus.Running) {
-        state.status = MotionStatus.Paused;
-        state.pausedAt = performance.now();
-      }
-    }
+    this.playback.pause();
   }
 
   play() {
-    if (this.isBatch && this.controls.length > 0) {
-      // Batch operation
-      for (const control of this.controls) {
-        control.play();
-      }
-      return;
-    }
-
-    const world = this.getWorld();
-    for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      if (state) {
-        if (state.status === MotionStatus.Paused && state.pausedAt) {
-          // Shift startTime forward by the paused duration so GPU elapsed stays accurate.
-          const pausedDuration = performance.now() - state.pausedAt;
-          state.startTime += pausedDuration;
-          state.pausedAt = 0;
-        }
-        state.status = MotionStatus.Running;
-        // Ensure scheduler is running when animation is resumed
-        world.scheduler.ensureRunning();
-      }
-    }
+    this.playback.play();
   }
 
   /** Reverse playback direction using negative playbackRate. */
   reverse() {
-    if (this.isBatch && this.controls.length > 0) {
-      for (const control of this.controls) {
-        control.reverse();
-      }
-      return;
-    }
-
-    const world = this.getWorld();
-    for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      const timeline = archetype.getEntityData(entityId, 'Timeline');
-      if (!state || !timeline) continue;
-
-      // If playbackRate is positive, negate; if zero, set to -1
-      const currentRate = state.playbackRate ?? 1;
-      const newRate = currentRate === 0 ? -1 : -Math.abs(currentRate);
-      state.playbackRate = newRate;
-
-      // Ensure we are running
-      state.status = MotionStatus.Running;
-      if (typeof (world.scheduler as any).ensureRunning === 'function') {
-        (world.scheduler as any).ensureRunning();
-      } else {
-        world.scheduler.start();
-      }
-    }
+    this.playback.reverse();
   }
 
   /** Check if current playback is reversed (negative playbackRate) */
   isReversed(): boolean {
-    const world = this.getWorld();
-    const archetype = world.getEntityArchetype(this.entityId);
-    if (!archetype) return false;
-    const state = archetype.getEntityData(this.entityId, 'MotionState');
-    const rate = state?.playbackRate ?? 1;
-    return rate < 0;
+    return this.playback.isReversed(this.coordinator.getPrimaryEntityId());
   }
 
   /** Seek to an absolute time (ms) on the timeline. */
   seek(timeMs: number) {
-    if (this.isBatch && this.controls.length > 0) {
-      for (const control of this.controls) {
-        control.seek(timeMs);
-      }
-      return;
-    }
+    this.frames.seek(timeMs);
+  }
 
-    const world = this.getWorld();
-    for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      const timeline = archetype.getEntityData(entityId, 'Timeline');
-      if (!state || !timeline) continue;
-
-      const clamped = Math.max(0, Math.min(timeMs, timeline.duration ?? 0));
-      state.currentTime = clamped;
-    }
+  seekFrame(framePosition: number, fps?: number) {
+    this.frames.seekFrame(framePosition, fps);
   }
 
   /** Get current absolute time (ms) on the timeline. */
   getCurrentTime(): number {
-    const world = this.getWorld();
-    const archetype = world.getEntityArchetype(this.entityId);
-    if (!archetype) return 0;
-    const state = archetype.getEntityData(this.entityId, 'MotionState');
-    return state?.currentTime ?? 0;
+    return this.frames.getCurrentTime(this.coordinator.getPrimaryEntityId());
+  }
+
+  getFramePosition(fps?: number): number {
+    return this.frames.getFramePosition(this.coordinator.getPrimaryEntityId(), fps);
+  }
+
+  getFrameIndex(fps?: number): number {
+    return this.frames.getFrameIndex(this.coordinator.getPrimaryEntityId(), fps);
   }
 
   /** Get total duration (ms) of the timeline. */
   getDuration(): number {
-    const world = this.getWorld();
-    const archetype = world.getEntityArchetype(this.entityId);
-    if (!archetype) return 0;
-    const timeline = archetype.getEntityData(this.entityId, 'Timeline');
-    return timeline?.duration ?? 0;
+    return this.frames.getDuration(this.coordinator.getPrimaryEntityId());
   }
 
   /** Set playback rate (1 = normal speed). */
   setPlaybackRate(rate: number) {
-    if (this.isBatch && this.controls.length > 0) {
-      for (const control of this.controls) {
-        control.setPlaybackRate(rate);
-      }
-      return;
-    }
-
-    const world = this.getWorld();
-    for (const entityId of this.entityIds) {
-      const archetype = world.getEntityArchetype(entityId);
-      if (!archetype) continue;
-      const state = archetype.getEntityData(entityId, 'MotionState');
-      if (state && Number.isFinite(rate) && rate > 0) {
-        state.playbackRate = rate;
-      }
-    }
+    this.playback.setPlaybackRate(rate);
   }
 
   /** Get playback rate (1 = normal speed). */
   getPlaybackRate(): number {
-    const world = this.getWorld();
-    const archetype = world.getEntityArchetype(this.entityId);
-    if (!archetype) return 1;
-    const state = archetype.getEntityData(this.entityId, 'MotionState');
-    return state?.playbackRate ?? 1;
+    return this.playback.getPlaybackRate(this.coordinator.getPrimaryEntityId());
   }
 
   /** Convenience: set FPS by mapping to playbackRate relative to 60fps. */
@@ -232,22 +110,22 @@ export class AnimationControl {
 
   /** Get the entity IDs in this animation (or batch) */
   getEntityIds(): number[] {
-    return [...this.entityIds];
+    return this.coordinator.getEntityIds();
   }
 
   /** Get individual controls if this is a batch animation */
   getControls(): AnimationControl[] {
-    return [...this.controls];
+    return this.coordinator.getControls();
   }
 
   /** Get count of entities in this animation */
   getCount(): number {
-    return this.entityIds.length;
+    return this.coordinator.getCount();
   }
 
   /** Check if this is a batch animation */
   isBatchAnimation(): boolean {
-    return this.isBatch;
+    return this.coordinator.isBatchAnimation();
   }
 
   /**
@@ -255,12 +133,11 @@ export class AnimationControl {
    * @param removeEntities - Whether to remove entities from world (default: true)
    */
   destroy(removeEntities = true): void {
-    // Stop all animations first
     this.stop();
 
     if (removeEntities) {
-      const world = this.getWorld();
-      for (const entityId of this.entityIds) {
+      const world = this.coordinator.getWorld();
+      for (const entityId of this.coordinator.getEntityIdView()) {
         const archetype = world.getEntityArchetype(entityId);
         if (archetype) {
           world.markForDeletion([entityId]);
@@ -269,8 +146,99 @@ export class AnimationControl {
       world.flushDeletions();
     }
 
-    // Clear references
-    this.controls.length = 0;
-    this.entityIds.length = 0;
+    this.coordinator.clearReferences();
+  }
+
+  static registerOnComplete(control: AnimationControl, onComplete?: () => void): void {
+    const world = control.coordinator.getWorld();
+    getAnimationCoordinator(world).register(control, onComplete);
+  }
+
+  static clearCompletionForControl(control: AnimationControl): void {
+    const world = control.coordinator.getWorld();
+    getAnimationCoordinator(world).clear(control);
+  }
+
+  static handleMotionStatusChange(
+    world: World,
+    entityId: number,
+    prevStatus: MotionStatus | undefined,
+    nextStatus: MotionStatus,
+  ): void {
+    const completed = getAnimationCoordinator(world).handleStatusChange(
+      entityId,
+      prevStatus,
+      nextStatus,
+    );
+    if (!completed) return;
+    detachControlFromScopes(completed.control);
+    try {
+      completed.onComplete();
+    } catch (e) {
+      warn('onComplete callback failed:', e);
+    }
+  }
+}
+
+export type DomAnimationScope = {
+  root: Element;
+  animations: AnimationControl[];
+};
+
+function detachControlFromScopes(control: AnimationControl): void {
+  const controlWithScopes = control as AnimationControl & { __domScopes?: Set<DomAnimationScope> };
+  const scopes: Set<DomAnimationScope> | undefined = controlWithScopes.__domScopes;
+  if (!scopes) return;
+  for (const s of scopes) {
+    const idx = s.animations.indexOf(control);
+    if (idx !== -1) {
+      s.animations.splice(idx, 1);
+    }
+  }
+  scopes.clear();
+}
+
+export function registerControlWithScope(
+  scope: DomAnimationScope,
+  control: AnimationControl,
+): void {
+  if (!scope.animations.includes(control)) {
+    scope.animations.push(control);
+  }
+  const controlWithScopes = control as AnimationControl & {
+    __domScopes?: Set<DomAnimationScope>;
+    destroy: (removeEntities?: boolean) => void;
+  };
+  if (!controlWithScopes.__domScopes) {
+    controlWithScopes.__domScopes = new Set<DomAnimationScope>();
+    const originalDestroy = control.destroy.bind(control);
+    controlWithScopes.destroy = (removeEntities?: boolean) => {
+      detachControlFromScopes(control);
+      AnimationControl.clearCompletionForControl(control);
+      return originalDestroy(removeEntities);
+    };
+  }
+  controlWithScopes.__domScopes.add(scope);
+}
+
+export function disposeScope(scope: DomAnimationScope): void {
+  const animations = [...scope.animations];
+  scope.animations.length = 0;
+  for (const control of animations) {
+    try {
+      AnimationControl.clearCompletionForControl(control);
+      control.stop();
+    } catch {}
+  }
+}
+
+export function disposeScopeHard(scope: DomAnimationScope, removeEntities = true): void {
+  const animations = [...scope.animations];
+  scope.animations.length = 0;
+  for (const control of animations) {
+    try {
+      AnimationControl.clearCompletionForControl(control);
+      control.destroy(removeEntities);
+    } catch {}
   }
 }

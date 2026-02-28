@@ -15,12 +15,11 @@
   "scripts": {
     "build": "rslib build",
     "dev": "rslib build --watch",
-    "test": "vitest run"
+    "test": "vitest run --pool=threads --maxWorkers=1"
   },
   "dependencies": {
-    "@g-motion/animation": "workspace:*",
     "@g-motion/core": "workspace:*",
-    "@g-motion/utils": "workspace:*"
+    "@g-motion/shared": "workspace:*"
   },
   "devDependencies": {
     "@rslib/core": "^0.18.3",

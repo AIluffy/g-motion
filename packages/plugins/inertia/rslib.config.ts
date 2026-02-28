@@ -8,4 +8,16 @@ export default defineConfig({
       dts: true,
     },
   ],
+  tools: {
+    rspack: {
+      module: {
+        rules: [
+          {
+            resourceQuery: /raw$/,
+            type: 'asset/source',
+          },
+        ],
+      },
+    },
+  },
 });

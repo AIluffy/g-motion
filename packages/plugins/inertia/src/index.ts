@@ -1,30 +1,49 @@
-import { MotionPlugin, MotionApp, app } from '@g-motion/core';
-import { createDebugger } from '@g-motion/utils';
-import { InertiaComponent } from './component';
-import { InertiaSystem } from './inertia-system';
+import type { MotionPlugin } from '@g-motion/core';
+import { registerPlugin } from '@g-motion/core';
+import { InertiaComponentSchema } from './component';
+import inertiaShaderCode from './shaders/inertia.wgsl?raw';
 
-const debugLog = createDebugger('Inertia');
+// Shader definition for plugin manifest
+const inertiaShader = {
+  code: inertiaShaderCode,
+  entryPoint: 'updateInertia',
+  bindings: [
+    { name: 'inertias', type: 'storage' as const, access: 'read_write' as const },
+    { name: 'params', type: 'uniform' as const },
+    { name: 'outputs', type: 'storage' as const, access: 'read_write' as const },
+    { name: 'stopped', type: 'storage' as const, access: 'read_write' as const },
+  ],
+};
 
-export const InertiaPlugin: MotionPlugin = {
-  name: 'InertiaPlugin',
+/**
+ * Inertia Plugin - GPU-only inertia physics plugin
+ *
+ * All inertia physics are handled by the GPU through the batch processing pipeline:
+ * batch/sampling.ts → physics-dispatch-system.ts → GPU Shader → readback → delivery
+ *
+ * No CPU fallback is provided. WebGPU must be available.
+ */
+export const inertiaPlugin: MotionPlugin = {
+  name: 'inertia',
   version: '0.0.0',
-  setup(appInstance: MotionApp) {
-    // Register Inertia component
-    appInstance.registerComponent('Inertia', InertiaComponent);
-    debugLog('Inertia component registered');
-
-    // Register Inertia system (runs before InterpolationSystem)
-    appInstance.registerSystem(InertiaSystem);
-    debugLog('InertiaSystem registered');
+  manifest: {
+    components: {
+      Inertia: { schema: InertiaComponentSchema },
+    },
+    shaders: {
+      inertia: inertiaShader,
+    },
   },
 };
 
-// Auto-register the Inertia plugin when this module is imported (only in browser environments)
-if (typeof window !== 'undefined' && typeof requestAnimationFrame !== 'undefined') {
-  debugLog('Auto-registering InertiaPlugin');
-  InertiaPlugin.setup(app);
-}
+// Auto-register plugin for auto-discovery
+registerPlugin(inertiaPlugin);
 
-export * from './component';
-export * from './inertia-system';
-export * from './velocity-tracker';
+// Re-export all exports from sub-modules
+export { InertiaComponentSchema } from './component';
+export { VelocityTracker } from './velocity-tracker';
+export { analyzeInertiaTracks, buildInertiaComponent } from './analyzer';
+export type { InertiaOptions } from '@g-motion/core';
+
+// Re-export shader code for external use
+export { default as INERTIA_GPU_SHADER } from './shaders/inertia.wgsl?raw';

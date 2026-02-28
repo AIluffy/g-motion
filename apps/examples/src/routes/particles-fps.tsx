@@ -107,7 +107,7 @@ function ParticlesFpsPage() {
         .mark([
           {
             to: { x: 0, y: 0, scale: 0 },
-            time: 0,
+            at: 0,
           },
           {
             to: {
@@ -115,7 +115,7 @@ function ParticlesFpsPage() {
               // y: offsetY / 2,
               scale: 1,
             },
-            time: duration,
+            at: duration,
           },
           {
             to: {
@@ -123,13 +123,14 @@ function ParticlesFpsPage() {
               y: offsetY,
               scale: 0,
             },
-            time: duration * 2,
+            at: duration * 2,
           },
         ])
-        .animate({
+        .option({
           repeat: Infinity,
           delay,
-        });
+        })
+        .play();
     });
   }, [fps, isReady, isPlaying]);
 

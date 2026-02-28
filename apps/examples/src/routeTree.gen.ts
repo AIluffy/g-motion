@@ -11,14 +11,19 @@
 import { Route as rootRouteImport } from './routes/__root';
 import { Route as WebgpuRouteImport } from './routes/webgpu';
 import { Route as SpringRouteImport } from './routes/spring';
+import { Route as SpeedRouteImport } from './routes/speed';
 import { Route as ParticlesFpsRouteImport } from './routes/particles-fps';
 import { Route as ObjectRouteImport } from './routes/object';
+import { Route as GpuOnlyInterpolationRouteImport } from './routes/gpu-only-interpolation';
 import { Route as GpuDeliveryDemoRouteImport } from './routes/gpu-delivery-demo';
 import { Route as GpuConfigRouteImport } from './routes/gpu-config';
 import { Route as EngineConfigRouteImport } from './routes/engine-config';
 import { Route as Dom3dRouteImport } from './routes/dom-3d';
 import { Route as DomRouteImport } from './routes/dom';
 import { Route as CustomEasingRouteImport } from './routes/custom-easing';
+import { Route as BenchmarkRouteImport } from './routes/benchmark';
+import { Route as AnimationControllerDemoRouteImport } from './routes/animation-controller-demo';
+import { Route as AnimateRouteImport } from './routes/animate';
 import { Route as IndexRouteImport } from './routes/index';
 
 const WebgpuRoute = WebgpuRouteImport.update({
@@ -31,6 +36,11 @@ const SpringRoute = SpringRouteImport.update({
   path: '/spring',
   getParentRoute: () => rootRouteImport,
 } as any);
+const SpeedRoute = SpeedRouteImport.update({
+  id: '/speed',
+  path: '/speed',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ParticlesFpsRoute = ParticlesFpsRouteImport.update({
   id: '/particles-fps',
   path: '/particles-fps',
@@ -39,6 +49,11 @@ const ParticlesFpsRoute = ParticlesFpsRouteImport.update({
 const ObjectRoute = ObjectRouteImport.update({
   id: '/object',
   path: '/object',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const GpuOnlyInterpolationRoute = GpuOnlyInterpolationRouteImport.update({
+  id: '/gpu-only-interpolation',
+  path: '/gpu-only-interpolation',
   getParentRoute: () => rootRouteImport,
 } as any);
 const GpuDeliveryDemoRoute = GpuDeliveryDemoRouteImport.update({
@@ -71,6 +86,21 @@ const CustomEasingRoute = CustomEasingRouteImport.update({
   path: '/custom-easing',
   getParentRoute: () => rootRouteImport,
 } as any);
+const BenchmarkRoute = BenchmarkRouteImport.update({
+  id: '/benchmark',
+  path: '/benchmark',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const AnimationControllerDemoRoute = AnimationControllerDemoRouteImport.update({
+  id: '/animation-controller-demo',
+  path: '/animation-controller-demo',
+  getParentRoute: () => rootRouteImport,
+} as any);
+const AnimateRoute = AnimateRouteImport.update({
+  id: '/animate',
+  path: '/animate',
+  getParentRoute: () => rootRouteImport,
+} as any);
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,41 +109,56 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
+  '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
+  '/benchmark': typeof BenchmarkRoute;
   '/custom-easing': typeof CustomEasingRoute;
   '/dom': typeof DomRoute;
   '/dom-3d': typeof Dom3dRoute;
   '/engine-config': typeof EngineConfigRoute;
   '/gpu-config': typeof GpuConfigRoute;
   '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute;
+  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute;
   '/object': typeof ObjectRoute;
   '/particles-fps': typeof ParticlesFpsRoute;
+  '/speed': typeof SpeedRoute;
   '/spring': typeof SpringRoute;
   '/webgpu': typeof WebgpuRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
+  '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
+  '/benchmark': typeof BenchmarkRoute;
   '/custom-easing': typeof CustomEasingRoute;
   '/dom': typeof DomRoute;
   '/dom-3d': typeof Dom3dRoute;
   '/engine-config': typeof EngineConfigRoute;
   '/gpu-config': typeof GpuConfigRoute;
   '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute;
+  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute;
   '/object': typeof ObjectRoute;
   '/particles-fps': typeof ParticlesFpsRoute;
+  '/speed': typeof SpeedRoute;
   '/spring': typeof SpringRoute;
   '/webgpu': typeof WebgpuRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
+  '/animate': typeof AnimateRoute;
+  '/animation-controller-demo': typeof AnimationControllerDemoRoute;
+  '/benchmark': typeof BenchmarkRoute;
   '/custom-easing': typeof CustomEasingRoute;
   '/dom': typeof DomRoute;
   '/dom-3d': typeof Dom3dRoute;
   '/engine-config': typeof EngineConfigRoute;
   '/gpu-config': typeof GpuConfigRoute;
   '/gpu-delivery-demo': typeof GpuDeliveryDemoRoute;
+  '/gpu-only-interpolation': typeof GpuOnlyInterpolationRoute;
   '/object': typeof ObjectRoute;
   '/particles-fps': typeof ParticlesFpsRoute;
+  '/speed': typeof SpeedRoute;
   '/spring': typeof SpringRoute;
   '/webgpu': typeof WebgpuRoute;
 }
@@ -121,54 +166,74 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | '/'
+    | '/animate'
+    | '/animation-controller-demo'
+    | '/benchmark'
     | '/custom-easing'
     | '/dom'
     | '/dom-3d'
     | '/engine-config'
     | '/gpu-config'
     | '/gpu-delivery-demo'
+    | '/gpu-only-interpolation'
     | '/object'
     | '/particles-fps'
+    | '/speed'
     | '/spring'
     | '/webgpu';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
+    | '/animate'
+    | '/animation-controller-demo'
+    | '/benchmark'
     | '/custom-easing'
     | '/dom'
     | '/dom-3d'
     | '/engine-config'
     | '/gpu-config'
     | '/gpu-delivery-demo'
+    | '/gpu-only-interpolation'
     | '/object'
     | '/particles-fps'
+    | '/speed'
     | '/spring'
     | '/webgpu';
   id:
     | '__root__'
     | '/'
+    | '/animate'
+    | '/animation-controller-demo'
+    | '/benchmark'
     | '/custom-easing'
     | '/dom'
     | '/dom-3d'
     | '/engine-config'
     | '/gpu-config'
     | '/gpu-delivery-demo'
+    | '/gpu-only-interpolation'
     | '/object'
     | '/particles-fps'
+    | '/speed'
     | '/spring'
     | '/webgpu';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  AnimateRoute: typeof AnimateRoute;
+  AnimationControllerDemoRoute: typeof AnimationControllerDemoRoute;
+  BenchmarkRoute: typeof BenchmarkRoute;
   CustomEasingRoute: typeof CustomEasingRoute;
   DomRoute: typeof DomRoute;
   Dom3dRoute: typeof Dom3dRoute;
   EngineConfigRoute: typeof EngineConfigRoute;
   GpuConfigRoute: typeof GpuConfigRoute;
   GpuDeliveryDemoRoute: typeof GpuDeliveryDemoRoute;
+  GpuOnlyInterpolationRoute: typeof GpuOnlyInterpolationRoute;
   ObjectRoute: typeof ObjectRoute;
   ParticlesFpsRoute: typeof ParticlesFpsRoute;
+  SpeedRoute: typeof SpeedRoute;
   SpringRoute: typeof SpringRoute;
   WebgpuRoute: typeof WebgpuRoute;
 }
@@ -189,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SpringRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/speed': {
+      id: '/speed';
+      path: '/speed';
+      fullPath: '/speed';
+      preLoaderRoute: typeof SpeedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/particles-fps': {
       id: '/particles-fps';
       path: '/particles-fps';
@@ -201,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/object';
       fullPath: '/object';
       preLoaderRoute: typeof ObjectRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/gpu-only-interpolation': {
+      id: '/gpu-only-interpolation';
+      path: '/gpu-only-interpolation';
+      fullPath: '/gpu-only-interpolation';
+      preLoaderRoute: typeof GpuOnlyInterpolationRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/gpu-delivery-demo': {
@@ -245,6 +324,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomEasingRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/benchmark': {
+      id: '/benchmark';
+      path: '/benchmark';
+      fullPath: '/benchmark';
+      preLoaderRoute: typeof BenchmarkRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/animation-controller-demo': {
+      id: '/animation-controller-demo';
+      path: '/animation-controller-demo';
+      fullPath: '/animation-controller-demo';
+      preLoaderRoute: typeof AnimationControllerDemoRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/animate': {
+      id: '/animate';
+      path: '/animate';
+      fullPath: '/animate';
+      preLoaderRoute: typeof AnimateRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/': {
       id: '/';
       path: '/';
@@ -257,14 +357,19 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnimateRoute: AnimateRoute,
+  AnimationControllerDemoRoute: AnimationControllerDemoRoute,
+  BenchmarkRoute: BenchmarkRoute,
   CustomEasingRoute: CustomEasingRoute,
   DomRoute: DomRoute,
   Dom3dRoute: Dom3dRoute,
   EngineConfigRoute: EngineConfigRoute,
   GpuConfigRoute: GpuConfigRoute,
   GpuDeliveryDemoRoute: GpuDeliveryDemoRoute,
+  GpuOnlyInterpolationRoute: GpuOnlyInterpolationRoute,
   ObjectRoute: ObjectRoute,
   ParticlesFpsRoute: ParticlesFpsRoute,
+  SpeedRoute: SpeedRoute,
   SpringRoute: SpringRoute,
   WebgpuRoute: WebgpuRoute,
 };

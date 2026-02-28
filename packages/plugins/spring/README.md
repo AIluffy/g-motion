@@ -1,103 +1,158 @@
 # @g-motion/plugin-spring
 
-Spring physics plugin for Motion animation engine, inspired by Popmotion.
+面向 Motion 的 GPU 弹簧物理插件。它在批处理管线中通过 WebGPU Shader 计算弹簧动力学，并在达到静止阈值时自动结束动画。插件仅提供 GPU 实现，没有 CPU 兜底。
 
-## Features
+## 主要特性
 
-- Spring-based animations with physical parameters (stiffness, damping, mass)
-- Semi-implicit Euler integration for stable, accurate physics
-- Per-track velocity state for independent property animations
-- Auto-registration on import in browser environments
-- Automatic completion detection based on rest thresholds
+- GPU 弹簧物理计算，使用半隐式欧拉积分保证稳定性
+- 基于组件的弹簧参数管理，支持每个轨道的初始速度
+- 内置常用弹簧预设与临界阻尼计算工具
+- 导入即自动注册，适配 @g-motion/animation 的 mark 流程
+- 基于 restSpeed/restDelta 判定动画是否收敛
 
-## Installation
+## 安装
 
 ```bash
 pnpm add @g-motion/plugin-spring
 ```
 
-## Usage
+## 快速开始
 
-```typescript
+```ts
 import { motion } from '@g-motion/animation';
-import '@g-motion/plugin-spring'; // Auto-registers the plugin
+import '@g-motion/plugin-spring';
 
-// Animate with spring physics
 motion('#box')
   .mark({
     to: { x: 200, y: 100 },
     spring: {
-      stiffness: 200,  // Higher = snappier (default: 100)
-      damping: 15,     // Higher = less bouncy (default: 10)
-      mass: 1,         // Heavier = slower (default: 1)
-      restSpeed: 10,   // Velocity threshold for completion (default: 10)
-      restDelta: 0.01  // Position threshold for completion (default: 0.01)
-    }
+      stiffness: 200,
+      damping: 15,
+      mass: 1,
+      restSpeed: 10,
+      restDelta: 0.01,
+    },
   })
   .animate();
 ```
 
-## Spring Parameters
+## 详细配置说明
 
-Inspired by Popmotion's spring options:
+`spring` 配置与 `SpringOptions` 类型一致，默认值由插件提供：
 
-- **stiffness** (default: 100): Spring stiffness. Higher values make the spring snappier.
-- **damping** (default: 10): Opposing force to stiffness. Lower values relative to stiffness create bouncier springs.
-- **mass** (default: 1): Mass of the object. Heavier objects take longer to accelerate and decelerate.
-- **restSpeed** (default: 10): Absolute velocity (units/sec) below which animation can complete.
-- **restDelta** (default: 0.01): Distance from target at which animation can complete.
+- stiffness：弹簧刚度，默认 100
+- damping：阻尼系数，默认 10
+- mass：质量，默认 1
+- restSpeed：速度阈值，低于该值可判定为静止，默认 10
+- restDelta：位移阈值，低于该值可判定为静止，默认 0.01
+- initialVelocity：可选的初始速度，按轨道记录
 
-## How It Works
+当 `mark()` 中出现 `spring` 配置时，时间线会走弹簧物理流程，完成时机由收敛阈值决定。
 
-The plugin registers:
+常用预设可直接复用：
 
-1. **SpringComponent**: Stores spring parameters and per-track velocity state
-2. **SpringSystem**: Runs before InterpolationSystem (order: 19), calculates physics using semi-implicit Euler integration
+- gentle
+- default
+- wobbly
+- stiff
+- slow
+- molasses
 
-When a `mark()` call includes a `spring` option, the animation uses physics-based motion instead of easing-based interpolation.
+## API 文档
 
-### Duration vs. Physics
+### springPlugin
 
-Spring animations are **physics-driven** and do not use the `time` parameter from `mark()`. The animation completes naturally when the spring reaches its rest state (determined by `restSpeed` and `restDelta` thresholds), not at a fixed time.
+插件实例，包含 Spring 组件与 GPU Shader 清单。导入模块后会自动注册。
 
-```typescript
-// The time parameter is ignored for spring animations
-motion('#box').mark({
-  to: { x: 200 },
-  time: 1000,  // This is ignored when spring is present
-  spring: { stiffness: 100, damping: 10 }
-}).animate();
+### SpringComponentSchema
 
-// Animation completes when spring physics settle, not after 1000ms
+Spring 组件的 schema 定义，包含 stiffness、damping、mass、restSpeed、restDelta 与 velocities 字段。
+
+### analyzeSpringTracks(tracks)
+
+扫描时间线轨道，返回：
+
+- hasSpring：是否存在弹簧配置
+- springConfig：首个出现的 spring 配置
+- springVelocities：按轨道记录的 initialVelocity
+
+### buildSpringComponent(config, velocities)
+
+根据 SpringOptions 与速度表构建 Spring 组件数据，缺省值与默认配置一致。
+
+### SPRING_PRESETS
+
+常用弹簧参数预设集合。
+
+### calculateCriticalDamping(stiffness, mass)
+
+根据刚度与质量计算临界阻尼值，公式为 `2 * sqrt(stiffness * mass)`。
+
+### SPRING_GPU_SHADER
+
+导出用于调试或自定义管线的 WGSL Shader 源码字符串。
+
+### SpringOptions
+
+弹簧配置类型定义，来自 `@g-motion/core`。
+
+## 使用示例
+
+### 使用预设
+
+```ts
+import { SPRING_PRESETS } from '@g-motion/plugin-spring';
+
+motion('#panel')
+  .mark({
+    to: { x: 240 },
+    spring: SPRING_PRESETS.wobbly,
+  })
+  .animate();
 ```
 
-This allows for natural, realistic motion that adapts to the spring parameters rather than forcing completion at an arbitrary time.
+### 设置初始速度
 
-## Examples
-
-### Bouncy spring
-
-```typescript
-motion('#element').mark({
-  to: { x: 300 },
-  spring: { stiffness: 100, damping: 5 } // Low damping = bouncy
-}).animate();
+```ts
+motion('#ball')
+  .mark({
+    to: { x: 320 },
+    spring: { stiffness: 170, damping: 26, initialVelocity: 120 },
+  })
+  .animate();
 ```
 
-### Stiff, quick spring
+### 计算临界阻尼
 
-```typescript
-motion('#element').mark({
-  to: { x: 300 },
-  spring: { stiffness: 400, damping: 30 } // High values = quick, no bounce
-}).animate();
+```ts
+import { calculateCriticalDamping } from '@g-motion/plugin-spring';
+
+const damping = calculateCriticalDamping(220, 1.2);
+
+motion('#chip')
+  .mark({
+    to: { x: 180 },
+    spring: { stiffness: 220, damping, mass: 1.2 },
+  })
+  .animate();
 ```
 
-### Heavy object
+## 常见问题
 
-```typescript
-motion('#element').mark({
-  to: { x: 300 },
-  spring: { mass: 5, stiffness: 100, damping: 20 } // Sluggish movement
-}).animate();
-```
+### 为什么动画没有触发弹簧？
+
+确认 mark 中包含 `spring` 配置，且插件已被导入（自动注册）。
+
+### spring 可以和 inertia 同时使用吗？
+
+不可以。同一 mark 内同时使用 spring 与 inertia 会触发参数校验错误。
+
+### 是否必须有 WebGPU？
+
+是的，该插件仅提供 GPU 实现，没有 CPU 兜底。
+
+## 贡献指南
+
+- 构建：pnpm --filter @g-motion/plugin-spring run build
+- 测试：pnpm --filter @g-motion/plugin-spring test
+- 提交前建议运行：pnpm lint 与 pnpm type-check

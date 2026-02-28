@@ -30,14 +30,22 @@ function ObjectDemo() {
     setDisplay(0);
 
     const control = motion(targetRef.current)
-      .mark([{ to: { value: 100 }, time: 900 }])
-      .mark([{ to: { value: 20 }, time: 1400 }])
-      .mark([{ to: { value: 60 }, time: 1800 }])
-      .animate({
-        onUpdate: (val) => {
-          setDisplay(val);
+      .mark([{ to: { value: 100 }, at: 900 }])
+      .mark([{ to: { value: 20 }, at: 1400 }])
+      .mark([{ to: { value: 60 }, at: 1800 }])
+      .option({
+        onUpdate: (latest) => {
+          console.log('onUpdate', latest);
+          const numeric =
+            typeof latest === 'number'
+              ? latest
+              : typeof (latest as any)?.value === 'number'
+                ? (latest as any).value
+                : targetRef.current.value;
+          setDisplay(numeric);
         },
-      });
+      })
+      .play();
 
     controlRef.current = control;
   };
@@ -48,14 +56,16 @@ function ObjectDemo() {
 
     // Direct primitive number animation - no object wrapping needed
     const control = motion(0)
-      .mark([{ to: 100 as any, time: 900 }])
-      .mark([{ to: 20 as any, time: 1400 }])
-      .mark([{ to: 60 as any, time: 1800 }])
-      .animate({
+      .mark([{ to: 100 as any, at: 900 }])
+      .mark([{ to: 20 as any, at: 1400 }])
+      .mark([{ to: 60 as any, at: 1800 }])
+      .option({
         onUpdate: (val) => {
+          console.log('onUpdate primitive', val);
           setPrimitiveDisplay(val);
         },
-      });
+      })
+      .play();
 
     controlRef.current = control;
   };

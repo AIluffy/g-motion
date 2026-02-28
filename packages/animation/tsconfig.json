@@ -5,7 +5,9 @@
     "rootDir": "./src",
     "composite": true
   },
-  "include": ["src/**/*", "../core/src/webgpu"],
+  "include": ["src/**/*", "../core/src/systems/timeline.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"],
-  "references": [{ "path": "../core" }]
+  "references": [
+    { "path": "../core" }
+  ]
 }

@@ -4,5 +4,5 @@ import { DOMPlugin } from '../src/index';
 test('DOMPlugin should have correct name and version', () => {
   expect(DOMPlugin.name).toBe('DOMPlugin');
   expect(DOMPlugin.version).toBe('0.0.0');
-  expect(DOMPlugin.setup).toBeDefined();
+  expect(DOMPlugin.manifest?.setup).toBeDefined();
 });

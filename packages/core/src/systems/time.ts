@@ -1,51 +1,174 @@
-import { SystemDef, MotionStatus } from '../index';
-import { WorldProvider } from '../worldProvider';
+import { MotionStatus } from '../components/state';
+import type { SystemContext, SystemDef } from '../plugin';
+import { getNowMs } from '@g-motion/shared';
 
 export const TimeSystem: SystemDef = {
   name: 'TimeSystem',
   order: 0,
-  update(dt: number) {
-    const world = WorldProvider.useWorld();
+  update(_dt: number, ctx?: SystemContext) {
+    const world = ctx?.services.world;
 
-    // Apply global speed multiplier if set
-    const globalSpeed = (world.config as any).globalSpeed ?? 1;
-    const adjustedDt = dt * globalSpeed;
+    if (!world) {
+      return;
+    }
+
+    const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
 
     for (const archetype of world.getArchetypes()) {
       const stateBuffer = archetype.getBuffer('MotionState');
-      if (!stateBuffer) continue;
+      const timelineBuffer = archetype.getBuffer('Timeline');
+      if (!stateBuffer || !timelineBuffer) continue;
+      if (archetype.getBuffer('Spring') || archetype.getBuffer('Inertia')) continue;
 
-      // Pre-fetch typed buffers for MotionState numeric fields if available
-      const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+      const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
+      const typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');
       const typedDelay = archetype.getTypedBuffer('MotionState', 'delay');
+      const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
+      const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
+      const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
 
       for (let i = 0; i < archetype.entityCount; i++) {
-        const state = stateBuffer[i];
-        if (state.status === MotionStatus.Running) {
-          const remainingDelay = state.delay ?? 0;
-
-          // Consume delay first; carry any leftover time into the animation clock.
-          if (remainingDelay > 0) {
-            const newDelay = remainingDelay - adjustedDt;
-
-            if (newDelay > 0) {
-              state.delay = newDelay;
-              if (typedDelay) typedDelay[i] = newDelay;
-              continue;
-            }
-
-            state.delay = 0;
-            if (typedDelay) typedDelay[i] = 0;
-            const usableDt = adjustedDt - remainingDelay;
-            state.currentTime += usableDt * state.playbackRate;
-            if (typedCurrentTime) typedCurrentTime[i] = state.currentTime;
-            continue;
-          }
-
-          state.currentTime += adjustedDt * state.playbackRate;
-          if (typedCurrentTime) typedCurrentTime[i] = state.currentTime;
+        const state = stateBuffer[i] as {
+          status: MotionStatus;
+          startTime: number;
+          pausedAt?: number;
+          delay?: number;
+          playbackRate?: number;
+          currentTime?: number;
+          iteration?: number;
+        };
+        const status = typedStatus ? (typedStatus[i] as unknown as MotionStatus) : state.status;
+        if (
+          status !== MotionStatus.Running &&
+          status !== MotionStatus.Paused &&
+          status !== MotionStatus.Finished
+        ) {
+          continue;
         }
+
+        const startTime = typedStartTime ? typedStartTime[i] : Number(state.startTime ?? 0);
+        const pausedAt = typedPausedAt ? typedPausedAt[i] : Number(state.pausedAt ?? 0);
+        const delay = typedDelay ? typedDelay[i] : Number(state.delay ?? 0);
+        const playbackRate = typedPlaybackRate
+          ? typedPlaybackRate[i]
+          : Number(state.playbackRate ?? 1);
+        const timeline = timelineBuffer[i] as { duration?: number };
+        const duration = Number(timeline.duration ?? 0);
+
+        const pausedAtNum = Number(pausedAt ?? 0);
+        const effectiveNow = pausedAtNum ? Math.min(nowMs, pausedAtNum) : nowMs;
+        const startTimeNum = Number(startTime ?? 0);
+        const delayNum = Number(delay ?? 0);
+        const playbackRateNum = Number(playbackRate ?? 1);
+        const rateAbs = Math.abs(playbackRateNum);
+        const delta = effectiveNow - startTimeNum - delayNum;
+
+        let timelineTime: number;
+        if (!(Number.isFinite(duration) && duration > 0)) {
+          timelineTime = 0;
+        } else if (delta < 0) {
+          timelineTime = delta * rateAbs;
+        } else {
+          const distanceTime = delta * rateAbs;
+          timelineTime = playbackRateNum < 0 ? duration - distanceTime : distanceTime;
+        }
+
+        state.currentTime = timelineTime;
+        if (typedCurrentTime) typedCurrentTime[i] = timelineTime;
       }
     }
   },
 };
+
+export function evaluateTimelineTimeRaw(params: {
+  nowMs: number;
+  startTime: number;
+  pausedAt?: number;
+  delay?: number;
+  playbackRate?: number;
+}): number {
+  const pausedAt = Number(params.pausedAt ?? 0);
+  const effectiveNow = pausedAt ? Math.min(params.nowMs, pausedAt) : params.nowMs;
+  const startTime = Number(params.startTime ?? 0);
+  const delay = Number(params.delay ?? 0);
+  const playbackRate = Number(params.playbackRate ?? 1);
+  return (effectiveNow - startTime - delay) * playbackRate;
+}
+
+function mod(n: number, d: number): number {
+  const r = n % d;
+  return r < 0 ? r + d : r;
+}
+
+export function evaluateMotionTime(params: {
+  nowMs: number;
+  startTime: number;
+  pausedAt?: number;
+  delay?: number;
+  playbackRate?: number;
+  duration: number;
+  loop?: number | boolean;
+  repeat?: number;
+}): { timelineTime: number; iteration: number; finished: boolean } {
+  const duration = Number(params.duration ?? 0);
+  if (!(Number.isFinite(duration) && duration > 0)) {
+    return { timelineTime: 0, iteration: 0, finished: true };
+  }
+
+  const playbackRate = Number(params.playbackRate ?? 1);
+  const direction = playbackRate < 0 ? -1 : 1;
+  const rateAbs = Math.abs(playbackRate);
+
+  const pausedAt = Number(params.pausedAt ?? 0);
+  const effectiveNow = pausedAt ? Math.min(params.nowMs, pausedAt) : params.nowMs;
+  const startTime = Number(params.startTime ?? 0);
+  const delay = Number(params.delay ?? 0);
+  const delta = effectiveNow - startTime - delay;
+  if (delta < 0) {
+    return { timelineTime: delta * rateAbs, iteration: 0, finished: false };
+  }
+
+  const distanceTime = delta * rateAbs;
+
+  const maxRepeat = Number.isFinite(Number(params.repeat))
+    ? Number(params.repeat)
+    : params.loop
+      ? -1
+      : 0;
+  const finiteRepeat = maxRepeat >= 0;
+
+  const iteration = Math.floor(distanceTime / duration);
+  const finished = finiteRepeat && iteration > maxRepeat;
+  if (finished) {
+    return { timelineTime: direction > 0 ? duration : 0, iteration, finished: true };
+  }
+
+  const wrappedDistance = mod(distanceTime, duration);
+  const timelineTime =
+    direction > 0 ? wrappedDistance : wrappedDistance === 0 ? duration : duration - wrappedDistance;
+  return { timelineTime, iteration, finished: false };
+}
+
+export function computeStartTimeForTimelineTime(params: {
+  nowMs: number;
+  pausedAt?: number;
+  delay?: number;
+  playbackRate?: number;
+  duration: number;
+  timelineTime: number;
+}): number {
+  const pausedAt = Number(params.pausedAt ?? 0);
+  const effectiveNow = pausedAt ? Math.min(params.nowMs, pausedAt) : params.nowMs;
+  const delay = Number(params.delay ?? 0);
+  const duration = Number(params.duration ?? 0);
+  const playbackRate = Number(params.playbackRate ?? 1);
+  const rateAbs = Math.abs(playbackRate);
+  if (!(Number.isFinite(duration) && duration > 0) || !(Number.isFinite(rateAbs) && rateAbs > 0)) {
+    return effectiveNow - delay;
+  }
+
+  const clampedTime = Math.max(0, Math.min(Number(params.timelineTime ?? 0), duration));
+  const distanceTime =
+    playbackRate < 0 ? (clampedTime >= duration ? 0 : duration - clampedTime) : clampedTime;
+  return effectiveNow - delay - distanceTime / rateAbs;
+}

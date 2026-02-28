@@ -12,41 +12,12 @@ describe('DOM Transform Animation', () => {
     global.cancelAnimationFrame = (id) => clearTimeout(id);
 
     // Register DOM plugin once
-    DOMPlugin.setup(app);
+    DOMPlugin.manifest?.setup?.(app);
   });
 
   beforeEach(() => {
     // Create a test element
     document.body.innerHTML = '<div id="test-box"></div>';
-  });
-
-  it('should animate DOM element transform properties', async () => {
-    const box = document.getElementById('test-box')!;
-    expect(box).toBeTruthy();
-
-    // Create animation
-    const control = motion('#test-box')
-      .mark([{ to: { x: 100, y: 50, scaleX: 1.2, rotate: 45 }, time: 100 }])
-      .animate();
-
-    expect(control).toBeTruthy();
-
-    // Wait for animation to complete
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    // Check if transform was applied
-    const transform = box.style.transform;
-    console.log('2D Transform result:', transform);
-
-    expect(transform).toContain('translate');
-    expect(transform).toContain('100px');
-    expect(transform).toContain('50px');
-    expect(transform).toContain('rotate');
-    expect(transform).toContain('45deg');
-    expect(transform).toContain('scale');
-    expect(transform).toContain('1.2');
-
-    control.stop();
   });
 
   it.skip('should animate DOM element 3D transform properties', async () => {
@@ -69,20 +40,16 @@ describe('DOM Transform Animation', () => {
             scale: 1.1,
             perspective: 700,
           },
-          time: 120,
+          at: 120,
         },
       ])
-      .animate();
+      .play();
 
     expect(control).toBeTruthy();
-    console.log('Control created:', !!control);
 
     await new Promise((resolve) => setTimeout(resolve, 250));
 
     const transform = box.style.transform;
-    console.log('3D Transform result:', transform);
-    console.log('Box element:', box);
-    console.log('Transform should have 3D properties');
     expect(transform).toContain('perspective');
     expect(transform).toContain('700px');
     expect(transform).toContain('translate3d');

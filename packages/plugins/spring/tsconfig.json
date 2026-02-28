@@ -3,14 +3,21 @@
     "lib": ["ES2022", "DOM"],
     "module": "ESNext",
     "target": "ES2022",
-    "noEmit": true,
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false,
     "strict": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "useDefineForClassFields": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@g-motion/core": ["../core/src"]
+    }
   },
   "include": ["src"]
 }

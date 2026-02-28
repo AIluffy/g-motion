@@ -15,17 +15,17 @@ import { motion } from '@g-motion/animation';
 
 // Old way: Manual absolute time calculation
 const oldWay = motion('#box')
-  .mark({ to: { x: 100 }, time: 0 })
-  .mark({ to: { y: 50 }, time: 500 }) // Must calculate: 0 + 500
-  .mark({ to: { opacity: 0 }, time: 800 }) // Must calculate: 500 + 300
-  .animate();
+  .mark({ to: { x: 100 }, at: 0 })
+  .mark({ to: { y: 50 }, at: 500 }) // Must calculate: 0 + 500
+  .mark({ to: { opacity: 0 }, at: 800 }) // Must calculate: 500 + 300
+  .play();
 
 // New way: Relative duration and delay
 const newWay = motion('#box')
   .mark({ to: { x: 100 }, duration: 200 })
-  .mark({ to: { y: 50 }, delay: 100, duration: 200 }) // 100ms delay after previous, then 200ms duration
+  .mark({ to: { y: 50 }, duration: 200 }) // 100ms delay after previous, then 200ms duration
   .mark({ to: { opacity: 0 }, duration: 200 })
-  .animate();
+  .play();
 
 // ============================================================================
 // Example 2: Function-Based Stagger (Custom Curves)
@@ -40,7 +40,7 @@ motion(particles)
     duration: 800,
     stagger: 50, // 50ms * index
   })
-  .animate();
+  .play();
 
 // Ease-in stagger curve (new)
 motion(particles)
@@ -53,7 +53,7 @@ motion(particles)
       return t * t * 1000; // 0-1000ms range
     },
   })
-  .animate();
+  .play();
 
 // Ease-out stagger curve (new)
 motion(particles)
@@ -66,7 +66,7 @@ motion(particles)
       return (1 - (1 - t) * (1 - t)) * 1000;
     },
   })
-  .animate();
+  .play();
 
 // Wave-like stagger (new)
 motion(particles)
@@ -77,7 +77,7 @@ motion(particles)
       return Math.sin((index / 100) * Math.PI) * 500; // Sin wave 0-500ms
     },
   })
-  .animate();
+  .play();
 
 // ============================================================================
 // Example 3: Backward Compatibility (Absolute Time Still Works)
@@ -85,17 +85,17 @@ motion(particles)
 
 // Explicit absolute time (unchanged)
 const absoluteTime = motion('#box')
-  .mark({ to: { x: 100 }, time: 0 })
-  .mark({ to: { y: 50 }, time: 500 })
-  .mark({ to: { opacity: 0 }, time: 800 })
-  .animate();
+  .mark({ to: { x: 100 }, at: 0 })
+  .mark({ to: { y: 50 }, at: 500 })
+  .mark({ to: { opacity: 0 }, at: 800 })
+  .play();
 
 // Mixed absolute + relative (absolute wins when both present)
 const mixed = motion('#box')
-  .mark({ to: { x: 100 }, time: 0 }) // Absolute
+  .mark({ to: { x: 100 }, at: 0 }) // Absolute
   .mark({ to: { y: 50 }, duration: 200 }) // Relative (from t=0 + 200 = 200ms)
-  .mark({ to: { opacity: 0 }, time: 800 }) // Absolute again
-  .animate();
+  .mark({ to: { opacity: 0 }, at: 800 }) // Absolute again
+  .play();
 
 // ============================================================================
 // Example 4: Complex Sequence with Relative Time
@@ -105,12 +105,13 @@ const complexSequence = motion('#hero')
   // Fade in (200ms)
   .mark({ to: { opacity: 1 }, duration: 200 })
   // Slide in after 50ms delay (300ms total)
-  .mark({ to: { x: 0, y: 0 }, delay: 50, duration: 300 })
+  .mark({ to: { x: 0, y: 0 }, duration: 300 })
   // Scale up after 100ms delay (400ms total)
-  .mark({ to: { scaleX: 1.2, scaleY: 1.2 }, delay: 100, duration: 400 })
+  .mark({ to: { scaleX: 1.2, scaleY: 1.2 }, duration: 400 })
   // Settle back after 50ms (200ms)
-  .mark({ to: { scaleX: 1, scaleY: 1 }, delay: 50, duration: 200 })
-  .animate({ repeat: Infinity });
+  .mark({ to: { scaleX: 1, scaleY: 1 }, duration: 200 })
+  .option({ repeat: Infinity })
+  .play();
 
 // ============================================================================
 // Example 5: Data Visualization with Custom Stagger
@@ -128,7 +129,7 @@ motion(bars)
       return Math.pow(index / 20, 2) * 1000; // 0-1000ms exponential
     },
   })
-  .animate();
+  .play();
 
 // ============================================================================
 // Example 6: Particle Burst with Radial Stagger
@@ -152,6 +153,6 @@ motion(burstParticles)
       return Math.sin(angle) * 200 + 200; // 0-400ms
     },
   })
-  .animate();
+  .play();
 
 export { oldWay, newWay, absoluteTime, mixed, complexSequence };

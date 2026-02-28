@@ -52,8 +52,13 @@ export interface BatchMetadata {
  * GPU batch configuration
  */
 export interface GPUBatchConfig {
-  maxBatchSize?: number; // Default: 1024 per archetype
-  usePersistentBuffers?: boolean; // Default: false (use shared pool)
-  enableDataTransferOptimization?: boolean; // Default: true
-  enableResultCaching?: boolean; // Default: true
+  /** Maximum batch size per archetype (default: 1024) */
+  maxBatchSize?: number;
+
+  /** Enable result caching for repeated GPU operations (default: true) */
+  enableResultCaching?: boolean;
+
+  // Removed configuration options (always enabled for optimal performance):
+  // - usePersistentBuffers: Always enabled via BatchBufferCache
+  // - enableDataTransferOptimization: Always enabled via zero-copy subarray()
 }

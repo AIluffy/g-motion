@@ -4,11 +4,10 @@ import { motion } from '../src/api/builder';
 
 describe('AnimationControl seek & getters', () => {
   it('seeks within duration and reports time/duration', () => {
-    // Initialize world via animate
     const ctrl = motion(0)
       .mark([{ to: 100, duration: 500 }])
       .mark([{ to: 200, duration: 500 }])
-      .animate();
+      .play();
 
     // Duration should be 1000
     expect(ctrl.getDuration()).toBe(1000);
@@ -27,10 +26,9 @@ describe('AnimationControl seek & getters', () => {
   });
 
   it('maps fps to playbackRate and back', () => {
-    // Initialize world via animate
     const ctrl = motion(0)
       .mark([{ to: 100, duration: 1000 }])
-      .animate();
+      .play();
 
     // Default playbackRate -> 60 fps
     expect(Math.round(ctrl.getFps())).toBe(60);

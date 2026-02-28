@@ -4,69 +4,90 @@
  * Handles asynchronous GPU device creation, validation, and pipeline setup.
  */
 
-import { WebGPUBufferManager } from '../../webgpu/buffer';
-import { buildInterpolationShader } from '../../webgpu/shader';
-import { getCustomEasingVersion, getCustomGpuEasings } from '../../webgpu/custom-easing';
-import { getGPUMetricsProvider } from '../../webgpu/metrics-provider';
-import { getAppContext } from '../../context';
+import {
+  ErrorCode,
+  ErrorSeverity,
+  getCustomEasingVersion,
+  getCustomGpuEasings,
+  MotionError,
+} from '@g-motion/shared';
+import type { WebGPUEngine } from '@g-motion/webgpu';
+import {
+  buildInterpolationShader,
+  getGPUMetricsProvider,
+  precompileWorkgroupPipelines,
+} from '@g-motion/webgpu';
+import { getErrorHandler } from '../../context';
 
 const bindGroupLayoutEntries = [
   {
     binding: 0,
-    visibility: 4, // GPUShaderStage.COMPUTE = 4
-    buffer: { type: 'storage' as const }, // states
+    visibility: 4,
+    buffer: { type: 'storage' as const },
   },
   {
     binding: 1,
-    visibility: 4, // GPUShaderStage.COMPUTE = 4
-    buffer: { type: 'read-only-storage' as const }, // keyframes
+    visibility: 4,
+    buffer: { type: 'read-only-storage' as const },
   },
   {
     binding: 2,
-    visibility: 4, // GPUShaderStage.COMPUTE = 4
-    buffer: { type: 'storage' as const }, // outputs
+    visibility: 4,
+    buffer: { type: 'storage' as const },
   },
 ];
 
 export async function initWebGPUCompute(
-  bufferManager: WebGPUBufferManager,
+  engine: WebGPUEngine,
 ): Promise<{ success: boolean; deviceAvailable: boolean; shaderVersion: number }> {
-  const initOk = await bufferManager.init();
-  const device = bufferManager.getDevice();
+  const initOk = await engine.initialize();
+  const device = engine.getGPUDevice();
   if (!initOk || !device) {
-    console.warn(
-      '[Motion] WebGPU not available; GPU batch processing disabled. CPU path will be used.',
+    const error = new MotionError(
+      'WebGPU not available.',
+      ErrorCode.GPU_DEVICE_UNAVAILABLE,
+      ErrorSeverity.FATAL,
+      {
+        initOk,
+        hasDevice: !!device,
+        stage: 'device',
+        source: 'initWebGPUCompute',
+      },
     );
-    getGPUMetricsProvider().updateStatus({
-      webgpuAvailable: false,
-      gpuInitialized: false,
-    });
-    return { success: false, deviceAvailable: false, shaderVersion: -1 };
+    getErrorHandler().handle(error);
+    throw error;
   }
 
-  // Initialize compute pipeline for default workgroup size (64)
-  const success = await bufferManager.initComputePipeline({
-    shaderCode: buildInterpolationShader(getCustomGpuEasings()),
+  const success = await precompileWorkgroupPipelines(
+    device,
+    buildInterpolationShader(getCustomGpuEasings()),
     bindGroupLayoutEntries,
-  });
+    'main',
+    'interp',
+  );
 
   const shaderVersion = getCustomEasingVersion();
 
   if (success) {
-    getAppContext().setWebGPUInitialized(true);
     getGPUMetricsProvider().updateStatus({
       gpuInitialized: true,
       webgpuAvailable: true,
+      enabled: true,
     });
   } else {
-    console.warn(
-      '[Motion] WebGPU compute pipeline initialization failed; GPU batch processing disabled.',
+    const error = new MotionError(
+      'WebGPU compute pipeline initialization failed.',
+      ErrorCode.GPU_PIPELINE_FAILED,
+      ErrorSeverity.FATAL,
+      {
+        shaderVersion,
+        stage: 'pipeline',
+        source: 'initWebGPUCompute',
+      },
     );
-    getGPUMetricsProvider().updateStatus({
-      gpuInitialized: false,
-      webgpuAvailable: false,
-    });
+    getErrorHandler().handle(error);
+    throw error;
   }
 
-  return { success, deviceAvailable: success, shaderVersion };
+  return { success: true, deviceAvailable: true, shaderVersion };
 }

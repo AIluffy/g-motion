@@ -16,28 +16,7 @@ import { linkButtonClass } from '@/components/ui/link-styles';
 const boxId = 'custom-easing-box';
 const bezier = { x1: 0.4, y1: 0.0, x2: 0.2, y2: 1.0 };
 
-// CPU cubic-bezier easing (function name must match WGSL fn for GPU lookup)
-function cubicBezierEase(t: number): number {
-  const { x1, y1, x2, y2 } = bezier;
-  const cx = 3 * x1;
-  const bx = 3 * (x2 - x1) - cx;
-  const ax = 1 - cx - bx;
-  const cy = 3 * y1;
-  const by = 3 * (y2 - y1) - cy;
-  const ay = 1 - cy - by;
-
-  let x = t;
-  for (let i = 0; i < 5; i++) {
-    const f = ((ax * x + bx) * x + cx) * x - t;
-    const df = (3 * ax * x + 2 * bx) * x + cx;
-    if (Math.abs(df) < 1e-6) break;
-    x -= f / df;
-  }
-  const y = ((ay * x + by) * x + cy) * x;
-  return y;
-}
-
-// WGSL counterpart injected into the compute shader
+// WGSL function - name 'cubicBezierEase' will be used for lookup
 const cubicBezierEaseWgsl = `
 fn cubicBezierEase(t: f32) -> f32 {
     let x1: f32 = ${bezier.x1};
@@ -68,7 +47,8 @@ let registered = false;
 function ensureGpuEasing() {
   if (registered) return;
   registered = true;
-  app.registerGpuEasing('cubicBezierEase', cubicBezierEase, cubicBezierEaseWgsl);
+  // Name is extracted from WGSL function declaration
+  app.registerGpuEasing(cubicBezierEaseWgsl);
 }
 
 export const Route = createFileRoute('/custom-easing')({
@@ -94,9 +74,10 @@ function CustomEasingDemo() {
   const start = () => {
     controlRef.current?.stop();
     const control = motion(`#${boxId}`)
-      .mark([{ to: { x: 220, y: 0, rotate: 10 }, time: 800, easing: cubicBezierEase }])
-      .mark([{ to: { x: 0, y: 0, rotate: 0 }, time: 1400, easing: cubicBezierEase }])
-      .animate({ repeat: 0 });
+      .mark([{ to: { x: 220, y: 0, rotate: 10 }, at: 800, ease: 'cubicBezierEase' as any }])
+      .mark([{ to: { x: 0, y: 0, rotate: 0 }, at: 1400, ease: 'cubicBezierEase' as any }])
+      .option({ repeat: 0 })
+      .play();
     controlRef.current = control;
     setIsRunning(true);
     window.setTimeout(() => setIsRunning(false), 1500);
@@ -114,10 +95,10 @@ function CustomEasingDemo() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-slate-300">Custom easing</p>
-            <h1 className="text-2xl font-semibold text-slate-50">Cubic-bezier on CPU + GPU</h1>
+            <h1 className="text-2xl font-semibold text-slate-50">Cubic-bezier on WebGPU</h1>
             <p className="text-slate-300">
-              Registers a cubic-bezier easing, injects WGSL into the compute shader, and uses it for
-              DOM transforms.
+              Registers a custom cubic-bezier easing, injects WGSL into the compute shader, and uses
+              it for DOM transforms on WebGPU.
             </p>
           </div>
           <Link to="/" className={linkButtonClass('ghost')}>
@@ -129,8 +110,8 @@ function CustomEasingDemo() {
           <CardHeader>
             <CardTitle>Animated box</CardTitle>
             <CardDescription>
-              The easing curve is custom (0.4, 0.0, 0.2, 1.0). GPU path uses injected WGSL; CPU path
-              uses the JS function.
+              The easing curve is custom (0.4, 0.0, 0.2, 1.0). WGSL is injected into the WebGPU
+              compute shader.
             </CardDescription>
           </CardHeader>
           <CardContent>
