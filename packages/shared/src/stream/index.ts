@@ -1,1 +1,1 @@
-export * from './packedStream';
+export * from './packed-stream';

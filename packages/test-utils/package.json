@@ -1,0 +1,31 @@
+{
+  "name": "@g-motion/test-utils",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./setup": {
+      "types": "./dist/setup.d.ts",
+      "import": "./dist/setup.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": true,
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch"
+  },
+  "devDependencies": {
+    "@g-motion/shared": "workspace:*",
+    "@rslib/core": "workspace:*",
+    "@types/node": "workspace:*",
+    "typescript": "workspace:*",
+    "vitest": "workspace:*"
+  }
+}

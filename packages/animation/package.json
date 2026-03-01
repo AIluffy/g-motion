@@ -29,6 +29,7 @@
   "devDependencies": {
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
+    "@g-motion/test-utils": "workspace:*",
     "typescript": "workspace:*",
     "vitest": "workspace:*"
   }

@@ -187,3 +187,15 @@ export * from './output-buffer-pool';
 export * from './passes/viewport';
 export * from './engine';
 export * from './benchmark';
+
+// GPU Batch Types (typed with proper WebGPU API types)
+export type {
+  GPUBatchBuffers,
+  GPUBatchDescriptor,
+  PhysicsBatchDescriptor,
+  ArchetypeBatchDescriptor,
+  KeyframePreprocessBatchDescriptor,
+  GPUBatchWithPreprocessedKeyframes,
+  ViewportCullingBatchDescriptor,
+  GPUBatchContextWithArchetypes,
+} from './types';

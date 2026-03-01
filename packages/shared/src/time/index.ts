@@ -1,2 +1,2 @@
-export * from './frameSampler';
+export * from './frame-sampler';
 export * from './now';

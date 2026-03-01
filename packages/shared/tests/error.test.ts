@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
-import { createWarn, isFatalError, panic, invariant } from '../src/error';
+import { createDebugger } from '../src';
+import { isFatalError, panic, invariant } from '../src/error';
 
 describe('error utilities', () => {
   test('panic throws fatal error with context', () => {
@@ -18,21 +19,14 @@ describe('error utilities', () => {
     expect(() => invariant(false, 'nope')).toThrow('nope');
   });
 
-  test('createWarn logs only in development', () => {
-    const originalEnv = process.env.NODE_ENV;
-    const warn = createWarn('TestWarn');
+  test('createDebugger works with warn level', () => {
+    const warn = createDebugger('TestWarn', 'warn');
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    process.env.NODE_ENV = 'development';
     warn('hello', { a: 1 });
+    // In dev mode by default, so it should log
     expect(spy).toHaveBeenCalledWith('[Motion][TestWarn]', 'hello', { a: 1 });
 
-    spy.mockClear();
-    process.env.NODE_ENV = 'production';
-    warn('nope');
-    expect(spy).not.toHaveBeenCalled();
-
-    process.env.NODE_ENV = originalEnv;
     spy.mockRestore();
   });
 });

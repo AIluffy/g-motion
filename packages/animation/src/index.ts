@@ -1,5 +1,5 @@
 import { getEngineForWorld, MotionStatus, World, WorldProvider } from '@g-motion/core';
-import { hasDomWithQuerySelectorAll } from '@g-motion/shared';
+import { getDomEnvironment } from '@g-motion/shared';
 import { motion as builderMotion } from './api/builder';
 import type { DomAnimationScope } from './api/control';
 import { AnimationControl, registerControlWithScope } from './api/control';
@@ -98,7 +98,8 @@ export function inspectTargets(
   const root = options?.root ?? (typeof document !== 'undefined' ? document : null);
   const hasDocument = typeof document !== 'undefined';
   const hasWindow = typeof window !== 'undefined';
-  const hasDOM = hasDomWithQuerySelectorAll();
+  const domEnv = getDomEnvironment();
+  const hasDOM = domEnv.hasDocument();
   const selectorCache: SelectorCache = {};
   const resolved = resolveTargets(input, {
     root: root ?? undefined,

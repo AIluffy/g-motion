@@ -37,6 +37,7 @@ pnpm --filter @g-motion/core run bench
 - 格式化：2 空格、单引号、分号、trailing comma（见 `.oxfmtrc.json`）。
 - Lint 重点：`no-var`、`prefer-const`、`prefer-arrow-callback`；`no-console` 为 warn。
 - 包构建统一使用 `rslib`；大部分包输出 `esm + cjs`，插件包输出 `esm`。
+- 文件命名风格：kebab-case
 
 ## 5. 变更原则（针对 packages）
 - 优先在既有层内修改，避免跨层反向依赖（尤其不要让底层包依赖 animation/plugin）。

@@ -1,6 +1,6 @@
-import { createWarn, panic, WebGPUConstants } from '@g-motion/shared';
+import { createDebugger, panic, WebGPUConstants } from '@g-motion/shared';
 
-const warn = createWarn('PipelineManager');
+const warn = createDebugger('PipelineManager', 'warn');
 
 const WORKGROUP_SIZES = [
   WebGPUConstants.WORKGROUP.SIZE_SMALL,

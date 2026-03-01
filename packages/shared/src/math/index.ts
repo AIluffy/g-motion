@@ -1,2 +1,2 @@
 export * from './interpolation';
-export * from './rollingAverage';
+export * from './rolling-average';

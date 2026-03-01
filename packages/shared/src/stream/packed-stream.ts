@@ -1,3 +1,5 @@
+import { crc32 } from '../data-integrity/crc32';
+
 const MAGIC = 0x504b4453;
 const VERSION = 1;
 
@@ -17,17 +19,8 @@ export interface PackedFrame {
   payload: Uint8Array;
 }
 
-export function crc32(bytes: Uint8Array): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) {
-    crc ^= bytes[i];
-    for (let j = 0; j < 8; j++) {
-      const mask = -(crc & 1);
-      crc = (crc >>> 1) ^ (0xedb88320 & mask);
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
+// Re-export crc32 for backward compatibility
+export { crc32 } from '../data-integrity/crc32';
 
 export function encodePackedFrame(
   payload: Uint8Array,
@@ -91,69 +84,71 @@ export class PackedStreamDecoder {
   }
 
   nextFrame(): PackedFrame | null {
-    const available = this.writeOffset - this.readOffset;
-    if (available < HEADER_SIZE) {
-      return null;
-    }
-    const view = new DataView(
-      this.buffer.buffer,
-      this.buffer.byteOffset + this.readOffset,
-      this.buffer.byteLength - this.readOffset,
-    );
-    let offset = 0;
-    const magic = view.getUint32(offset);
-    if (magic !== MAGIC) {
-      this.readOffset += 1;
-      return this.nextFrame();
-    }
-    offset += 4;
-    const version = view.getUint8(offset);
-    offset += 1;
-    if (version !== VERSION) {
-      this.readOffset += 1;
-      return this.nextFrame();
-    }
-    const flags = view.getUint8(offset);
-    offset += 1;
-    const sequence = view.getUint32(offset);
-    offset += 4;
-    const length = view.getUint32(offset);
-    offset += 4;
-    const checksum = view.getUint32(offset);
-    offset += 4;
-    const required = HEADER_SIZE + length;
-    if (available < required) {
-      return null;
-    }
-    const start = this.readOffset + HEADER_SIZE;
-    const end = start + length;
-    const slice = this.buffer.subarray(start, end);
-    const computed = crc32(slice);
-    if (computed !== checksum) {
-      this.readOffset += 1;
-      return this.nextFrame();
-    }
-    if (this.expectedSequence !== null) {
-      const expected = this.expectedSequence + 1;
-      if (sequence !== expected) {
-        const error = new Error('Packed frame sequence mismatch');
-        (error as any).expected = expected;
-        (error as any).received = sequence;
-        throw error;
+    while (true) {
+      const available = this.writeOffset - this.readOffset;
+      if (available < HEADER_SIZE) {
+        return null;
       }
+      const view = new DataView(
+        this.buffer.buffer,
+        this.buffer.byteOffset + this.readOffset,
+        this.buffer.byteLength - this.readOffset,
+      );
+      let offset = 0;
+      const magic = view.getUint32(offset);
+      if (magic !== MAGIC) {
+        this.readOffset += 1;
+        continue;
+      }
+      offset += 4;
+      const version = view.getUint8(offset);
+      offset += 1;
+      if (version !== VERSION) {
+        this.readOffset += 1;
+        continue;
+      }
+      const flags = view.getUint8(offset);
+      offset += 1;
+      const sequence = view.getUint32(offset);
+      offset += 4;
+      const length = view.getUint32(offset);
+      offset += 4;
+      const checksum = view.getUint32(offset);
+      offset += 4;
+      const required = HEADER_SIZE + length;
+      if (available < required) {
+        return null;
+      }
+      const start = this.readOffset + HEADER_SIZE;
+      const end = start + length;
+      const slice = this.buffer.subarray(start, end);
+      const computed = crc32(slice);
+      if (computed !== checksum) {
+        this.readOffset += 1;
+        continue;
+      }
+      if (this.expectedSequence !== null) {
+        const expected = this.expectedSequence + 1;
+        if (sequence !== expected) {
+          const error = new Error('Packed frame sequence mismatch');
+          (error as any).expected = expected;
+          (error as any).received = sequence;
+          throw error;
+        }
+      }
+      this.expectedSequence = sequence;
+      const header: PackedFrameHeader = {
+        magic,
+        version,
+        flags,
+        sequence,
+        length,
+        checksum,
+      };
+      const payload = new Uint8Array(length);
+      payload.set(slice);
+      this.readOffset += required;
+      return { header, payload };
     }
-    this.expectedSequence = sequence;
-    const header: PackedFrameHeader = {
-      magic,
-      version,
-      flags,
-      sequence,
-      length,
-      checksum,
-    };
-    const payload = new Uint8Array(length);
-    payload.set(slice);
-    this.readOffset += required;
-    return { header, payload };
   }
 }

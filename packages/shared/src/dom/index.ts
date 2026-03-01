@@ -1,2 +1,2 @@
 export * from './type-guards';
-export * from './targetResolver';
+export * from './target-resolver';

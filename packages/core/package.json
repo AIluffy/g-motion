@@ -27,6 +27,7 @@
   "devDependencies": {
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
+    "@g-motion/test-utils": "workspace:*",
     "@webgpu/types": "^0.1.67",
     "typescript": "workspace:*",
     "vitest": "workspace:*"

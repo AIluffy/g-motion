@@ -2,7 +2,7 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/shared';
+} from '@g-motion/webgpu';
 import type {
   BatchEntity,
   BatchKeyframe,

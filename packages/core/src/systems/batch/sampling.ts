@@ -63,7 +63,7 @@ function getEasingName(easing?: Easing): string {
 
 function getFlatTracks(timeline: {
   tracks?: TimelineData;
-}): { keys: string[]; values: Track[] } | undefined {
+}): { keys: readonly string[]; values: readonly Track[] } | undefined {
   const tracks = timeline.tracks;
   if (!tracks || tracks.size === 0) return undefined;
   if (tracks instanceof TimelineTracksMap) {

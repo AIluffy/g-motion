@@ -3,27 +3,29 @@
  * Verifies that console.debug is not called by default in hot paths
  */
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { globalDebugController } from '@g-motion/shared';
 import { createDOMRenderer } from '../src/renderer';
 
 describe('DOMRenderer Logging', () => {
   let consoleDebugSpy: ReturnType<typeof vi.spyOn>;
-  let originalDebugFlag: boolean | undefined;
+  let originalDebugFlag: string | undefined;
 
   beforeEach(() => {
-    consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
-    // Save original __MOTION_DEBUG__ flag
-    originalDebugFlag = (globalThis as any).__MOTION_DEBUG__;
+    globalDebugController.reset();
+    consoleDebugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // Save original __MOTION_DEBUG_LEVEL__ flag
+    originalDebugFlag = (globalThis as any).__MOTION_DEBUG_LEVEL__;
     // Ensure debug is off by default
-    delete (globalThis as any).__MOTION_DEBUG__;
+    delete (globalThis as any).__MOTION_DEBUG_LEVEL__;
   });
 
   afterEach(() => {
     consoleDebugSpy.mockRestore();
     // Restore original flag
     if (originalDebugFlag !== undefined) {
-      (globalThis as any).__MOTION_DEBUG__ = originalDebugFlag;
+      (globalThis as any).__MOTION_DEBUG_LEVEL__ = originalDebugFlag;
     } else {
-      delete (globalThis as any).__MOTION_DEBUG__;
+      delete (globalThis as any).__MOTION_DEBUG_LEVEL__;
     }
   });
 
@@ -41,8 +43,8 @@ describe('DOMRenderer Logging', () => {
   });
 
   test('should log when __MOTION_DEBUG__ is enabled', () => {
-    // Enable debug flag
-    (globalThis as any).__MOTION_DEBUG__ = true;
+    // Enable debug flag - use the correct global that the DebugController checks
+    (globalThis as any).__MOTION_DEBUG_LEVEL__ = 'verbose';
 
     // Simulate production environment
     const originalEnv = process.env.NODE_ENV;

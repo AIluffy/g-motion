@@ -1,5 +1,3 @@
-import { isDev } from '../debug';
-
 export type MotionErrorContext = Record<string, unknown>;
 
 const MOTION_FATAL_FLAG = '__motionFatal';
@@ -27,18 +25,4 @@ export function invariant(
 export function isFatalError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   return (error as Record<string, unknown>)[MOTION_FATAL_FLAG] === true;
-}
-
-export function createWarn(namespace: string) {
-  const prefix = `[Motion][${namespace}]`;
-  return (message: string, context?: MotionErrorContext): void => {
-    if (!isDev()) return;
-    const c = typeof console !== 'undefined' ? console : undefined;
-    if (!c || typeof c.warn !== 'function') return;
-    if (context) {
-      c.warn(prefix, message, context);
-    } else {
-      c.warn(prefix, message);
-    }
-  };
 }

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { crc32 } from '../src/data-integrity/crc32';
 import {
-  crc32,
   encodePackedFrame,
   PackedStreamDecoder,
   type PackedFrame,
-} from '../src/stream/packedStream';
+} from '../src/stream/packed-stream';
 
 function toBytes(str: string): Uint8Array {
   const arr = new Uint8Array(str.length);

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_HALF_FLOAT_COMPONENTS,
-  DOM_TRANSFORM_KEYS,
   EXCLUDED_STYLE_KEYS,
   GPU_CAPABLE_PROPERTIES,
   STANDARD_GPU_CHANNEL_PROPERTIES,
@@ -18,9 +17,9 @@ describe('transform constants (shared)', () => {
     expect(TRANSFORM_KEYS).toContain('perspective');
   });
 
-  it('includes DOM transform keys with skew', () => {
-    expect(DOM_TRANSFORM_KEYS).toContain('skewX');
-    expect(DOM_TRANSFORM_KEYS).toContain('skewY');
+  it('includes transform keys with skew', () => {
+    expect(TRANSFORM_KEYS).toContain('skewX');
+    expect(TRANSFORM_KEYS).toContain('skewY');
   });
 
   it('defines GPU-capable properties with opacity', () => {
@@ -46,11 +45,13 @@ describe('transform constants (shared)', () => {
   });
 
   it('excludes transform style keys', () => {
-    expect(EXCLUDED_STYLE_KEYS.__primitive).toBe(true);
+    // __primitive 不再在 EXCLUDED_STYLE_KEYS 中，应由调用方单独处理
     expect(EXCLUDED_STYLE_KEYS.transform).toBe(true);
     expect(EXCLUDED_STYLE_KEYS.translateX).toBe(true);
     expect(EXCLUDED_STYLE_KEYS.scale).toBe(true);
     expect(EXCLUDED_STYLE_KEYS.perspective).toBe(true);
+    expect(EXCLUDED_STYLE_KEYS.skewX).toBe(true);
+    expect(EXCLUDED_STYLE_KEYS.skewY).toBe(true);
   });
 
   it('typed keys are a subset of transform keys', () => {

@@ -1,4 +1,4 @@
-import type { GPUBatchDescriptor } from '@g-motion/shared';
+import type { GPUBatchDescriptor } from './types';
 import type { WebGPUFrameEncoder } from './command-encoder';
 import { getGPUMetricsProvider } from './metrics-provider';
 import type { OutputBufferReadbackTag } from './output-buffer-pool';

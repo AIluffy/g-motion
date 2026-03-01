@@ -1,5 +1,9 @@
-import type { GPUBatchDescriptor } from '@g-motion/shared';
-import type { PendingReadback, WebGPUEngine, WebGPUFrameEncoder } from '@g-motion/webgpu';
+import type {
+  GPUBatchDescriptor,
+  PendingReadback,
+  WebGPUEngine,
+  WebGPUFrameEncoder,
+} from '@g-motion/webgpu';
 import {
   runViewportCullingCompactionPass,
   runViewportCullingCompactionPassAsync,

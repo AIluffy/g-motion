@@ -14,13 +14,12 @@
  * - Buffer pooling and reuse
  */
 
+import { panic, createDebugger } from '@g-motion/shared';
 import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/shared';
-import { panic } from '@g-motion/shared';
-import { createWarn } from '@g-motion/shared';
+} from '@g-motion/webgpu';
 import {
   __resetKeyframePassesForTests,
   __resetOutputFormatPassForTests,
@@ -75,7 +74,7 @@ export {
 export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
 
 const engine = getWebGPUEngine();
-const warn = createWarn('WebGPUComputeSystem');
+const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
 export function __resetWebGPUComputeSystemForTests(): void {
   engine.resetForTests();

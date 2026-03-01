@@ -5,7 +5,7 @@
  * Organizes keyframes into a format optimized for the search and interpolation passes.
  */
 
-import type { KeyframePreprocessBatchDescriptor } from '@g-motion/shared';
+import type { KeyframePreprocessBatchDescriptor } from '../../types';
 import type { WebGPUFrameEncoder } from '../../command-encoder';
 import {
   CHANNEL_MAP_STRIDE,

@@ -1,5 +1,9 @@
-import type { PhysicsBatchDescriptor } from '@g-motion/shared';
-import type { PendingReadback, WebGPUEngine, WebGPUFrameEncoder } from '@g-motion/webgpu';
+import type {
+  PendingReadback,
+  PhysicsBatchDescriptor,
+  WebGPUEngine,
+  WebGPUFrameEncoder,
+} from '@g-motion/webgpu';
 import {
   dispatchPhysicsBatch,
   getPersistentGPUBufferManager,

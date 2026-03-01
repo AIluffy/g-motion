@@ -5,7 +5,7 @@
  * Returns a promise for the readback operation.
  */
 
-import type { ViewportCullingBatchDescriptor } from '@g-motion/shared';
+import type { ViewportCullingBatchDescriptor } from '../../types';
 import type { WebGPUFrameEncoder } from '../../command-encoder';
 import { getCullingCompactPipeline } from './culling-pipeline';
 import { collectViewportCullingCPUInputs } from './culling-types';

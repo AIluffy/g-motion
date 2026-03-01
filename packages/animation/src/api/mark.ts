@@ -1,11 +1,12 @@
 import { InertiaOptions, Keyframe, SpringOptions, TimelineData } from '@g-motion/core';
-import { Easing, createWarn, panic } from '@g-motion/shared';
 import {
+  Easing,
   createDebugger,
   isArrayLike,
   isDev,
   isDomElement,
   isNodeList,
+  panic,
   resolveDomElements,
 } from '@g-motion/shared';
 
@@ -33,7 +34,7 @@ export enum TargetType {
 }
 
 const debugResolveTargets = createDebugger('Animation:resolveTargets');
-const warnTargets = createWarn('Targets');
+const warnTargets = createDebugger('Targets', 'warn');
 
 export function resolveTimeValue(
   opts: MarkOptions,

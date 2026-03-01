@@ -1,147 +1,77 @@
-// Shared debug logger utility
-// - No side effects; pure functions for tree-shaking
-// - Enabled in non-production by default
-// - Can be forced on in production with:
-//   - globalThis.__MOTION_DEBUG__ = true
-//   - localStorage.setItem('motion_debug', 'true')
-//   - URL parameter: ?motion_debug=1
-
-const isProd = (): boolean => {
-  if (typeof process !== 'undefined' && typeof process.env !== 'undefined') {
-    return process.env.NODE_ENV === 'production';
-  }
-  return false;
-};
-
 /**
- * Development environment utilities
+ * Debug logging utility
+ *
+ * Provides namespace-based debug logging with configurable thresholds.
+ * Supports environment-based configuration via:
+ * - globalThis.__MOTION_DEBUG_LEVEL__ (highest priority)
+ * - URL parameter: ?motion_debug=true
+ * - localStorage: motion_debug=true
+ *
+ * This module exports both the DebugController class and convenience functions
+ * that proxy to a global default instance for backward compatibility.
  */
 
+import { DebugController, DebugLevel, DebugEnvironment } from './DebugController';
+
+export { DebugController, type DebugLevel, type DebugEnvironment };
+
 /**
- * Checks if the current environment is development mode
- * @returns boolean - true if in development mode
+ * @deprecated Use DebugController instead
+ */
+export const DebugManager = DebugController;
+
+/**
+ * Global default debug controller instance
+ */
+export const globalDebugController = new DebugController();
+
+/**
+ * Check if the current environment is development mode
+ * @returns true if in development mode
  */
 export function isDev(): boolean {
-  if (typeof process !== 'undefined' && typeof process.env !== 'undefined') {
-    return process.env.NODE_ENV === 'development';
+  try {
+    if (typeof process !== 'undefined' && typeof process.env !== 'undefined') {
+      return process.env.NODE_ENV === 'development';
+    }
+  } catch {
+    // process not available
   }
   return false;
 }
 
-export type DebugLevel = 'debug' | 'info' | 'warn' | 'error';
-
-const LEVEL_ORDER: Record<DebugLevel, number> = {
-  debug: 10,
-  info: 20,
-  warn: 30,
-  error: 40,
-};
-
 /**
- * Get a global flag from globalThis with type safety
+ * Create a namespaced debugger function
+ *
+ * @param namespace - Namespace for the debugger (prepended to log messages)
+ * @returns Debugger function
  */
-function getGlobalFlag<T>(key: string, defaultValue: T): T {
-  if (typeof globalThis === 'undefined') return defaultValue;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const value = (globalThis as any)?.[key];
-  return value !== undefined && value !== null ? value : defaultValue;
-}
-
-/**
- * Get a global debug level from globalThis
- */
-function getGlobalDebugLevel(): DebugLevel | null {
-  const level = getGlobalFlag<DebugLevel | null>('__MOTION_DEBUG_LEVEL__', null);
-  if (level && (level === 'debug' || level === 'info' || level === 'warn' || level === 'error')) {
-    return level;
-  }
-  return null;
-}
-
-/**
- * Check if debug is enabled via URL parameter or localStorage
- * Supports: ?motion_debug=1 or localStorage.motion_debug = 'true'
- */
-function getUrlOrStorageDebugFlag(): boolean {
-  if (typeof window === 'undefined') return false;
-
-  // Check URL parameter: ?motion_debug=1
-  try {
-    const url = new URLSearchParams(window.location.search);
-    const debugParam = url.get('motion_debug');
-    if (debugParam === '1' || debugParam === 'true') {
-      return true;
-    }
-  } catch {
-    // URL not available or invalid
-  }
-
-  // Check localStorage
-  try {
-    if (localStorage.getItem('motion_debug') === 'true') {
-      return true;
-    }
-  } catch {
-    // localStorage not available
-  }
-
-  return false;
-}
-
-function getDebugThreshold(): DebugLevel {
-  const globalLevel = getGlobalDebugLevel();
-  const urlDebug = getUrlOrStorageDebugFlag();
-  const globalDebug = getGlobalFlag<boolean>('__MOTION_DEBUG__', false);
-
-  // Priority: globalLevel > urlDebug > globalDebug > environment default
-  return globalLevel ?? (urlDebug || globalDebug ? 'debug' : isProd() ? 'warn' : 'debug');
-}
-
-function shouldLog(level: DebugLevel): boolean {
-  const threshold = getDebugThreshold();
-  return LEVEL_ORDER[level] >= LEVEL_ORDER[threshold];
-}
-
-// Cache for debuggers to avoid creating same function multiple times
-const debuggerCache = new Map<string, (...args: unknown[]) => void>();
-
-function getCachedDebugger(namespace: string, level: DebugLevel): (...args: unknown[]) => void {
-  const cacheKey = `${namespace}:${level}`;
-  const existing = debuggerCache.get(cacheKey);
-  if (existing) {
-    return existing;
-  }
-
-  const prefix = `[Motion][${namespace}]`;
-  const fn = (...args: unknown[]) => {
-    if (!shouldLog(level)) return;
-    const c = typeof console !== 'undefined' ? console : undefined;
-    const consoleFn = c
-      ? (c as unknown as Record<string, (...a: unknown[]) => void>)[level]
-      : undefined;
-    if (typeof consoleFn === 'function') {
-      consoleFn(prefix, ...args);
-    } else if (c && typeof c.log === 'function') {
-      c.log(prefix, ...args);
-    }
-  };
-
-  debuggerCache.set(cacheKey, fn);
-  return fn;
-}
-
 export function createDebugger(namespace: string): (...args: unknown[]) => void;
+/**
+ * Create a namespaced debugger function with specific level
+ *
+ * @param namespace - Namespace for the debugger
+ * @param level - Minimum level for this debugger (default: 'verbose')
+ * @returns Debugger function
+ */
 export function createDebugger(namespace: string, level: DebugLevel): (...args: unknown[]) => void;
-export function createDebugger(namespace: string, level: DebugLevel = 'debug') {
-  return getCachedDebugger(namespace, level);
+export function createDebugger(
+  namespace: string,
+  level: DebugLevel = 'verbose',
+): (...args: unknown[]) => void {
+  return globalDebugController.createDebugger(namespace, level);
 }
 
 /**
- * Clear all caches - useful for testing
+ * Convenience default debugger for quick use
+ */
+export const debug = createDebugger('Core');
+
+/**
+ * Clear all debugger caches
+ *
+ * @deprecated Use globalDebugController.reset() instead
  */
 export function _clearDebuggerCache(): void {
-  debuggerCache.clear();
+  globalDebugController.reset();
 }
-
-// Convenience default debugger for quick use
-export const debug = createDebugger('Core');

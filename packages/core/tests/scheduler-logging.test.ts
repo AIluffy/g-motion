@@ -124,7 +124,7 @@ describe('SystemScheduler Logging', () => {
     });
   });
 
-  test('should not log errors in production', () => {
+  test('should log errors in production with warn level', () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
 
@@ -156,8 +156,9 @@ describe('SystemScheduler Logging', () => {
       setTimeout(() => {
         scheduler.stop();
 
-        // Should not log in production
-        expect(consoleWarnSpy).not.toHaveBeenCalled();
+        // In production, warn level logs are still emitted (default threshold is 'warn')
+        // To suppress logging in production, set globalThis.__MOTION_DEBUG_LEVEL__ = 'error'
+        expect(consoleWarnSpy).toHaveBeenCalled();
 
         process.env.NODE_ENV = originalEnv;
         resolve();

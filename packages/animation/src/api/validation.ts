@@ -1,7 +1,7 @@
 import type { InertiaOptions } from '@g-motion/core';
-import { createWarn, panic } from '@g-motion/shared';
+import { createDebugger, panic } from '@g-motion/shared';
 
-const warn = createWarn('Validation');
+const warn = createDebugger('Validation', 'warn');
 
 const SUPPORTED_INTERP = new Set(['linear', 'bezier', 'hold', 'autoBezier', 'spring', 'inertia']);
 

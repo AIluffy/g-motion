@@ -1,5 +1,10 @@
-import type { GPUBatchDescriptor, GPUBatchWithPreprocessedKeyframes } from '@g-motion/shared';
-import type { GPUMetricsProvider, WebGPUEngine, WebGPUFrameEncoder } from '@g-motion/webgpu';
+import type {
+  GPUMetricsProvider,
+  GPUBatchDescriptor,
+  GPUBatchWithPreprocessedKeyframes,
+  WebGPUEngine,
+  WebGPUFrameEncoder,
+} from '@g-motion/webgpu';
 import {
   dispatchGPUBatch,
   getGPUChannelMappingRegistry,

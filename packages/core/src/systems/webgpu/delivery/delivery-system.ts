@@ -15,12 +15,12 @@ import {
   isStandardTransformChannels,
 } from '@g-motion/webgpu';
 import type { ChannelMapping } from '@g-motion/webgpu';
-import { createWarn, isDev } from '@g-motion/shared';
+import { createDebugger, isDev } from '@g-motion/shared';
 import { getRendererCode } from '../../../renderer-code';
 import { applyGPUResultPacket } from './apply-results';
 
 const s_gpuResultPacketsScratch: GPUResultPacket[] = [];
-const warn = createWarn('GPUResultApplySystem');
+const warn = createDebugger('GPUResultApplySystem', 'warn');
 
 export const GPUResultApplySystem: SystemDef = {
   name: 'GPUResultApplySystem',

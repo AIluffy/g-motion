@@ -1,4 +1,4 @@
-import { createWarn } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
 import type { BufferAllocation, ComputeMetrics } from './engine';
 import {
   getPersistentGPUBufferManager,
@@ -20,7 +20,7 @@ export class BufferManager {
   };
   private stagingPool: StagingBufferPool | null = null;
   private persistentBufferManager: PersistentGPUBufferManager | null = null;
-  private readonly warn = createWarn('BufferManager');
+  private readonly warn = createDebugger('BufferManager', 'warn');
 
   async initialize(): Promise<void> {
     if (!this.device) return;

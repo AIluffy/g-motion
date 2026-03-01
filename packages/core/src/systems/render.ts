@@ -1,4 +1,4 @@
-import { createWarn } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
 import { SystemContext, SystemDef } from '../index';
 import { getRendererName } from '../renderer-code';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
@@ -25,7 +25,7 @@ const missingRendererWarned = new Set<string>();
 const rendererGroupCache = getRendererGroupCache();
 const componentNamesScratch: string[] = [];
 const componentBuffersScratch: Array<Array<ComponentValue | undefined>> = [];
-const warn = createWarn('RenderSystem');
+const warn = createDebugger('RenderSystem', 'warn');
 
 function hasAnyTransformTypedBuffers(transformTypedBuffers: TransformTypedBuffers): boolean {
   for (const k in transformTypedBuffers) {

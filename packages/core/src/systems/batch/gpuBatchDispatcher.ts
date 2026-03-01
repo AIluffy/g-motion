@@ -1,9 +1,9 @@
+import { panic } from '@g-motion/shared';
 import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/shared';
-import { panic } from '@g-motion/shared';
+} from '@g-motion/webgpu';
 import { selectWorkgroupSize } from '@g-motion/webgpu';
 import type { BatchStatistics } from './batchStatistics';
 import type { EntityIdLeasePool } from './entityIdLeasePool';

@@ -1,9 +1,9 @@
-import { createWarn, getNowMs, isFatalError } from '@g-motion/shared';
+import { createDebugger, getNowMs, isFatalError } from '@g-motion/shared';
 import { getPersistentGPUBufferManager } from '@g-motion/webgpu';
 import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
 import { FrameSampler } from './utils';
 
-const warn = createWarn('SchedulerProcessor');
+const warn = createDebugger('SchedulerProcessor', 'warn');
 
 export class SchedulerProcessor {
   private engineFrame = 0;

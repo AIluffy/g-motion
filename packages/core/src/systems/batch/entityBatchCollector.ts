@@ -1,8 +1,8 @@
 import type { BatchEntity, BatchKeyframe, BatchMetadata } from './types';
-import { createWarn, panic } from '@g-motion/shared';
+import { createDebugger, panic } from '@g-motion/shared';
 import type { BatchStatistics } from './batchStatistics';
 
-const warn = createWarn('BatchCollector');
+const warn = createDebugger('BatchCollector', 'warn');
 
 export class EntityBatchCollector {
   private entityBatches: Map<string, BatchEntity[]> = new Map();
