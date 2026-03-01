@@ -347,9 +347,9 @@ All optimizations validated through comprehensive benchmark suite (38+ tests, al
 
 **Code Organization** (ECS Module Split Rules):
 1. Component files ≤50 lines; split data vs logic if larger
-2. Each System in own folder: `index.ts` (≤150 lines), `pipeline.ts` (≤80 lines)
-3. Shader logic separate: one `.wgsl` per file (≤80 lines), no inline WGSL
-4. Scheduler only orders systems (≤150 lines); no business logic
+2. Each System in own folder: `index.ts` (≤300 lines), `pipeline.ts` (≤150 lines)
+3. Shader logic separate: one `.wgsl` per file (≤150 lines), no inline WGSL
+4. Scheduler only orders systems (≤300 lines); no business logic
 5. GPU management isolated in dedicated modules
 6. Renderers isolated per target (DOM/Canvas/WebGL/WebGPU)
 7. Plugins extend via "component + system"; core ECS immutable
