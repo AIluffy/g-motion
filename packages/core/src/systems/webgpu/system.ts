@@ -46,8 +46,8 @@ import {
   resolveWebGPUReadbackMode,
 } from './system-config';
 
+import { initializeWebGPU } from './initialization';
 import {
-  ensureWebGPUInitialized,
   ensureWebGPUPipelines,
   maybeSampleOutputFormatPoolStats,
 } from './system/gpu-initialization-system';
@@ -109,7 +109,7 @@ export const WebGPUComputeSystem: SystemDef = {
     const { world, metricsProvider, processor, config } = deps;
 
     const debugIOEnabled = isWebGPUIODebugEnabled(config);
-    await ensureWebGPUInitialized({ engine, metricsProvider });
+    await initializeWebGPU(engine, { metricsProvider });
     if (engine.mockWebGPU) {
       metricsProvider.updateStatus({ enabled: true });
       return;

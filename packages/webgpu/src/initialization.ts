@@ -1,6 +1,7 @@
-import { panic } from '@g-motion/shared';
+import { getCustomEasingVersion, getCustomGpuEasings, panic } from '@g-motion/shared';
 import { AsyncReadbackManager } from './async-readback';
 import type { WebGPUEngine } from './engine';
+import { getGPUMetricsProvider } from './metrics-provider';
 import type { GPUMetricsProvider } from './metrics-provider';
 import { getPersistentGPUBufferManager } from './persistent-buffer-manager';
 import { PHYSICS_COMBINED_SHADER } from './physics-shader';
@@ -15,6 +16,20 @@ export type WebGPUInitializationDeps = {
   metricsProvider: GPUMetricsProvider;
   getCustomGpuEasings: () => ReadonlyArray<CustomGpuEasing>;
   getCustomEasingVersion: () => number;
+};
+
+export type InitConfig = {
+  metricsProvider?: GPUMetricsProvider;
+  getCustomGpuEasings?: () => ReadonlyArray<CustomGpuEasing>;
+  getCustomEasingVersion?: () => number;
+  allowMock?: boolean;
+};
+
+export type WebGPUInitResult = {
+  success: boolean;
+  deviceAvailable: boolean;
+  shaderVersion: number;
+  mockWebGPU: boolean;
 };
 
 const INTERP_BIND_GROUP_LAYOUT_ENTRIES = [
@@ -41,6 +56,12 @@ const PHYSICS_BIND_GROUP_LAYOUT_ENTRIES = [
   { binding: 2, visibility: 4, buffer: { type: 'storage' as const } },
   { binding: 3, visibility: 4, buffer: { type: 'storage' as const } },
 ];
+
+const resolveInitDeps = (config?: InitConfig): WebGPUInitializationDeps => ({
+  metricsProvider: config?.metricsProvider ?? getGPUMetricsProvider(),
+  getCustomGpuEasings: config?.getCustomGpuEasings ?? getCustomGpuEasings,
+  getCustomEasingVersion: config?.getCustomEasingVersion ?? getCustomEasingVersion,
+});
 
 export async function initWebGPUCompute(
   engine: WebGPUEngine,
@@ -85,26 +106,35 @@ export async function initWebGPUCompute(
   return { success: true, deviceAvailable: true, shaderVersion };
 }
 
-export async function ensureWebGPUInitialized(params: {
-  engine: WebGPUEngine;
-  deps: WebGPUInitializationDeps;
-}): Promise<void> {
-  const { engine, deps } = params;
+export async function initializeWebGPU(
+  engine: WebGPUEngine,
+  config?: InitConfig,
+): Promise<WebGPUInitResult> {
+  const deps = resolveInitDeps(config);
   const { metricsProvider, getCustomEasingVersion } = deps;
 
-  if (engine.isInitialized) return;
+  if (engine.isInitialized) {
+    return {
+      success: true,
+      deviceAvailable: engine.deviceAvailable,
+      shaderVersion: engine.shaderVersion,
+      mockWebGPU: engine.mockWebGPU,
+    };
+  }
 
+  const allowMock = config?.allowMock !== false;
   const maybeGpu = (globalThis as any).navigator?.gpu as { __isFake?: boolean } | undefined;
-  if (maybeGpu?.__isFake === true) {
+  if (allowMock && maybeGpu?.__isFake === true) {
+    const shaderVersion = getCustomEasingVersion();
     engine.setMockWebGPU(true);
     engine.setDeviceAvailable(true);
-    engine.setShaderVersion(getCustomEasingVersion());
+    engine.setShaderVersion(shaderVersion);
     metricsProvider.updateStatus({
       webgpuAvailable: true,
       gpuInitialized: true,
       enabled: true,
     });
-    return;
+    return { success: true, deviceAvailable: true, shaderVersion, mockWebGPU: true };
   }
 
   if (!maybeGpu) {
@@ -135,6 +165,21 @@ export async function ensureWebGPUInitialized(params: {
     gpuInitialized: true,
     enabled: true,
   });
+
+  return {
+    success: true,
+    deviceAvailable: true,
+    shaderVersion: engine.shaderVersion,
+    mockWebGPU: false,
+  };
+}
+
+export async function ensureWebGPUInitialized(params: {
+  engine: WebGPUEngine;
+  deps: WebGPUInitializationDeps;
+}): Promise<void> {
+  const { engine, deps } = params;
+  await initializeWebGPU(engine, deps);
 }
 
 export async function ensureWebGPUPipelines(params: {

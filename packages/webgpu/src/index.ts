@@ -27,9 +27,10 @@ export type { WorkgroupSize } from './pipeline';
 export {
   ensureWebGPUInitialized,
   ensureWebGPUPipelines,
+  initializeWebGPU,
   initWebGPUCompute,
 } from './initialization';
-export type { WebGPUInitializationDeps } from './initialization';
+export type { InitConfig, WebGPUInitializationDeps, WebGPUInitResult } from './initialization';
 
 export {
   __getOutputFormatBufferPoolStatsForTests,
