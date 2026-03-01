@@ -62,12 +62,27 @@ export const TRANSFORM_KEYS = [...BASE_TRANSFORM_KEYS, ...SKEW_KEYS] as const;
  */
 export const TRANSFORM_TYPED_KEYS = BASE_TRANSFORM_KEYS;
 
-// Re-export GPU properties for backward compatibility
-export {
-  GPU_CAPABLE_PROPERTIES,
-  STANDARD_GPU_CHANNEL_PROPERTIES,
-  DEFAULT_HALF_FLOAT_COMPONENTS,
-} from '../constants/gpu-properties';
+/**
+ * 支持 GPU 的属性列表
+ */
+export const GPU_CAPABLE_PROPERTIES = [...TRANSFORM_TYPED_KEYS, 'opacity'] as const;
+
+/**
+ * 标准 GPU 通道属性
+ */
+export const STANDARD_GPU_CHANNEL_PROPERTIES = [
+  'x',
+  'y',
+  'rotate',
+  'scaleX',
+  'scaleY',
+  'opacity',
+] as const;
+
+/**
+ * 默认半精度浮点组件
+ */
+export const DEFAULT_HALF_FLOAT_COMPONENTS = [...TRANSFORM_TYPED_KEYS, 'opacity'] as const;
 
 // ============================================
 // 排除列表

@@ -7,6 +7,7 @@ export class NonNegativeRollingAverage {
 
   constructor(numSamples = 30) {
     this.numSamples = numSamples;
+    this.samples = new Array<number>(numSamples).fill(0);
   }
 
   addSample(value: number): void {
@@ -26,7 +27,7 @@ export class NonNegativeRollingAverage {
 
   reset(): void {
     this.total = 0;
-    this.samples = [];
+    this.samples.fill(0);
     this.cursor = 0;
     this.filledCount = 0;
   }

@@ -21,6 +21,7 @@ export function isNodeList(value: unknown): value is NodeListOf<Element> | HTMLC
 
 /**
  * Type guard for array-like objects (excluding actual Arrays and Strings)
+ * @public
  */
 export function isArrayLike(
   value: unknown,

@@ -8,6 +8,7 @@
  * that proxy to a global default instance for backward compatibility.
  */
 
+import { panic } from '../error';
 import { EasingRegistry, EasingEntry } from './EasingRegistry';
 
 export { EasingRegistry, type EasingEntry };
@@ -52,8 +53,9 @@ export function registerGpuEasing(nameOrWgsl: string, wgslCode?: string): string
   const wgslFn = nameOrWgsl;
   const match = wgslFn.match(/fn\s+(\w+)\s*\(/);
   if (!match) {
-    throw new Error(
+    panic(
       'Invalid WGSL easing: missing function declaration (expected: fn name(t: f32) -> f32 { ... })',
+      { wgslFn },
     );
   }
   const name = match[1];

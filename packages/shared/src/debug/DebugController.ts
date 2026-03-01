@@ -22,6 +22,17 @@ const LEVEL_ORDER: Record<DebugLevel, number> = {
 };
 
 /**
+ * Module-level constant — avoids re-creation on every debugger call
+ */
+const CONSOLE_METHOD_MAP: Record<DebugLevel, string> = {
+  none: 'log',
+  error: 'error',
+  warn: 'warn',
+  info: 'info',
+  verbose: 'log',
+} as const;
+
+/**
  * Debug environment interface for dependency injection
  *
  * Allows tests to inject mock environment instead of using browser APIs
@@ -224,16 +235,7 @@ export class DebugController {
       const c = typeof console !== 'undefined' ? console : undefined;
       if (!c) return;
 
-      // Map our level to console method
-      const consoleMethodMap: Record<DebugLevel, string> = {
-        none: 'log',
-        error: 'error',
-        warn: 'warn',
-        info: 'info',
-        verbose: 'log',
-      };
-
-      const methodName = consoleMethodMap[level];
+      const methodName = CONSOLE_METHOD_MAP[level];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const consoleFn = (c as any)[methodName];
 

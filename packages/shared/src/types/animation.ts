@@ -14,6 +14,19 @@ import type { SpringOptions, InertiaOptions } from './physics';
 export type Easing = string;
 
 /**
+ * 动画状态枚举
+ */
+export const MotionStatus = {
+  Idle: 0,
+  Running: 1,
+  Paused: 2,
+  Completed: 3,
+  Cancelled: 4,
+} as const;
+
+export type MotionStatusValue = (typeof MotionStatus)[keyof typeof MotionStatus];
+
+/**
  * 单个关键帧定义
  */
 export interface Keyframe {
@@ -67,7 +80,7 @@ export interface RenderData {
  * 动画状态组件数据 - 跟踪动画进度
  */
 export interface MotionStateData {
-  status: number; // MotionStatus enum
+  status: MotionStatusValue;
   startTime: number;
   currentTime: number;
   playbackRate: number;
