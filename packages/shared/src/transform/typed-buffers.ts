@@ -1,5 +1,9 @@
 import { TRANSFORM_TYPED_KEYS } from './constants';
-import type { TransformTypedBuffers } from './types';
+
+export type TransformTypedBuffers = Record<
+  string,
+  Float32Array | Float64Array | Int32Array | undefined
+>;
 
 type TypedBufferGetter = (
   component: string,

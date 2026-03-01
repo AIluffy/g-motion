@@ -62,39 +62,12 @@ export const TRANSFORM_KEYS = [...BASE_TRANSFORM_KEYS, ...SKEW_KEYS] as const;
  */
 export const TRANSFORM_TYPED_KEYS = BASE_TRANSFORM_KEYS;
 
-// ============================================
-// 系统特定属性集
-// ============================================
-
-/**
- * GPU 可加速属性列表
- * 用于: 判断属性是否可通过 GPU 计算管道处理 (@g-motion/animation visualTarget.ts)
- * 包含: 所有基础 transform 属性 + opacity
- * 排除: skew (GPU 管道暂不支持)
- */
-export const GPU_CAPABLE_PROPERTIES = [...BASE_TRANSFORM_KEYS, 'opacity'] as const;
-
-/**
- * 标准 GPU 通道属性
- * 用于: WebGPU channel mapping 和着色器 uniform 定义 (@g-motion/webgpu channel-mapping.ts)
- * 包含最常用的 transform 子集 + opacity，用于优化 GPU 内存布局
- */
-export const STANDARD_GPU_CHANNEL_PROPERTIES = [
-  'x',
-  'y',
-  'rotate',
-  'scaleX',
-  'scaleY',
-  'opacity',
-] as const;
-
-/**
- * 默认半精度浮点组件
- * 用于: 判断哪些组件可使用 f16 精度以节省 GPU 内存 (@g-motion/core half-float.ts)
- * 包含: 所有基础 transform 属性 + opacity
- * 排除: skew (GPU 管道暂不支持)
- */
-export const DEFAULT_HALF_FLOAT_COMPONENTS = [...BASE_TRANSFORM_KEYS, 'opacity'] as const;
+// Re-export GPU properties for backward compatibility
+export {
+  GPU_CAPABLE_PROPERTIES,
+  STANDARD_GPU_CHANNEL_PROPERTIES,
+  DEFAULT_HALF_FLOAT_COMPONENTS,
+} from '../constants/gpu-properties';
 
 // ============================================
 // 排除列表

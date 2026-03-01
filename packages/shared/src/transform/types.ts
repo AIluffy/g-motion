@@ -40,8 +40,3 @@ export interface Quaternion {
   z: number;
   w: number;
 }
-
-export type TransformTypedBuffers = Record<
-  string,
-  Float32Array | Float64Array | Int32Array | undefined
->;

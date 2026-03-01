@@ -87,7 +87,3 @@ export function getCustomGpuEasings(): ReadonlyArray<{ name: string; wgslFn: str
 export function __resetCustomEasings(): void {
   globalEasingRegistry.reset();
 }
-
-// Re-export registry utility types for consumers who need the generic pattern
-export { Registry, RegistryWithDefaults } from '../collections/registry';
-export type { RegistryEntry, RegistryOptions } from '../collections/registry';

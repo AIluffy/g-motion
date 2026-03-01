@@ -1,4 +1,4 @@
-import { crc32 } from '../data-integrity/crc32';
+import { crc32 } from './crc32';
 
 const MAGIC = 0x504b4453;
 const VERSION = 1;
@@ -18,9 +18,6 @@ export interface PackedFrame {
   header: PackedFrameHeader;
   payload: Uint8Array;
 }
-
-// Re-export crc32 for backward compatibility
-export { crc32 } from '../data-integrity/crc32';
 
 export function encodePackedFrame(
   payload: Uint8Array,

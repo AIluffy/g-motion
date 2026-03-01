@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { crc32 } from '../src/data-integrity/crc32';
+import { crc32 } from '../src/stream/crc32';
 import {
   encodePackedFrame,
   PackedStreamDecoder,

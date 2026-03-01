@@ -1,3 +1,5 @@
+import { isDomElement, isNodeList } from './type-guards';
+
 export type DomTargetResolverContext = {
   root: Element | Document | null | undefined;
 } & Record<string, unknown>;
@@ -52,13 +54,9 @@ const defaultDomEnv: DomEnvironment = {
     }
   },
 
-  isElement(input: unknown): input is Element {
-    return typeof Element !== 'undefined' && input instanceof Element;
-  },
+  isElement: isDomElement,
 
-  isNodeList(input: unknown): input is NodeListLike {
-    return typeof NodeList !== 'undefined' && input instanceof NodeList;
-  },
+  isNodeList: isNodeList,
 
   isHTMLCollection(input: unknown): input is NodeListLike {
     return typeof HTMLCollection !== 'undefined' && input instanceof HTMLCollection;

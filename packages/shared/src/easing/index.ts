@@ -5,5 +5,3 @@ export {
   getCustomEasingVersion,
   getCustomGpuEasings,
 } from './registry';
-export { Registry, RegistryWithDefaults } from '../collections/registry';
-export type { RegistryEntry, RegistryOptions } from '../collections/registry';
