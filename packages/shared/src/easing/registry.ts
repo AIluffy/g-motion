@@ -9,7 +9,7 @@
  */
 
 import { panic } from '../error';
-import { EasingRegistry, EasingEntry } from './EasingRegistry';
+import { EasingRegistry, EasingEntry } from './easing-registry';
 
 export { EasingRegistry, type EasingEntry };
 

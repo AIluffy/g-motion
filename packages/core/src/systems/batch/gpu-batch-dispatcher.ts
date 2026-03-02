@@ -5,8 +5,8 @@ import type {
   PhysicsBatchDescriptor,
 } from '@g-motion/webgpu/internal';
 import { selectWorkgroupSize } from '@g-motion/webgpu/internal';
-import type { BatchStatistics } from './batchStatistics';
-import type { EntityIdLeasePool } from './entityIdLeasePool';
+import type { BatchStatistics } from './batch-statistics';
+import type { EntityIdLeasePool } from './entity-id-lease-pool';
 
 export class GPUBatchDispatcher {
   private archetypeBatches: Map<string, ArchetypeBatchDescriptor> = new Map();

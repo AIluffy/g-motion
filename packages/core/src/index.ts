@@ -22,5 +22,5 @@ export * from './systems/webgpu';
 export * from './systems/webgpu/delivery';
 export * from './utils';
 export * from './world';
-export * from './worldProvider';
+export * from './world-provider';
 export * from '@g-motion/webgpu';

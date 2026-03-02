@@ -1,4 +1,4 @@
-import { sharedBatchScheduler } from './batchScheduler';
+import { sharedBatchScheduler } from './batch-scheduler';
 
 type StyleMap = Map<HTMLElement, Record<string, string>>;
 type TransformMap = Map<HTMLElement, string>;

@@ -30,6 +30,14 @@ export interface GPUBatchBuffers {
  */
 export interface GPUBatchDescriptor extends WorkgroupBatchDescriptor {
   kind?: 'interpolation';
+  /** 原型 ID */
+  archetypeId: string;
+  /** 实体 ID 列表 */
+  entityIds: ArrayLike<number>;
+  /** 实体数量 */
+  entityCount: number;
+  /** 实体 ID 缓冲区租赁 ID */
+  entityIdsLeaseId?: number;
   /** 动画状态数据 */
   statesData: Float32Array;
   /** 关键帧数据 */
@@ -56,6 +64,14 @@ export interface GPUBatchDescriptor extends WorkgroupBatchDescriptor {
  */
 export interface PhysicsBatchDescriptor extends WorkgroupBatchDescriptor {
   kind: 'physics';
+  /** 原型 ID */
+  archetypeId: string;
+  /** 实体 ID 列表 */
+  entityIds: ArrayLike<number>;
+  /** 实体数量 */
+  entityCount: number;
+  /** 实体 ID 缓冲区租赁 ID */
+  entityIdsLeaseId?: number;
   /** 物理配置 */
   physics: {
     /** 基础原型 ID */

@@ -5,8 +5,8 @@ import type { Archetype } from './archetype';
 import type { ComponentValue } from '@g-motion/shared';
 import type { MotionAppConfig, NormalizedMotionAppConfig } from './plugin';
 import { normalizeConfig } from './plugin';
-import { ArchetypeManager, type MotionStatusCoordinator } from './archetypeManager';
-import { SystemCoordinator } from './systemCoordinator';
+import { ArchetypeManager, type MotionStatusCoordinator } from './archetype-manager';
+import { SystemCoordinator } from './system-coordinator';
 
 /**
  * Component data type

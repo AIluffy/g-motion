@@ -18,11 +18,11 @@ export type { MarkOptions, ResolvedMarkOptions } from './mark';
 import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
 import { analyzeSpringTracks } from '@g-motion/plugin-spring';
 import { ComponentRegistrar } from '../registery';
-import { AnimationValidator } from './animationValidator';
-import { GPUChannelMapper } from './gpuChannelMapper';
+import { AnimationValidator } from './animation-validator';
+import { GPUChannelMapper } from './gpu-channel-mapper';
 import { buildRenderComponent } from './render';
-import type { VisualTarget } from './visualTarget';
-import { getOrCreateVisualTarget } from './visualTarget';
+import type { VisualTarget } from './visual-target';
+import { getOrCreateVisualTarget } from './visual-target';
 
 type PlayOptions = {
   onUpdate?: (val: any) => void;

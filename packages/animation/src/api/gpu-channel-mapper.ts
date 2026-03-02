@@ -1,6 +1,6 @@
 import { registerGPUChannelMappingForTracks } from '@g-motion/core';
 import type { TimelineData } from '@g-motion/core';
-import type { VisualTarget } from './visualTarget';
+import type { VisualTarget } from './visual-target';
 import { TargetType } from './mark';
 
 export class GPUChannelMapper {

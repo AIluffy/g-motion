@@ -7,7 +7,7 @@ import { getRegisteredPlugins } from './plugin';
 import type { SystemScheduler } from './scheduler';
 import { clearPipelineCache } from './systems/webgpu';
 import { World } from './world';
-import { WorldProvider } from './worldProvider';
+import { WorldProvider } from './world-provider';
 
 const warn = createDebugger('MotionEngine', 'warn');
 

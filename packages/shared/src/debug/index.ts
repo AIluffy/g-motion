@@ -11,7 +11,7 @@
  * that proxy to a global default instance for backward compatibility.
  */
 
-import { DebugController, DebugLevel, DebugEnvironment } from './DebugController';
+import { DebugController, DebugLevel, DebugEnvironment } from './debug-controller';
 
 export { DebugController, type DebugLevel, type DebugEnvironment };
 

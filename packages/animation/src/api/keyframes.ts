@@ -1,7 +1,7 @@
 import { TimelineData, Keyframe } from '@g-motion/core';
 import { TRANSFORM_KEYS, createDebugger } from '@g-motion/shared';
 import { ResolvedMarkOptions, TargetType } from './mark';
-import type { VisualTarget } from './visualTarget';
+import type { VisualTarget } from './visual-target';
 import { defaultRegistry, ValueType } from '@g-motion/values';
 
 const warn = createDebugger('Keyframes', 'warn');

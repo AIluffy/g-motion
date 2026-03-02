@@ -1,4 +1,4 @@
-import { BatchCoordinator } from './batchCoordinator';
+import { BatchCoordinator } from './batch-coordinator';
 import type { GPUBatchConfig } from './types';
 
 export class ComputeBatchProcessor extends BatchCoordinator {

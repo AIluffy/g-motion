@@ -11,10 +11,10 @@ import type {
   GPUBatchConfig,
 } from './types';
 import { DEFAULT_MAX_BATCH_SIZE } from './config';
-import { BatchStatistics } from './batchStatistics';
-import { EntityBatchCollector } from './entityBatchCollector';
-import { EntityIdLeasePool } from './entityIdLeasePool';
-import { GPUBatchDispatcher } from './gpuBatchDispatcher';
+import { BatchStatistics } from './batch-statistics';
+import { EntityBatchCollector } from './entity-batch-collector';
+import { EntityIdLeasePool } from './entity-id-lease-pool';
+import { GPUBatchDispatcher } from './gpu-batch-dispatcher';
 
 export class BatchCoordinator {
   private maxBatchSize: number;

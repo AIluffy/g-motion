@@ -1,7 +1,7 @@
 import { World, getRendererCode } from '@g-motion/core';
 import { TargetType } from './mark';
-import type { VisualTarget } from './visualTarget';
-import { getOrCreateVisualTarget } from './visualTarget';
+import type { VisualTarget } from './visual-target';
+import { getOrCreateVisualTarget } from './visual-target';
 
 export function buildRenderComponent(
   target: any,

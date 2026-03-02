@@ -14,7 +14,7 @@ import { AppContext } from '../src/context';
 import { SystemDef } from '../src/plugin';
 import { SystemScheduler } from '../src/scheduler';
 import { World } from '../src/world';
-import { WorldProvider } from '../src/worldProvider';
+import { WorldProvider } from '../src/world-provider';
 
 describe('SystemScheduler Logging', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;

@@ -9,7 +9,7 @@ import {
   type TargetScopeRoot,
   type TargetType,
 } from './api/mark';
-import { isVisualTargetCached } from './api/visualTarget';
+import { isVisualTargetCached } from './api/visual-target';
 import { registerAnimationSystems } from './registery';
 
 function initEngine(world: World) {
@@ -167,5 +167,5 @@ export * from './api/builder';
 export * from './api/control';
 export * from './api/gpu-status';
 export * from './api/mark';
-export * from './api/visualTarget';
+export * from './api/visual-target';
 export { engine } from './engine';

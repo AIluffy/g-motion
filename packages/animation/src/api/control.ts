@@ -1,10 +1,10 @@
 import { MotionStatus } from '@g-motion/core';
 import { createDebugger } from '@g-motion/shared';
 import type { World } from '@g-motion/core';
-import { BatchCoordinator } from './control/batchCoordinator';
-import { AnimationCoordinator } from './control/completionHandler';
-import { FrameNavigator } from './control/frameNavigator';
-import { PlaybackController } from './control/playbackController';
+import { BatchCoordinator } from './control/batch-coordinator';
+import { AnimationCoordinator } from './control/completion-handler';
+import { FrameNavigator } from './control/frame-navigator';
+import { PlaybackController } from './control/playback-controller';
 
 const warn = createDebugger('AnimationControl', 'warn');
 

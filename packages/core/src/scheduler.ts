@@ -8,7 +8,7 @@ import { WebGPUConstants } from './constants';
 import type { EngineServices, SystemDef } from './plugin';
 import { SchedulerLoop } from './scheduler-loop';
 import { SchedulerProcessor } from './scheduler-processor';
-import { WorldProvider } from './worldProvider';
+import { WorldProvider } from './world-provider';
 
 const GPU_TAIL_KEEP_ALIVE_MS = WebGPUConstants.GPU.TAIL_KEEP_ALIVE_MS;
 

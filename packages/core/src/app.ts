@@ -5,7 +5,7 @@ import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
 import { MotionApp, MotionAppConfig } from './plugin';
 import { getRendererCode } from './renderer-code';
 import type { World } from './world';
-import { WorldProvider } from './worldProvider';
+import { WorldProvider } from './world-provider';
 
 const debug = createDebugger('Core');
 

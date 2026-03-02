@@ -1,6 +1,6 @@
 import type { BatchEntity, BatchKeyframe, BatchMetadata } from './types';
 import { createDebugger, panic } from '@g-motion/shared';
-import type { BatchStatistics } from './batchStatistics';
+import type { BatchStatistics } from './batch-statistics';
 
 const warn = createDebugger('BatchCollector', 'warn');
 
