@@ -215,7 +215,7 @@ async function processArchetypeBatches(
   const frame = batchedSubmitEnabled
     ? createWebGPUFrameEncoder({
         device: gpu,
-        timingHelper: engine.timingHelper,
+        timestampManager: engine.timestampManager,
         label: `motion-frame-${engine.frameId}`,
       })
     : undefined;

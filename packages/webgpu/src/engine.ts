@@ -4,7 +4,7 @@ import type { DeviceManager } from './device-manager';
 import { ReadbackManager } from './readback-manager';
 import type { PersistentGPUBufferManager } from './persistent-buffer-manager';
 import type { StagingBufferPool } from './staging-pool';
-import type { TimingHelper } from './timing-helper';
+import type { GPUTimestampQueryManager } from './timestamp-query-manager';
 import type { DeviceInitResult } from './types';
 import type { PipelineManager, WorkgroupSize } from './pipeline-manager';
 import { clearKeyframePipelineCache } from './passes/keyframe/pipelines';
@@ -162,8 +162,11 @@ export class WebGPUEngine {
   incrementOutputFormatStatsCounter() {
     this.runtimeState.incrementOutputFormatStatsCounter();
   }
-  setTimingHelper(helper: TimingHelper | null) {
-    this.frameCoordinator.setTimingHelper(helper);
+  setTimestampManager(manager: GPUTimestampQueryManager | null) {
+    this.frameCoordinator.setTimestampManager(manager);
+  }
+  setTimingHelper(_helper: any) {
+    // Legacy support
   }
   setBufferManager(manager: BufferManager) {
     this.frameCoordinator.setBufferManager(manager);
@@ -183,8 +186,11 @@ export class WebGPUEngine {
   setReadbackManager(manager: AsyncReadbackManager | null) {
     this.frameCoordinator.setReadbackManager(manager);
   }
+  get timestampManager() {
+    return this.frameCoordinator.timestampManager;
+  }
   get timingHelper() {
-    return this.frameCoordinator.timingHelper;
+    return this.frameCoordinator.timestampManager;
   }
   get stagingPool() {
     return this.frameCoordinator.stagingPool;

@@ -156,7 +156,7 @@ export async function processInterpolationArchetype(params: {
       device,
       queue,
       gpuBatch,
-      engine.timingHelper,
+      engine.timestampManager,
       archetypeId,
       rawStride,
       {

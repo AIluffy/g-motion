@@ -126,7 +126,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   await dispatchPhysicsBatch({
     device,
     queue,
-    timingHelper: engine.timingHelper,
+    timestampManager: engine.timestampManager,
     archetypeId: baseArchetypeId,
     slotCount,
     workgroupHint: batch.workgroupHint,

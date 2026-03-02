@@ -71,8 +71,13 @@ export class DeviceManager {
       const canTimestamp =
         this.config.timestampQuery && this.adapter.features.has('timestamp-query');
 
+      const requiredFeatures: GPUFeatureName[] = [];
+      if (canTimestamp) {
+        requiredFeatures.push('timestamp-query');
+      }
+
       this.device = await this.adapter.requestDevice({
-        requiredFeatures: canTimestamp ? ['timestamp-query'] : [],
+        requiredFeatures,
       });
 
       if (!this.device) {

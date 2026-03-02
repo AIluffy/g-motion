@@ -3,13 +3,13 @@ import { BufferManager } from './buffer-manager';
 import type { PersistentGPUBufferManager } from './persistent-buffer-manager';
 import { ReadbackManager } from './readback-manager';
 import type { StagingBufferPool } from './staging-pool';
-import type { TimingHelper } from './timing-helper';
+import type { GPUTimestampQueryManager } from './timestamp-query-manager';
 import type { GPURuntimeState } from './gpu-runtime-state';
 
 export class GPUFrameCoordinator {
   private _bufferManager: BufferManager;
   private _readbackManager: AsyncReadbackManager | null = null;
-  private _timingHelper: TimingHelper | null = null;
+  private _timestampManager: GPUTimestampQueryManager | null = null;
 
   constructor(bufferManager: BufferManager = new BufferManager()) {
     this._bufferManager = bufferManager;
@@ -38,14 +38,23 @@ export class GPUFrameCoordinator {
         manager.destroy();
       }
     }
+    this._timestampManager?.destroy();
   }
 
-  setTimingHelper(helper: TimingHelper | null): void {
-    this._timingHelper = helper;
+  setTimestampManager(manager: GPUTimestampQueryManager | null): void {
+    this._timestampManager = manager;
   }
 
-  get timingHelper(): TimingHelper | null {
-    return this._timingHelper;
+  get timestampManager(): GPUTimestampQueryManager | null {
+    return this._timestampManager;
+  }
+
+  setTimingHelper(_helper: any): void {
+    // Legacy support for TimingHelper if needed, but internally we use GPUTimestampQueryManager
+  }
+
+  get timingHelper(): any {
+    return this._timestampManager;
   }
 
   setBufferManager(manager: BufferManager): void {
@@ -100,9 +109,9 @@ export class GPUFrameCoordinator {
     this._bufferManager.resetMetrics();
   }
 
-  beginFrame(state: GPURuntimeState): void {
-    state.incrementFrameId();
-    this._timingHelper?.beginFrame?.();
+  beginFrame(runtimeState: GPURuntimeState): void {
+    runtimeState.incrementFrameId();
+    this._timestampManager?.beginFrame();
   }
 
   endFrame(): void {

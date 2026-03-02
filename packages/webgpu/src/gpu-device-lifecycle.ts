@@ -1,6 +1,6 @@
 import { createDebugger } from '@g-motion/shared';
 import { DeviceManager } from './device-manager';
-import { getTimingHelper } from './timing-helper';
+import { GPUTimestampQueryManager } from './timestamp-query-manager';
 import type { DeviceInitResult } from './types';
 import type { GPUFrameCoordinator } from './gpu-frame-coordinator';
 import type { GPUPipelineRegistry } from './gpu-pipeline-registry';
@@ -62,7 +62,10 @@ export class GPUDeviceLifecycle {
         this.pipelineRegistry.clearPipelineCache(device);
         this.onDeviceLost(device);
       });
-      this.frameCoordinator.setTimingHelper(getTimingHelper(device));
+
+      const timestampManager = new GPUTimestampQueryManager(device);
+      this.frameCoordinator.setTimestampManager(timestampManager);
+
       this.runtimeState.setDeviceAvailable(true);
       this.runtimeState.setInitialized(true);
       return result;

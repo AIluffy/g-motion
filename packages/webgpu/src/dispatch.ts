@@ -5,14 +5,14 @@ import type { OutputBufferReadbackTag } from './output-buffer-pool';
 import { acquirePooledOutputBuffer } from './output-buffer-pool';
 import { getPersistentGPUBufferManager } from './persistent-buffer-manager';
 import { getPipelineForWorkgroup, recordWorkgroupTiming, selectWorkgroupSize } from './pipeline';
-import type { TimingHelper, TimingToken } from './timing-helper';
+import type { GPUTimestampQueryManager } from './timestamp-query-manager';
 export { dispatchPhysicsBatch } from './passes/physics/dispatch-pass';
 
 export async function dispatchGPUBatch(
   device: GPUDevice,
   queue: GPUQueue,
   batch: GPUBatchDescriptor,
-  timingHelper: TimingHelper | null,
+  timestampManager: GPUTimestampQueryManager | null,
   archetypeId: string,
   channelCount: number,
   options?: {
@@ -133,14 +133,17 @@ export async function dispatchGPUBatch(
     return { outputBuffer, outputBufferTag, entityCount: batch.entityCount, archetypeId };
   }
 
+  const startTime = performance.now();
   const cmdEncoder = device.createCommandEncoder({
     label: `dispatch-${archetypeId}`,
   });
 
-  const passWithTiming: { pass: GPUComputePassEncoder; token: TimingToken | null } = timingHelper
-    ? timingHelper.beginComputePassWithToken(cmdEncoder)
-    : { pass: cmdEncoder.beginComputePass(), token: null };
-  const passEncoder = passWithTiming.pass;
+  const descriptor: GPUComputePassDescriptor = {
+    label: `dispatch-${archetypeId}-pass`,
+  };
+
+  const queryIndex = timestampManager?.injectTimestampWrites(descriptor) ?? null;
+  const passEncoder = cmdEncoder.beginComputePass(descriptor);
 
   passEncoder.setPipeline(pipeline);
   passEncoder.setBindGroup(0, bindGroup);
@@ -149,29 +152,51 @@ export async function dispatchGPUBatch(
 
   const commandBuffer = cmdEncoder.finish();
 
-  const token = passWithTiming.token;
-  const afterSubmit =
-    timingHelper && timingHelper.hasTimestampSupport() && token
-      ? () => {
-          timingHelper
-            .getResultForToken(token)
-            .then((gpuTimeNs) => {
-              const gpuTimeMs = gpuTimeNs / 1_000_000;
-              getGPUMetricsProvider().recordMetric({
-                batchId: `${archetypeId}-timing`,
-                entityCount: batch.entityCount,
-                timestamp: performance.now(),
-                gpu: true,
-                gpuComputeTimeMs: gpuTimeMs,
-                gpuComputeTimeNs: gpuTimeNs,
-                workgroupsDispatched: workgroupsX,
-                workgroupSize,
-              });
-              recordWorkgroupTiming(archetypeId, workgroupSize, gpuTimeMs);
-            })
-            .catch(() => {});
-        }
-      : undefined;
+  const afterSubmit = () => {
+    const endTime = performance.now();
+    const cpuDurationMs = endTime - startTime;
+
+    if (timestampManager && timestampManager.hasSupport() && queryIndex !== null) {
+      timestampManager
+        .resolveAndReadback(cmdEncoder, queryIndex)
+        .then((result) => {
+          const durationMs = result ? result.durationMs : cpuDurationMs;
+          const durationNs = result ? result.durationNs : cpuDurationMs * 1_000_000;
+
+          getGPUMetricsProvider().recordMetric({
+            batchId: archetypeId,
+            entityCount: batch.entityCount,
+            timestamp: result ? result.timestamp : performance.now(),
+            gpu: true,
+            gpuComputeTimeMs: durationMs,
+            gpuComputeTimeNs: durationNs,
+            workgroupsDispatched: workgroupsX,
+            workgroupSize,
+          });
+          recordWorkgroupTiming(archetypeId, workgroupSize, durationMs);
+        })
+        .catch(() => {
+          // Fallback to CPU timing on error
+          recordCPUMetric();
+        });
+    } else {
+      recordCPUMetric();
+    }
+
+    function recordCPUMetric() {
+      getGPUMetricsProvider().recordMetric({
+        batchId: archetypeId,
+        entityCount: batch.entityCount,
+        timestamp: performance.now(),
+        gpu: true,
+        gpuComputeTimeMs: cpuDurationMs,
+        gpuComputeTimeNs: cpuDurationMs * 1_000_000,
+        workgroupsDispatched: workgroupsX,
+        workgroupSize,
+      });
+      recordWorkgroupTiming(archetypeId, workgroupSize, cpuDurationMs);
+    }
+  };
 
   if (submit) {
     submit(commandBuffer, afterSubmit);

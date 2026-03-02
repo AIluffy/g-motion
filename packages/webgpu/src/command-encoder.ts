@@ -1,4 +1,4 @@
-import type { TimingHelper } from './timing-helper';
+import type { GPUTimestampQueryManager } from './timestamp-query-manager';
 
 type CopyCommand = {
   src: GPUBuffer;
@@ -23,28 +23,33 @@ export type WebGPUFrameEncoder = {
 
 export function createWebGPUFrameEncoder(params: {
   device: GPUDevice;
-  timingHelper: TimingHelper | null;
+  timestampManager: GPUTimestampQueryManager | null;
   label: string;
 }): WebGPUFrameEncoder {
-  const { device, timingHelper, label } = params;
+  const { device, timestampManager, label } = params;
 
   const encoder = device.createCommandEncoder({ label });
   const afterSubmitCallbacks: Array<() => void> = [];
   const copyCommands: CopyCommand[] = [];
   let pass: {
     pass: GPUComputePassEncoder;
-    token: unknown | null;
+    queryIndex: number | null;
   } | null = null;
 
   const beginComputePass = (): GPUComputePassEncoder => {
     if (pass) return pass.pass;
-    if (timingHelper) {
-      const res = timingHelper.beginComputePassWithToken(encoder);
-      pass = { pass: res.pass, token: res.token };
-      return res.pass;
+
+    const descriptor: GPUComputePassDescriptor = {
+      label: `${label}-compute-pass`,
+    };
+
+    let queryIndex: number | null = null;
+    if (timestampManager) {
+      queryIndex = timestampManager.injectTimestampWrites(descriptor);
     }
-    const p = encoder.beginComputePass();
-    pass = { pass: p, token: null };
+
+    const p = encoder.beginComputePass(descriptor);
+    pass = { pass: p, queryIndex };
     return p;
   };
 
@@ -75,9 +80,9 @@ export function createWebGPUFrameEncoder(params: {
 
     const commandBuffer = encoder.finish();
 
-    const token = pass?.token ?? null;
+    const queryIndex = pass?.queryIndex ?? null;
     const afterSubmit =
-      afterSubmitCallbacks.length || (timingHelper && token)
+      afterSubmitCallbacks.length || (timestampManager && queryIndex !== null)
         ? () => {
             for (const cb of afterSubmitCallbacks) {
               try {
@@ -85,8 +90,8 @@ export function createWebGPUFrameEncoder(params: {
               } catch {}
             }
 
-            if (timingHelper && token && timingHelper.hasTimestampSupport()) {
-              timingHelper.getResultForToken(token as any).catch(() => {});
+            if (timestampManager && queryIndex !== null && timestampManager.hasSupport()) {
+              timestampManager.resolveAndReadback(encoder, queryIndex).catch(() => {});
             }
           }
         : undefined;

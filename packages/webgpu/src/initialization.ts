@@ -8,7 +8,7 @@ import { PHYSICS_COMBINED_SHADER } from './physics-shader';
 import { clearPipelineCache, precompileWorkgroupPipelines } from './pipeline';
 import { buildInterpolationShader } from './shader';
 import { StagingBufferPool } from './staging-pool';
-import { getTimingHelper } from './timing-helper';
+import { GPUTimestampQueryManager } from './timestamp-query-manager';
 import type { DeviceInitResult } from './types';
 
 const warn = createDebugger('WebGPUInitialization', 'warn');
@@ -209,7 +209,7 @@ export async function initializeWebGPU(
     };
   }
 
-  engine.setTimingHelper(getTimingHelper(device));
+  engine.setTimestampManager(new GPUTimestampQueryManager(device));
   engine.setStagingPool(new StagingBufferPool(device));
   engine.setReadbackManager(new AsyncReadbackManager());
   getPersistentGPUBufferManager(device);
