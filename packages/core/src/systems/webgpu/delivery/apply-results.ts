@@ -1,9 +1,9 @@
-import type { ChannelMapping, GPUResultPacket } from '@g-motion/webgpu';
+import type { ChannelMapping, GPUResultPacket } from '@g-motion/webgpu/internal';
 import {
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
   unmarkPhysicsGPUEntity,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import { MotionStatus } from '../../../components/state';
 import type { World } from '../../../world';
 import {

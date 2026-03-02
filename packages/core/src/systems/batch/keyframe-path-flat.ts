@@ -10,8 +10,10 @@
 
 import type { TimelineData, Track } from '@g-motion/shared';
 import { KEYFRAME_FLOATS, MAX_KEYFRAMES_PER_CHANNEL } from './constants';
-import type { BezierKf, PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
-import { tryReusePackedCache, writeSingleKeyframe } from './keyframe-utils';
+import type { KeyframeLike } from './keyframe-pack';
+import { packSingleKeyframe } from './keyframe-pack';
+import type { PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
+import { tryReusePackedCache } from './keyframe-utils';
 import { bufferCache } from './utils';
 
 export function serializeFlatChannelPath(
@@ -57,7 +59,7 @@ export function serializeFlatChannelPath(
           KEYFRAME_FLOATS;
 
         if (track && kIndex < count) {
-          writeSingleKeyframe(keyframesData, offset, track[kIndex] as BezierKf);
+          packSingleKeyframe(track[kIndex] as KeyframeLike, keyframesData, offset);
         } else {
           for (let f = 0; f < KEYFRAME_FLOATS; f++) keyframesData[offset + f] = 0;
         }

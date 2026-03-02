@@ -1,4 +1,6 @@
 import { createDebugger, panic, WebGPUConstants } from '@g-motion/shared';
+import type { GPUMetricsProvider } from './metrics-provider';
+import { getGPUMetricsProvider } from './metrics-provider';
 
 const warn = createDebugger('PipelineManager', 'warn');
 
@@ -11,6 +13,160 @@ const WORKGROUP_SIZES = [
 
 export type WorkgroupSize = (typeof WORKGROUP_SIZES)[number];
 
+const WORKGROUP_INDEX = new Map<number, number>([
+  [WebGPUConstants.WORKGROUP.SIZE_SMALL, 0],
+  [WebGPUConstants.WORKGROUP.SIZE_MEDIUM, 1],
+  [WebGPUConstants.WORKGROUP.SIZE_DEFAULT, 2],
+  [WebGPUConstants.WORKGROUP.SIZE_XLARGE, 3],
+]);
+
+type WorkgroupHistory = {
+  counts: Uint16Array;
+  emaMs: Float32Array;
+  lastMs: Float32Array;
+  sampleCount: number;
+  exploreCursor: number;
+};
+
+export class AdaptiveWorkgroupSelector {
+  private histories = new Map<string, WorkgroupHistory>();
+  private readonly minSamples: number;
+  private readonly emaAlpha: number;
+  private readonly memoryCheckInterval: number;
+  private metricsProvider: GPUMetricsProvider;
+  private forcedSize: WorkgroupSize | null = null;
+  private memoryPenalty = 0;
+  private memoryCountdown = 0;
+
+  constructor(options?: {
+    minSamples?: number;
+    emaAlpha?: number;
+    memoryCheckInterval?: number;
+    metricsProvider?: GPUMetricsProvider;
+  }) {
+    this.minSamples = Math.max(1, Math.floor(options?.minSamples ?? 4));
+    this.emaAlpha = Math.min(0.5, Math.max(0.05, options?.emaAlpha ?? 0.2));
+    this.memoryCheckInterval = Math.max(8, Math.floor(options?.memoryCheckInterval ?? 60));
+    this.metricsProvider = options?.metricsProvider ?? getGPUMetricsProvider();
+  }
+
+  setForcedWorkgroupSize(size: number | null): void {
+    if (size == null) {
+      this.forcedSize = null;
+      return;
+    }
+    const index = WORKGROUP_INDEX.get(size);
+    this.forcedSize = index === undefined ? null : (size as WorkgroupSize);
+  }
+
+  select(archetypeId: string, entityCount: number): WorkgroupSize {
+    if (this.forcedSize) return this.forcedSize;
+    const count = Number.isFinite(entityCount) ? Math.max(1, Math.floor(entityCount)) : 0;
+    if (count <= 0) return this.fallbackForEntityCount(0);
+
+    const history = this.getHistory(archetypeId);
+    if (history.sampleCount === 0) {
+      return this.fallbackForEntityCount(count);
+    }
+
+    if (history.sampleCount < this.minSamples * WORKGROUP_SIZES.length) {
+      const total = WORKGROUP_SIZES.length;
+      for (let i = 0; i < total; i++) {
+        const idx = (history.exploreCursor + i) % total;
+        if (history.counts[idx] < this.minSamples) {
+          history.exploreCursor = (idx + 1) % total;
+          return WORKGROUP_SIZES[idx];
+        }
+      }
+    }
+
+    const memoryPenalty = this.refreshMemoryPenalty();
+    let bestIndex = 0;
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < WORKGROUP_SIZES.length; i++) {
+      const size = WORKGROUP_SIZES[i];
+      const ema = history.emaMs[i];
+      const baseMs = ema > 0 ? ema : this.fallbackScoreBias(count, size);
+      const groups = Math.ceil(count / size);
+      const launched = groups * size;
+      const occupancy = launched > 0 ? count / launched : 1;
+      const occupancyPenalty = 1 + (1 - occupancy) * 0.25;
+      const sizePenalty = memoryPenalty > 0 ? 1 + memoryPenalty * (size / WORKGROUP_SIZES[3]) : 1;
+      const score = baseMs * occupancyPenalty * sizePenalty;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = i;
+      }
+    }
+    return WORKGROUP_SIZES[bestIndex];
+  }
+
+  recordTiming(archetypeId: string, workgroupSize: WorkgroupSize, durationMs: number): void {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return;
+    const index = WORKGROUP_INDEX.get(workgroupSize);
+    if (index === undefined) return;
+    const history = this.getHistory(archetypeId);
+    const prev = history.emaMs[index];
+    const next = prev === 0 ? durationMs : prev + (durationMs - prev) * this.emaAlpha;
+    history.emaMs[index] = next;
+    history.lastMs[index] = durationMs;
+    if (history.counts[index] < 65535) {
+      history.counts[index] += 1;
+    }
+    history.sampleCount += 1;
+  }
+
+  private getHistory(archetypeId: string): WorkgroupHistory {
+    const existing = this.histories.get(archetypeId);
+    if (existing) return existing;
+    const history: WorkgroupHistory = {
+      counts: new Uint16Array(WORKGROUP_SIZES.length),
+      emaMs: new Float32Array(WORKGROUP_SIZES.length),
+      lastMs: new Float32Array(WORKGROUP_SIZES.length),
+      sampleCount: 0,
+      exploreCursor: 0,
+    };
+    this.histories.set(archetypeId, history);
+    return history;
+  }
+
+  private refreshMemoryPenalty(): number {
+    if (this.memoryCountdown > 0) {
+      this.memoryCountdown -= 1;
+      return this.memoryPenalty;
+    }
+    this.memoryCountdown = this.memoryCheckInterval;
+    const status = this.metricsProvider.getStatus();
+    if (status.memoryAlertActive) {
+      this.memoryPenalty = 0.25;
+      return this.memoryPenalty;
+    }
+    const usage = status.memoryUsageBytes;
+    const threshold = status.memoryUsageThresholdBytes;
+    if (typeof usage === 'number' && typeof threshold === 'number' && threshold > 0) {
+      const ratio = usage / threshold;
+      this.memoryPenalty = ratio > 1 ? 0.2 : ratio > 0.8 ? 0.1 : 0;
+      return this.memoryPenalty;
+    }
+    this.memoryPenalty = 0;
+    return this.memoryPenalty;
+  }
+
+  private fallbackScoreBias(entityCount: number, workgroupSize: WorkgroupSize): number {
+    const fallback = this.fallbackForEntityCount(entityCount);
+    if (fallback === workgroupSize) return 1;
+    return workgroupSize > fallback ? 1.08 : 1.04;
+  }
+
+  private fallbackForEntityCount(entityCount: number): WorkgroupSize {
+    const { WORKGROUP } = WebGPUConstants;
+    if (entityCount >= WORKGROUP.ENTITY_COUNT_XLARGE_THRESHOLD) return WORKGROUP.SIZE_XLARGE;
+    if (entityCount <= WORKGROUP.ENTITY_COUNT_SMALL_THRESHOLD) return WORKGROUP.SIZE_SMALL;
+    if (entityCount <= WORKGROUP.ENTITY_COUNT_MEDIUM_THRESHOLD) return WORKGROUP.SIZE_MEDIUM;
+    return WORKGROUP.SIZE_DEFAULT;
+  }
+}
+
 type PipelineBucket = {
   pipelineCache: Map<number, GPUComputePipeline>;
   pipelineCacheKey: string | null;
@@ -21,6 +177,7 @@ export class PipelineManager {
   private computePipeline: GPUComputePipeline | null = null;
   private device: GPUDevice | null = null;
   private queue: GPUQueue | null = null;
+  private workgroupSelector = new AdaptiveWorkgroupSelector();
 
   async initialize(): Promise<void> {}
 
@@ -52,8 +209,9 @@ export class PipelineManager {
     device: GPUDevice,
     workgroupHint: number,
     cacheId = 'default',
+    archetypeId?: string,
   ): Promise<GPUComputePipeline | null> {
-    const selected = this.selectWorkgroupSize(workgroupHint);
+    const selected = this.selectWorkgroupSize(workgroupHint, archetypeId);
     const pipelineCache = this.getBucket(device, cacheId).pipelineCache;
     const { WORKGROUP } = WebGPUConstants;
     return (
@@ -86,9 +244,22 @@ export class PipelineManager {
     this.pipelineBuckets.clear();
   }
 
-  selectWorkgroupSize(workgroupHint: number): WorkgroupSize {
+  selectWorkgroupSize(workgroupHint: number, archetypeId?: string): WorkgroupSize {
     const { WORKGROUP } = WebGPUConstants;
     if (!Number.isFinite(workgroupHint) || workgroupHint <= 0) return WORKGROUP.SIZE_DEFAULT;
+    if (
+      archetypeId == null &&
+      (workgroupHint === WORKGROUP.SIZE_SMALL ||
+        workgroupHint === WORKGROUP.SIZE_MEDIUM ||
+        workgroupHint === WORKGROUP.SIZE_DEFAULT ||
+        workgroupHint === WORKGROUP.SIZE_XLARGE)
+    ) {
+      return workgroupHint as WorkgroupSize;
+    }
+    const entityCount = Math.floor(workgroupHint);
+    if (archetypeId) {
+      return this.workgroupSelector.select(archetypeId, entityCount);
+    }
     if (
       workgroupHint === WORKGROUP.SIZE_SMALL ||
       workgroupHint === WORKGROUP.SIZE_MEDIUM ||
@@ -97,17 +268,25 @@ export class PipelineManager {
     ) {
       return workgroupHint as WorkgroupSize;
     }
-    const entityCount = Math.floor(workgroupHint);
-    if (entityCount >= WORKGROUP.ENTITY_COUNT_XLARGE_THRESHOLD) return WORKGROUP.SIZE_XLARGE;
-    if (entityCount < WORKGROUP.ENTITY_COUNT_SMALL_THRESHOLD) return WORKGROUP.SIZE_SMALL;
-    if (entityCount < WORKGROUP.ENTITY_COUNT_MEDIUM_THRESHOLD) return WORKGROUP.SIZE_MEDIUM;
-    return WORKGROUP.SIZE_DEFAULT;
+    return this.workgroupSelector.select('default', entityCount);
+  }
+
+  setForcedWorkgroupSize(size: number | null): void {
+    this.workgroupSelector.setForcedWorkgroupSize(size);
+  }
+
+  recordWorkgroupTiming(
+    archetypeId: string,
+    workgroupSize: WorkgroupSize,
+    durationMs: number,
+  ): void {
+    this.workgroupSelector.recordTiming(archetypeId, workgroupSize, durationMs);
   }
 
   async precompileWorkgroupPipelines(
     device: GPUDevice,
     shaderCode: string,
-    bindGroupLayoutEntries: any[],
+    bindGroupLayoutEntries: GPUBindGroupLayoutEntry[],
     entryPoint: string = 'main',
     cacheId: string = 'default',
   ): Promise<boolean> {

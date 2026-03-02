@@ -1,14 +1,14 @@
 import { WebGPUConstants } from '@g-motion/shared';
 import { createDebugger, getNowMs } from '@g-motion/shared';
-import type { GPUMetricsProvider, WebGPUEngine } from '@g-motion/webgpu';
+import type { GPUMetricsProvider, WebGPUEngine } from '@g-motion/webgpu/internal';
 import {
   enqueueGPUResults,
   PHYSICS_STATE_STRIDE,
   processOutputBuffer,
   setPendingReadbackCount,
   tryReleasePooledOutputBufferFromTag,
-} from '@g-motion/webgpu';
-import type { MotionAppConfig } from '../../../plugin';
+} from '@g-motion/webgpu/internal';
+import type { NormalizedMotionAppConfig } from '../../../plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow, stepPhysicsShadow } from '../physics-validation';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
@@ -22,7 +22,7 @@ export function processCompletedReadbacks(params: {
   device: GPUDevice;
   metricsProvider: GPUMetricsProvider;
   processor: ComputeBatchProcessor;
-  config: MotionAppConfig;
+  config: NormalizedMotionAppConfig;
   debugIOEnabled: boolean;
 }): void {
   const { engine, device, metricsProvider, processor, config, debugIOEnabled } = params;
@@ -158,8 +158,7 @@ export function processCompletedReadbacks(params: {
       }
       if (kind === 'physics' && values && values.length) {
         const physicsTag = tag as PhysicsReadbackTag;
-        const validateEnabled =
-          config.physicsValidation === true || config.debug?.physicsValidation === true;
+        const validateEnabled = config.debug?.physicsValidation === true;
         if (validateEnabled) {
           const shadow = physicsValidationShadow.get(res.archetypeId);
           const slotCount =

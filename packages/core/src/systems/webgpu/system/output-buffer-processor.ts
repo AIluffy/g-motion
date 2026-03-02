@@ -4,7 +4,7 @@ import type {
   GPUBatchWithPreprocessedKeyframes,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import {
   dispatchGPUBatch,
   getGPUChannelMappingRegistry,
@@ -12,7 +12,7 @@ import {
   processOutputBuffer,
   runKeyframeInterpPass,
   runKeyframePreprocessPass,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import type { World } from '../../../world';
 import type { ComputeBatchProcessor } from '../../batch';
 import { debugIO, firstEntityChannelPreview, float32Preview } from '../debug';

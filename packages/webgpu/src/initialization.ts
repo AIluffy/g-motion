@@ -1,4 +1,4 @@
-import { getCustomEasingVersion, getCustomGpuEasings, panic } from '@g-motion/shared';
+import { createDebugger, getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
 import { AsyncReadbackManager } from './async-readback';
 import type { WebGPUEngine } from './engine';
 import { getGPUMetricsProvider } from './metrics-provider';
@@ -9,6 +9,9 @@ import { clearPipelineCache, precompileWorkgroupPipelines } from './pipeline';
 import { buildInterpolationShader } from './shader';
 import { StagingBufferPool } from './staging-pool';
 import { getTimingHelper } from './timing-helper';
+import type { DeviceInitResult } from './types';
+
+const warn = createDebugger('WebGPUInitialization', 'warn');
 
 type CustomGpuEasing = { name: string; wgslFn: string; id: number };
 
@@ -30,6 +33,7 @@ export type WebGPUInitResult = {
   deviceAvailable: boolean;
   shaderVersion: number;
   mockWebGPU: boolean;
+  deviceInit: DeviceInitResult;
 };
 
 const INTERP_BIND_GROUP_LAYOUT_ENTRIES = [
@@ -66,17 +70,24 @@ const resolveInitDeps = (config?: InitConfig): WebGPUInitializationDeps => ({
 export async function initWebGPUCompute(
   engine: WebGPUEngine,
   deps: WebGPUInitializationDeps,
-): Promise<{ success: boolean; deviceAvailable: boolean; shaderVersion: number }> {
+): Promise<{
+  success: boolean;
+  deviceAvailable: boolean;
+  shaderVersion: number;
+  deviceInit: DeviceInitResult;
+}> {
   const { metricsProvider, getCustomGpuEasings, getCustomEasingVersion } = deps;
-  const initOk = await engine.initialize();
+  const deviceInit = await engine.initialize();
   const device = engine.getGPUDevice();
-  if (!initOk || !device) {
-    panic('WebGPU not available.', {
-      initOk,
-      hasDevice: !!device,
-      stage: 'device',
-      source: 'initWebGPUCompute',
-    });
+  if (!deviceInit.ok || !device) {
+    const message = deviceInit.ok ? 'WebGPU device not available.' : deviceInit.message;
+    warn(message, { stage: 'device', source: 'initWebGPUCompute' });
+    return {
+      success: false,
+      deviceAvailable: false,
+      shaderVersion: getCustomEasingVersion(),
+      deviceInit: deviceInit.ok ? { ok: false, reason: 'no-device', message } : deviceInit,
+    };
   }
 
   const success = await precompileWorkgroupPipelines(
@@ -89,21 +100,27 @@ export async function initWebGPUCompute(
 
   const shaderVersion = getCustomEasingVersion();
 
-  if (success) {
-    metricsProvider.updateStatus({
-      gpuInitialized: true,
-      webgpuAvailable: true,
-      enabled: true,
-    });
-  } else {
-    panic('WebGPU compute pipeline initialization failed.', {
+  if (!success) {
+    warn('WebGPU compute pipeline initialization failed.', {
       shaderVersion,
       stage: 'pipeline',
       source: 'initWebGPUCompute',
     });
+    return {
+      success: false,
+      deviceAvailable: false,
+      shaderVersion,
+      deviceInit,
+    };
   }
 
-  return { success: true, deviceAvailable: true, shaderVersion };
+  metricsProvider.updateStatus({
+    gpuInitialized: true,
+    webgpuAvailable: true,
+    enabled: true,
+  });
+
+  return { success: true, deviceAvailable: true, shaderVersion, deviceInit };
 }
 
 export async function initializeWebGPU(
@@ -114,11 +131,18 @@ export async function initializeWebGPU(
   const { metricsProvider, getCustomEasingVersion } = deps;
 
   if (engine.isInitialized) {
+    const device = engine.getGPUDevice();
+    const adapter = engine.getGPUAdapter();
+    const deviceInit: DeviceInitResult =
+      device && adapter
+        ? { ok: true, device, adapter, limits: adapter.limits }
+        : { ok: false, reason: 'no-device', message: 'WebGPU device not available.' };
     return {
       success: true,
       deviceAvailable: engine.deviceAvailable,
       shaderVersion: engine.shaderVersion,
       mockWebGPU: engine.mockWebGPU,
+      deviceInit,
     };
   }
 
@@ -134,24 +158,55 @@ export async function initializeWebGPU(
       gpuInitialized: true,
       enabled: true,
     });
-    return { success: true, deviceAvailable: true, shaderVersion, mockWebGPU: true };
+    return {
+      success: true,
+      deviceAvailable: true,
+      shaderVersion,
+      mockWebGPU: true,
+      deviceInit: {
+        ok: false,
+        reason: 'no-device',
+        message: 'WebGPU mock enabled without device.',
+      },
+    };
   }
 
   if (!maybeGpu) {
-    panic('WebGPU is not supported in this environment.');
+    const message = 'WebGPU is not supported in this environment.';
+    warn(message, { source: 'initializeWebGPU' });
+    return {
+      success: false,
+      deviceAvailable: false,
+      shaderVersion: getCustomEasingVersion(),
+      mockWebGPU: false,
+      deviceInit: { ok: false, reason: 'no-webgpu', message },
+    };
   }
 
-  try {
-    const initResult = await initWebGPUCompute(engine, deps);
-    engine.setDeviceAvailable(true);
-    engine.setShaderVersion(initResult.shaderVersion);
-  } catch {
-    panic('Failed to initialize WebGPU. GPU may be unavailable or blocked.');
+  const initResult = await initWebGPUCompute(engine, deps);
+  if (!initResult.success) {
+    return {
+      success: false,
+      deviceAvailable: false,
+      shaderVersion: initResult.shaderVersion,
+      mockWebGPU: false,
+      deviceInit: initResult.deviceInit,
+    };
   }
+  engine.setDeviceAvailable(true);
+  engine.setShaderVersion(initResult.shaderVersion);
 
   const device = engine.getGPUDevice();
   if (!device) {
-    panic('WebGPU device is not available.');
+    const message = 'WebGPU device is not available.';
+    warn(message, { source: 'initializeWebGPU' });
+    return {
+      success: false,
+      deviceAvailable: false,
+      shaderVersion: initResult.shaderVersion,
+      mockWebGPU: false,
+      deviceInit: { ok: false, reason: 'no-device', message },
+    };
   }
 
   engine.setTimingHelper(getTimingHelper(device));
@@ -171,15 +226,16 @@ export async function initializeWebGPU(
     deviceAvailable: true,
     shaderVersion: engine.shaderVersion,
     mockWebGPU: false,
+    deviceInit: initResult.deviceInit,
   };
 }
 
 export async function ensureWebGPUInitialized(params: {
   engine: WebGPUEngine;
   deps: WebGPUInitializationDeps;
-}): Promise<void> {
+}): Promise<WebGPUInitResult> {
   const { engine, deps } = params;
-  await initializeWebGPU(engine, deps);
+  return initializeWebGPU(engine, deps);
 }
 
 export async function ensureWebGPUPipelines(params: {

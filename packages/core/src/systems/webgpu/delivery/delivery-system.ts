@@ -6,15 +6,15 @@
  */
 
 import type { SystemContext, SystemDef } from '../../../plugin';
-import { drainGPUResultsInto } from '@g-motion/webgpu';
-import type { GPUResultPacket } from '@g-motion/webgpu';
+import { drainGPUResultsInto } from '@g-motion/webgpu/internal';
+import type { GPUResultPacket } from '@g-motion/webgpu/internal';
 import {
   getGPUChannelMappingRegistry,
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
   isStandardTransformChannels,
-} from '@g-motion/webgpu';
-import type { ChannelMapping } from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
+import type { ChannelMapping } from '@g-motion/webgpu/internal';
 import { createDebugger, isDev } from '@g-motion/shared';
 import { getRendererCode } from '../../../renderer-code';
 import { applyGPUResultPacket } from './apply-results';

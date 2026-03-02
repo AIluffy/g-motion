@@ -9,7 +9,10 @@
  *   sliceArchetypes()    – apply work-slicing to select which archetypes to process
  */
 
-import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '@g-motion/webgpu';
+import type {
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+} from '@g-motion/webgpu/internal';
 import type { Archetype } from '../../archetype';
 import { SchedulingConstants } from '../../constants/scheduling';
 import type { SystemContext } from '../../plugin';
@@ -45,7 +48,7 @@ export function buildFrameContext(ctx: SystemContext, seekInvalidation: boolean)
     config.samplingMode === 'frame' && typeof ctx.sampling?.frame === 'number'
       ? ctx.sampling.frame
       : engineFrame;
-  const preprocessConfig = config.keyframePreprocess;
+  const preprocessConfig = config.keyframe?.preprocess;
   const preprocessOptions: RawKeyframeGenerationOptions = {
     timeInterval:
       preprocessConfig?.timeInterval ?? SchedulingConstants.DEFAULT_KEYFRAME_INTERVAL_MS,
@@ -60,7 +63,7 @@ export function buildFrameContext(ctx: SystemContext, seekInvalidation: boolean)
   return {
     nowMs,
     tickFrame,
-    timelineFlatEnabled: config.timelineFlat === true,
+    timelineFlatEnabled: config.keyframe?.timelineFlat === true,
     staticReuseEnabled: config.batchSamplingStaticReuse === true,
     seekInvalidation,
     preprocessEnabled: !!preprocessConfig?.enabled,

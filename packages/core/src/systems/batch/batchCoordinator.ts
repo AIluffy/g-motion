@@ -2,7 +2,7 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import type {
   BatchEntity,
   BatchKeyframe,
@@ -109,8 +109,8 @@ export class BatchCoordinator {
     this.gpuDispatcher.clearArchetypeBatches();
   }
 
-  selectWorkgroup(entityCount: number): number {
-    return this.gpuDispatcher.selectWorkgroup(entityCount);
+  selectWorkgroup(archetypeId: string, entityCount: number): number {
+    return this.gpuDispatcher.selectWorkgroup(archetypeId, entityCount);
   }
 
   addKeyframes(batchId: string, keyframes: BatchKeyframe[]): boolean {

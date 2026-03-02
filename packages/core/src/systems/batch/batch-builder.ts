@@ -10,7 +10,10 @@
  */
 
 import type { PreprocessedKeyframes, TimelineComponentData } from '@g-motion/shared';
-import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '@g-motion/webgpu';
+import type {
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+} from '@g-motion/webgpu/internal';
 import { canReuseBatch, canReusePreprocessed, computeBatchVersionHash } from './batch-cache';
 import { serializeKeyframes } from './keyframe-serializer';
 import { packEntityStates } from './state-packer';

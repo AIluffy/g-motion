@@ -1,3 +1,5 @@
+import { crc32 } from '@g-motion/shared';
+
 /**
  * Persistent GPU Buffer Manager
  *
@@ -86,6 +88,8 @@ export class PersistentGPUBufferManager {
   private device: GPUDevice;
   private buffers = new Map<string, PersistentBuffer>();
   private previousData = new Map<string, Uint8Array>(); // For change detection
+  private previousDataHash = new Map<string, number>();
+  private previousDataLength = new Map<string, number>();
   private currentFrame = 0;
   private readonly recycleThreshold = 120; // Frames (~2 seconds at 60fps)
   private stats: IncrementalUpdateStats = {
@@ -304,6 +308,114 @@ export class PersistentGPUBufferManager {
     }
   }
 
+  uploadIfChanged(
+    key: string,
+    data: ArrayBufferView,
+    usage: GPUBufferUsageFlags,
+    options?: {
+      label?: string;
+      offset?: number;
+      size?: number;
+      forceUpdate?: boolean;
+      allowGrowth?: boolean;
+      versionHint?: number;
+    },
+  ): GPUBuffer {
+    const offset = options?.offset ?? 0;
+    const size = options?.size ?? data.byteLength;
+    const requiredSize = offset + size;
+    const existing = this.buffers.get(key);
+
+    if (existing && existing.size >= requiredSize) {
+      existing.lastUsedFrame = this.currentFrame;
+
+      const hasVersionHint = options?.versionHint !== undefined;
+      const prevContentVersion = existing.contentVersion;
+      if (hasVersionHint && !options.forceUpdate && prevContentVersion === options.versionHint) {
+        this.stats.bytesSkipped += size;
+        return existing.buffer;
+      }
+      if (hasVersionHint) {
+        existing.contentVersion = options.versionHint;
+      }
+
+      const bytes = new Uint8Array(data.buffer, data.byteOffset, size);
+      const shouldCheckContent =
+        !options?.forceUpdate && (!hasVersionHint || prevContentVersion !== options.versionHint);
+      if (shouldCheckContent) {
+        const prevHash = this.previousDataHash.get(key);
+        const prevLength = this.previousDataLength.get(key);
+        const nextHash = crc32(bytes);
+        if (prevHash !== undefined && prevLength === bytes.byteLength && nextHash === prevHash) {
+          this.stats.bytesSkipped += size;
+          return existing.buffer;
+        }
+        this.previousDataHash.set(key, nextHash);
+        this.previousDataLength.set(key, bytes.byteLength);
+        this.stats.incrementalUpdates++;
+      } else if (options?.forceUpdate) {
+        const nextHash = crc32(bytes);
+        this.previousDataHash.set(key, nextHash);
+        this.previousDataLength.set(key, bytes.byteLength);
+      }
+
+      this.uploadData(existing.buffer, data, key, offset, size);
+      existing.version++;
+      existing.isDirty = false;
+      this.stats.totalUpdates++;
+      this.stats.totalBytesProcessed += size;
+      return existing.buffer;
+    }
+
+    if (existing && existing.size < requiredSize) {
+      if (options?.allowGrowth !== false) {
+        existing.buffer.destroy();
+        this.buffers.delete(key);
+        this.previousData.delete(key);
+        this.previousDataHash.delete(key);
+        this.previousDataLength.delete(key);
+      } else {
+        throw new Error(
+          `Buffer '${key}' size mismatch: has ${existing.size}, needs ${requiredSize}`,
+        );
+      }
+    }
+
+    const newSize = this.calculateOptimalSize(requiredSize);
+    const buffer = this.device.createBuffer({
+      size: newSize,
+      usage: usage | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+      label: options?.label || key,
+    });
+
+    const mapped = new Uint8Array(buffer.getMappedRange());
+    mapped.set(new Uint8Array(data.buffer, data.byteOffset, size), offset);
+    buffer.unmap();
+
+    const bytes = new Uint8Array(data.buffer, data.byteOffset, size);
+    this.previousDataHash.set(key, crc32(bytes));
+    this.previousDataLength.set(key, bytes.byteLength);
+
+    const persistentBuffer: PersistentBuffer = {
+      buffer,
+      size: newSize,
+      usage,
+      lastUsedFrame: this.currentFrame,
+      version: 0,
+      isDirty: false,
+      label: options?.label,
+      contentVersion: options?.versionHint,
+    };
+
+    this.buffers.set(key, persistentBuffer);
+
+    this.stats.totalUpdates++;
+    this.stats.totalBytesProcessed += size;
+
+    return buffer;
+  }
+
   /**
    * Update an existing buffer with new data
    *
@@ -471,6 +583,8 @@ export class PersistentGPUBufferManager {
     for (const key of toRemove) {
       this.buffers.delete(key);
       this.previousData.delete(key);
+      this.previousDataHash.delete(key);
+      this.previousDataLength.delete(key);
     }
   }
 
@@ -531,6 +645,8 @@ export class PersistentGPUBufferManager {
     }
     this.buffers.clear();
     this.previousData.clear();
+    this.previousDataHash.clear();
+    this.previousDataLength.clear();
     this.currentFrame = 0;
   }
 

@@ -123,3 +123,11 @@ export interface GPUBatchContextWithArchetypes {
   timestamp: number;
   archetypeBatchesReady?: boolean;
 }
+
+export type DeviceInitResult =
+  | { ok: true; device: GPUDevice; adapter: GPUAdapter; limits: GPUSupportedLimits }
+  | {
+      ok: false;
+      reason: 'no-webgpu' | 'no-adapter' | 'no-device' | 'device-lost';
+      message: string;
+    };

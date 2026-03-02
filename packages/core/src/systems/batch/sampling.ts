@@ -17,9 +17,11 @@ import {
   consumeForcedGPUStateSyncEntityIdsSet,
   getGPUChannelMappingRegistry,
   isPhysicsGPUEntity,
+  setForcedWorkgroupSize,
   type RawKeyframeGenerationOptions,
   type RawKeyframeValueEvaluator,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
+import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '@g-motion/webgpu/internal';
 import { SchedulingConstants } from '../../constants/scheduling';
 import type { SystemContext, SystemDef } from '../../plugin';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
@@ -51,7 +53,9 @@ export const BatchSamplingSystem: SystemDef = {
 
     const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
     const config = world.config;
-    const timelineFlatEnabled = config.timelineFlat === true;
+    const forcedWorkgroupSize = config.webgpu?.forceWorkgroupSize;
+    setForcedWorkgroupSize(typeof forcedWorkgroupSize === 'number' ? forcedWorkgroupSize : null);
+    const timelineFlatEnabled = config.keyframe?.timelineFlat === true;
     const staticReuseEnabled = config.batchSamplingStaticReuse === true;
     const seekInvalidation = consumeBatchSamplingSeekInvalidation();
     const engineFrame =
@@ -62,7 +66,7 @@ export const BatchSamplingSystem: SystemDef = {
       config.samplingMode === 'frame' && typeof ctx?.sampling?.frame === 'number'
         ? ctx!.sampling!.frame
         : engineFrame;
-    const preprocessConfig = config.keyframePreprocess;
+    const preprocessConfig = config.keyframe?.preprocess;
     const preprocessEnabled = !!preprocessConfig?.enabled;
     const preprocessOptions: RawKeyframeGenerationOptions = {
       timeInterval:
@@ -144,10 +148,7 @@ export const BatchSamplingSystem: SystemDef = {
       });
       if (entityCount > 0) {
         const prevBatchRaw = processor.getArchetypeBatch(archetype.id);
-        const prevBatch =
-          prevBatchRaw && (prevBatchRaw as { kind?: string }).kind !== 'physics'
-            ? (prevBatchRaw as Parameters<typeof buildAnimationBatch>[0]['prevBatch'])
-            : undefined;
+        const prevBatch = isAnimationBatch(prevBatchRaw) ? prevBatchRaw : undefined;
         buildAnimationBatch({
           archetypeId: archetype.id,
           entityIndicesBuf,
@@ -271,3 +272,8 @@ export const BatchSamplingSystem: SystemDef = {
     getArchetypeBufferCache().nextFrame();
   },
 };
+
+const isAnimationBatch = (
+  batch: ArchetypeBatchDescriptor | undefined,
+): batch is Exclude<ArchetypeBatchDescriptor, PhysicsBatchDescriptor> =>
+  !!batch && batch.kind !== 'physics';

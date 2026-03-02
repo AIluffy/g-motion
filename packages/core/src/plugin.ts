@@ -54,46 +54,190 @@ export interface MotionAppConfig {
     interpolationArchetypesPerFrame?: number;
   };
 
-  keyframePreprocess?: {
-    enabled?: boolean;
-    timeInterval?: number;
-    maxSubdivisionsPerSegment?: number;
+  keyframe?: {
+    preprocess?: {
+      enabled?: boolean;
+      timeInterval?: number;
+      maxSubdivisionsPerSegment?: number;
+    };
+    searchOptimized?: boolean;
+    entryExpandOnGPU?: boolean;
+    searchIndexed?: boolean;
+    searchIndexedMinKeyframes?: number;
+    timelineFlat?: boolean;
   };
-
-  keyframeSearchOptimized?: boolean;
-  keyframeEntryExpandOnGPU?: boolean;
-  keyframeSearchIndexed?: boolean;
-  keyframeSearchIndexedMinKeyframes?: number;
-  timelineFlat?: boolean;
   metricsSamplingRate?: number;
 
-  debugWebGPUIO?: boolean;
   debug?: {
     webgpuIO?: boolean;
     physicsValidation?: boolean;
   };
 
+  webgpu?: {
+    culling?: {
+      enabled?: boolean;
+      viewport?: boolean;
+      async?: boolean;
+    };
+    statesConditionalUpload?: boolean;
+    forceStatesUpload?: boolean;
+    forceWorkgroupSize?: number;
+    batchedSubmit?: boolean;
+    readbackMode?: 'full' | 'visible';
+    outputBufferReuse?: boolean;
+  };
+  batchSamplingStaticReuse?: boolean;
+  physicsMaxVelocity?: number;
+
+  /** @deprecated use keyframe.preprocess */
+  keyframePreprocess?: {
+    enabled?: boolean;
+    timeInterval?: number;
+    maxSubdivisionsPerSegment?: number;
+  };
+  /** @deprecated use keyframe.searchOptimized */
+  keyframeSearchOptimized?: boolean;
+  /** @deprecated use keyframe.entryExpandOnGPU */
+  keyframeEntryExpandOnGPU?: boolean;
+  /** @deprecated use keyframe.searchIndexed */
+  keyframeSearchIndexed?: boolean;
+  /** @deprecated use keyframe.searchIndexedMinKeyframes */
+  keyframeSearchIndexedMinKeyframes?: number;
+  /** @deprecated use keyframe.timelineFlat */
+  timelineFlat?: boolean;
+  /** @deprecated use debug.webgpuIO */
+  debugWebGPUIO?: boolean;
+  /** @deprecated use debug.physicsValidation */
+  physicsValidation?: boolean;
+  /** @deprecated use webgpu.culling */
   webgpuCulling?: {
     enabled?: boolean;
     viewport?: boolean;
     async?: boolean;
   };
-
+  /** @deprecated use webgpu.statesConditionalUpload */
   webgpuStatesConditionalUpload?: boolean;
+  /** @deprecated use webgpu.forceStatesUpload */
   webgpuForceStatesUpload?: boolean;
+  /** @deprecated use webgpu.batchedSubmit */
   webgpuBatchedSubmit?: boolean;
+  /** @deprecated use webgpu.readbackMode */
   webgpuReadbackMode?: 'full' | 'visible';
+  /** @deprecated use webgpu.outputBufferReuse */
   webgpuOutputBufferReuse?: boolean;
-  batchSamplingStaticReuse?: boolean;
-  physicsMaxVelocity?: number;
-  physicsValidation?: boolean;
+}
+
+export interface NormalizedMotionAppConfig extends MotionAppConfig {
+  keyframe?: MotionAppConfig['keyframe'];
+  debug?: MotionAppConfig['debug'];
+  webgpu?: MotionAppConfig['webgpu'];
+}
+
+export function normalizeConfig(config: MotionAppConfig = {}): NormalizedMotionAppConfig {
+  const source: MotionAppConfig = config ?? {};
+  const warnDeprecated = (field: string, replacement: string) => {
+    console.warn(`[MotionAppConfig] "${field}" 已废弃，请使用 "${replacement}"。`);
+  };
+
+  if (source.keyframePreprocess !== undefined)
+    warnDeprecated('keyframePreprocess', 'keyframe.preprocess');
+  if (source.keyframeSearchOptimized !== undefined)
+    warnDeprecated('keyframeSearchOptimized', 'keyframe.searchOptimized');
+  if (source.keyframeEntryExpandOnGPU !== undefined)
+    warnDeprecated('keyframeEntryExpandOnGPU', 'keyframe.entryExpandOnGPU');
+  if (source.keyframeSearchIndexed !== undefined)
+    warnDeprecated('keyframeSearchIndexed', 'keyframe.searchIndexed');
+  if (source.keyframeSearchIndexedMinKeyframes !== undefined)
+    warnDeprecated('keyframeSearchIndexedMinKeyframes', 'keyframe.searchIndexedMinKeyframes');
+  if (source.timelineFlat !== undefined) warnDeprecated('timelineFlat', 'keyframe.timelineFlat');
+  if (source.debugWebGPUIO !== undefined) warnDeprecated('debugWebGPUIO', 'debug.webgpuIO');
+  if (source.physicsValidation !== undefined)
+    warnDeprecated('physicsValidation', 'debug.physicsValidation');
+  if (source.webgpuCulling !== undefined) warnDeprecated('webgpuCulling', 'webgpu.culling');
+  if (source.webgpuStatesConditionalUpload !== undefined)
+    warnDeprecated('webgpuStatesConditionalUpload', 'webgpu.statesConditionalUpload');
+  if (source.webgpuForceStatesUpload !== undefined)
+    warnDeprecated('webgpuForceStatesUpload', 'webgpu.forceStatesUpload');
+  if (source.webgpuBatchedSubmit !== undefined)
+    warnDeprecated('webgpuBatchedSubmit', 'webgpu.batchedSubmit');
+  if (source.webgpuReadbackMode !== undefined)
+    warnDeprecated('webgpuReadbackMode', 'webgpu.readbackMode');
+  if (source.webgpuOutputBufferReuse !== undefined)
+    warnDeprecated('webgpuOutputBufferReuse', 'webgpu.outputBufferReuse');
+
+  const keyframe: NonNullable<MotionAppConfig['keyframe']> = {
+    ...(source.keyframe ?? {}),
+  };
+  if (source.keyframePreprocess !== undefined && keyframe.preprocess === undefined) {
+    keyframe.preprocess = source.keyframePreprocess;
+  }
+  if (source.keyframeSearchOptimized !== undefined && keyframe.searchOptimized === undefined) {
+    keyframe.searchOptimized = source.keyframeSearchOptimized;
+  }
+  if (source.keyframeEntryExpandOnGPU !== undefined && keyframe.entryExpandOnGPU === undefined) {
+    keyframe.entryExpandOnGPU = source.keyframeEntryExpandOnGPU;
+  }
+  if (source.keyframeSearchIndexed !== undefined && keyframe.searchIndexed === undefined) {
+    keyframe.searchIndexed = source.keyframeSearchIndexed;
+  }
+  if (
+    source.keyframeSearchIndexedMinKeyframes !== undefined &&
+    keyframe.searchIndexedMinKeyframes === undefined
+  ) {
+    keyframe.searchIndexedMinKeyframes = source.keyframeSearchIndexedMinKeyframes;
+  }
+  if (source.timelineFlat !== undefined && keyframe.timelineFlat === undefined) {
+    keyframe.timelineFlat = source.timelineFlat;
+  }
+
+  const debug: NonNullable<MotionAppConfig['debug']> = {
+    ...(source.debug ?? {}),
+  };
+  if (source.debugWebGPUIO !== undefined && debug.webgpuIO === undefined) {
+    debug.webgpuIO = source.debugWebGPUIO;
+  }
+  if (source.physicsValidation !== undefined && debug.physicsValidation === undefined) {
+    debug.physicsValidation = source.physicsValidation;
+  }
+
+  const webgpu: NonNullable<MotionAppConfig['webgpu']> = {
+    ...(source.webgpu ?? {}),
+  };
+  if (source.webgpuCulling !== undefined && webgpu.culling === undefined) {
+    webgpu.culling = source.webgpuCulling;
+  }
+  if (
+    source.webgpuStatesConditionalUpload !== undefined &&
+    webgpu.statesConditionalUpload === undefined
+  ) {
+    webgpu.statesConditionalUpload = source.webgpuStatesConditionalUpload;
+  }
+  if (source.webgpuForceStatesUpload !== undefined && webgpu.forceStatesUpload === undefined) {
+    webgpu.forceStatesUpload = source.webgpuForceStatesUpload;
+  }
+  if (source.webgpuBatchedSubmit !== undefined && webgpu.batchedSubmit === undefined) {
+    webgpu.batchedSubmit = source.webgpuBatchedSubmit;
+  }
+  if (source.webgpuReadbackMode !== undefined && webgpu.readbackMode === undefined) {
+    webgpu.readbackMode = source.webgpuReadbackMode;
+  }
+  if (source.webgpuOutputBufferReuse !== undefined && webgpu.outputBufferReuse === undefined) {
+    webgpu.outputBufferReuse = source.webgpuOutputBufferReuse;
+  }
+
+  return {
+    ...source,
+    keyframe: Object.keys(keyframe).length > 0 ? keyframe : undefined,
+    debug: Object.keys(debug).length > 0 ? debug : undefined,
+    webgpu: Object.keys(webgpu).length > 0 ? webgpu : undefined,
+  };
 }
 
 export interface EngineServices {
   world: import('./world').World;
   scheduler: import('./scheduler').SystemScheduler;
   app: MotionApp;
-  config: MotionAppConfig;
+  config: NormalizedMotionAppConfig;
   batchProcessor: import('./systems/batch').ComputeBatchProcessor;
   metrics: import('@g-motion/webgpu').GPUMetricsProvider;
   appContext: import('./context').AppContext;

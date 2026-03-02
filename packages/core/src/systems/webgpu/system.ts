@@ -14,37 +14,27 @@
  * - Buffer pooling and reuse
  */
 
-import { panic, createDebugger } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
 import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import {
-  __resetKeyframePassesForTests,
-  __resetOutputFormatPassForTests,
-  __resetViewportCullingPassForTests,
   clearPhysicsGPUEntities,
   createWebGPUFrameEncoder,
   getWebGPUEngine,
   resetWebGPUEngine,
   setPendingReadbackCount,
-} from '@g-motion/webgpu';
-import type { SystemContext, SystemDef } from '../../plugin';
+} from '@g-motion/webgpu/internal';
 import {
-  isKeyframeEntryExpandOnGPUEnabled,
-  isKeyframeSearchIndexedEnabled,
-  isWebGPUBatchedSubmitEnabled,
-  isWebGPUForceStatesUploadEnabled,
-  isWebGPUIODebugEnabled,
-  isWebGPUStatesConditionalUploadEnabled,
-  isWebGPUViewportCullingAsyncEnabled,
-  isWebGPUViewportCullingEnabled,
-  resolveKeyframeSearchIndexedMinKeyframes,
-  resolveKeyframeSearchOptimizedFlag,
-  resolveWebGPUOutputBufferReuseEnabled,
-  resolveWebGPUReadbackMode,
-} from './system-config';
+  __resetKeyframePassesForTests,
+  __resetOutputFormatPassForTests,
+  __resetViewportCullingPassForTests,
+} from '@g-motion/webgpu/testing';
+import type { SystemContext, SystemDef } from '../../plugin';
+import type { GPUFrameContext } from './frame-context';
+import { createGPUFrameContext } from './frame-context';
 
 import { initializeWebGPU } from './initialization';
 import {
@@ -56,12 +46,12 @@ import { dispatchPhysicsBatchForArchetype } from './system/physics-dispatch-syst
 import { processCompletedReadbacks } from './system/readback-processing-system';
 
 export {
-  __getKeyframeSearchShaderModeForTests,
   disableGPUOutputFormatPass,
   enableGPUOutputFormatPass,
   processOutputBuffer,
-  ProcessOutputBufferInput,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
+export type { ProcessOutputBufferInput } from '@g-motion/webgpu/internal';
+export { __getKeyframeSearchShaderModeForTests } from '@g-motion/webgpu/testing';
 export { debugIO, firstEntityChannelPreview, float32Preview } from './debug';
 export {
   clearPhysicsValidationShadow,
@@ -108,14 +98,13 @@ export const WebGPUComputeSystem: SystemDef = {
 
     const { world, metricsProvider, processor, config } = deps;
 
-    const debugIOEnabled = isWebGPUIODebugEnabled(config);
-    await initializeWebGPU(engine, { metricsProvider });
+    const initResult = await initializeWebGPU(engine, { metricsProvider });
     if (engine.mockWebGPU) {
       metricsProvider.updateStatus({ enabled: true });
       return;
     }
 
-    if (!engine.deviceAvailable) {
+    if (!initResult.success || !engine.deviceAvailable) {
       clearPhysicsGPUEntities();
       setPendingReadbackCount(0);
       metricsProvider.updateStatus({
@@ -123,15 +112,25 @@ export const WebGPUComputeSystem: SystemDef = {
         webgpuAvailable: false,
         gpuInitialized: false,
       });
-      panic('WebGPU is not available. This application requires WebGPU.');
+      const reason = initResult.deviceInit.ok ? 'no-device' : initResult.deviceInit.reason;
+      const message = initResult.deviceInit.ok
+        ? 'WebGPU device not available.'
+        : initResult.deviceInit.message;
+      warn(message, { reason });
+      return;
     }
 
     const device = engine.getGPUDevice();
     if (!device) {
-      panic('WebGPU device not available.', {
-        stage: 'device',
-        source: 'WebGPUComputeSystem',
+      clearPhysicsGPUEntities();
+      setPendingReadbackCount(0);
+      metricsProvider.updateStatus({
+        enabled: true,
+        webgpuAvailable: false,
+        gpuInitialized: false,
       });
+      warn('WebGPU device not available.');
+      return;
     }
 
     try {
@@ -140,13 +139,23 @@ export const WebGPUComputeSystem: SystemDef = {
 
     await ensureWebGPUPipelines({ engine, device, metricsProvider });
 
+    const frameContext = createGPUFrameContext({
+      world,
+      processor,
+      config,
+      device,
+      metricsProvider,
+      dtMsInput: _dt,
+      sampling: ctx?.sampling,
+    });
+
     processCompletedReadbacks({
       engine,
       device,
       metricsProvider,
       processor,
       config,
-      debugIOEnabled,
+      debugIOEnabled: frameContext.flags.debugIOEnabled,
     });
 
     metricsProvider.updateStatus({ enabled: true });
@@ -160,22 +169,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     engine.beginFrame();
 
-    const { dtMs, dtSec, maxVelocity } = resolvePhysicsTiming(_dt, ctx, config);
-    const flags = resolveProcessingFlags(world, config);
-
-    await processArchetypeBatches({
-      archetypeBatches,
-      world,
-      processor,
-      config,
-      device,
-      metricsProvider,
-      debugIOEnabled,
-      dtMs,
-      dtSec,
-      maxVelocity,
-      ...flags,
-    });
+    await processArchetypeBatches(frameContext, archetypeBatches);
 
     sp.nextFrame();
     engine.endFrame();
@@ -196,93 +190,13 @@ function resolveComputeDeps(ctx: SystemContext | undefined): {
   return { world, metricsProvider, processor, config };
 }
 
-function resolvePhysicsTiming(
-  dtMsInput: number,
-  ctx: SystemContext | undefined,
-  config: NonNullable<SystemContext['services']['config']>,
-): { dtMs: number; dtSec: number; maxVelocity: number } {
-  const globalSpeed = config.globalSpeed ?? 1;
-  const samplingMode = config.samplingMode ?? 'time';
-  const baseDtMs =
-    samplingMode === 'frame' && typeof ctx?.sampling?.deltaTimeMs === 'number'
-      ? ctx!.sampling!.deltaTimeMs
-      : dtMsInput;
-  const dtMs = baseDtMs * globalSpeed;
-  return {
-    dtMs,
-    dtSec: dtMs / 1000,
-    maxVelocity: config.physicsMaxVelocity ?? 10000,
-  };
-}
-
-function resolveProcessingFlags(
-  world: SystemContext['services']['world'] | null,
-  config: NonNullable<SystemContext['services']['config']>,
-): {
-  preprocessEnabled: boolean;
-  useOptimizedKeyframeSearch: boolean;
-  keyframeSearchIndexedEnabled: boolean;
-  keyframeSearchIndexedMinKeyframes: number;
-  keyframeEntryExpandOnGPUEnabled: boolean;
-  viewportCullingEnabled: boolean;
-  viewportCullingAsyncEnabled: boolean;
-  statesConditionalUploadEnabled: boolean;
-  forceStatesUploadEnabled: boolean;
-  outputBufferReuseEnabled: boolean;
-} {
-  const preprocessEnabled = !!config.keyframePreprocess?.enabled;
-  const useOptimizedKeyframeSearch = resolveKeyframeSearchOptimizedFlag(config);
-  const keyframeSearchIndexedEnabled = isKeyframeSearchIndexedEnabled(config);
-  const keyframeSearchIndexedMinKeyframes = resolveKeyframeSearchIndexedMinKeyframes(config);
-  const keyframeEntryExpandOnGPUEnabled = isKeyframeEntryExpandOnGPUEnabled(config);
-  const readbackMode = resolveWebGPUReadbackMode(config);
-  const viewportCullingEnabled =
-    !!world && (isWebGPUViewportCullingEnabled(config) || readbackMode === 'visible');
-  const viewportCullingAsyncEnabled =
-    viewportCullingEnabled && isWebGPUViewportCullingAsyncEnabled(config);
-  return {
-    preprocessEnabled,
-    useOptimizedKeyframeSearch,
-    keyframeSearchIndexedEnabled,
-    keyframeSearchIndexedMinKeyframes,
-    keyframeEntryExpandOnGPUEnabled,
-    viewportCullingEnabled,
-    viewportCullingAsyncEnabled,
-    statesConditionalUploadEnabled: isWebGPUStatesConditionalUploadEnabled(config),
-    forceStatesUploadEnabled: isWebGPUForceStatesUploadEnabled(config),
-    outputBufferReuseEnabled: resolveWebGPUOutputBufferReuseEnabled(config),
-  };
-}
-
-async function processArchetypeBatches(params: {
-  archetypeBatches: Map<string, ArchetypeBatchDescriptor>;
-  world: SystemContext['services']['world'] | null;
-  processor: NonNullable<SystemContext['services']['batchProcessor']>;
-  config: NonNullable<SystemContext['services']['config']>;
-  device: GPUDevice;
-  metricsProvider: NonNullable<SystemContext['services']['metrics']>;
-  debugIOEnabled: boolean;
-  preprocessEnabled: boolean;
-  useOptimizedKeyframeSearch: boolean;
-  keyframeSearchIndexedEnabled: boolean;
-  keyframeSearchIndexedMinKeyframes: number;
-  keyframeEntryExpandOnGPUEnabled: boolean;
-  viewportCullingEnabled: boolean;
-  viewportCullingAsyncEnabled: boolean;
-  statesConditionalUploadEnabled: boolean;
-  forceStatesUploadEnabled: boolean;
-  outputBufferReuseEnabled: boolean;
-  dtMs: number;
-  dtSec: number;
-  maxVelocity: number;
-}): Promise<void> {
+async function processArchetypeBatches(
+  frameContext: GPUFrameContext,
+  archetypeBatches: Map<string, ArchetypeBatchDescriptor>,
+): Promise<void> {
+  const { device, services, flags, physics } = frameContext;
+  const { world, processor, config, metricsProvider } = services;
   const {
-    archetypeBatches,
-    world,
-    processor,
-    config,
-    device,
-    metricsProvider,
     debugIOEnabled,
     preprocessEnabled,
     useOptimizedKeyframeSearch,
@@ -294,16 +208,13 @@ async function processArchetypeBatches(params: {
     statesConditionalUploadEnabled,
     forceStatesUploadEnabled,
     outputBufferReuseEnabled,
-    dtMs,
-    dtSec,
-    maxVelocity,
-  } = params;
-
-  const batchedSubmitEnabled = isWebGPUBatchedSubmitEnabled(config);
-  const queue = device.queue;
+    batchedSubmitEnabled,
+  } = flags;
+  const { dtMs, dtSec, maxVelocity } = physics;
+  const { gpu, queue } = device;
   const frame = batchedSubmitEnabled
     ? createWebGPUFrameEncoder({
-        device,
+        device: gpu,
         timingHelper: engine.timingHelper,
         label: `motion-frame-${engine.frameId}`,
       })
@@ -348,7 +259,7 @@ async function processArchetypeBatches(params: {
         if (batch.kind === 'physics') {
           await dispatchPhysicsBatchForArchetype({
             engine,
-            device,
+            device: gpu,
             processor,
             config,
             batch: batch as PhysicsBatchDescriptor,
@@ -363,7 +274,7 @@ async function processArchetypeBatches(params: {
 
         await processInterpolationArchetype({
           engine,
-          device,
+          device: gpu,
           world,
           processor,
           metricsProvider,

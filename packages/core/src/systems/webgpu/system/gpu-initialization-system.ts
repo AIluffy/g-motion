@@ -1,12 +1,12 @@
-import type { MotionAppConfig } from '../../../plugin';
+import type { NormalizedMotionAppConfig } from '../../../plugin';
 import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
-import { getOutputFormatBufferPoolStats } from '@g-motion/webgpu';
-import type { GPUMetricsProvider } from '@g-motion/webgpu';
-import type { WebGPUEngine } from '@g-motion/webgpu';
+import { getOutputFormatBufferPoolStats } from '@g-motion/webgpu/internal';
+import type { GPUMetricsProvider, WebGPUInitResult } from '@g-motion/webgpu/internal';
+import type { WebGPUEngine } from '@g-motion/webgpu/internal';
 import {
   ensureWebGPUInitialized as ensureWebGPUInitializedCore,
   ensureWebGPUPipelines as ensureWebGPUPipelinesCore,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,
@@ -17,10 +17,10 @@ const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
 export async function ensureWebGPUInitialized(params: {
   engine: WebGPUEngine;
   metricsProvider: GPUMetricsProvider;
-}): Promise<void> {
+}): Promise<WebGPUInitResult> {
   const { engine, metricsProvider } = params;
   const deps = buildInitDeps(metricsProvider);
-  await ensureWebGPUInitializedCore({ engine, deps });
+  return ensureWebGPUInitializedCore({ engine, deps });
 }
 
 export async function ensureWebGPUPipelines(params: {
@@ -36,7 +36,7 @@ export async function ensureWebGPUPipelines(params: {
 export function maybeSampleOutputFormatPoolStats(params: {
   engine: WebGPUEngine;
   metricsProvider: GPUMetricsProvider;
-  config: MotionAppConfig;
+  config: NormalizedMotionAppConfig;
   device: GPUDevice;
 }): void {
   const { engine, metricsProvider, config, device } = params;

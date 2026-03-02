@@ -3,8 +3,8 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/webgpu';
-import { selectWorkgroupSize } from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
+import { selectWorkgroupSize } from '@g-motion/webgpu/internal';
 import type { BatchStatistics } from './batchStatistics';
 import type { EntityIdLeasePool } from './entityIdLeasePool';
 
@@ -36,7 +36,7 @@ export class GPUBatchDispatcher {
       });
     }
 
-    const workgroupHint = this.selectWorkgroup(entityCount);
+    const workgroupHint = this.selectWorkgroup(archetypeId, entityCount);
 
     const batch: GPUBatchDescriptor = {
       archetypeId,
@@ -94,7 +94,9 @@ export class GPUBatchDispatcher {
     }
 
     const hint =
-      typeof workgroupHint === 'number' ? workgroupHint : this.selectWorkgroup(slotCount);
+      typeof workgroupHint === 'number'
+        ? workgroupHint
+        : this.selectWorkgroup(baseArchetypeId, slotCount);
     const batch: PhysicsBatchDescriptor = {
       archetypeId,
       entityIds,
@@ -155,8 +157,8 @@ export class GPUBatchDispatcher {
     this.stats.setArchetypeCount(0);
   }
 
-  selectWorkgroup(entityCount: number): number {
-    return selectWorkgroupSize(entityCount);
+  selectWorkgroup(archetypeId: string, entityCount: number): number {
+    return selectWorkgroupSize(archetypeId, entityCount);
   }
 
   clear(): void {

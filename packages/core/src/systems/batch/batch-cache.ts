@@ -15,8 +15,7 @@
  */
 
 import type { PreprocessedKeyframes } from '@g-motion/shared';
-import type { GPUBatchDescriptor } from '@g-motion/webgpu';
-import type { RawKeyframeGenerationOptions } from '@g-motion/webgpu';
+import type { GPUBatchDescriptor, RawKeyframeGenerationOptions } from '@g-motion/webgpu/internal';
 
 // ---------------------------------------------------------------------------
 // Version hash

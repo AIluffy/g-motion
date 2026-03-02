@@ -1,5 +1,5 @@
 import { createDebugger } from '@g-motion/shared';
-import { getGPUMetricsProvider, resetWebGPUEngine } from '@g-motion/webgpu';
+import { getGPUMetricsProvider, resetWebGPUEngine } from '@g-motion/webgpu/internal';
 import { App, appWorld, app as globalApp, registerBuiltInRenderers } from './app';
 import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';

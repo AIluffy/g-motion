@@ -145,6 +145,27 @@ const engine = createEngine();
 engine.use(ExamplePlugin);
 ```
 
+## MotionAppConfig 迁移指南
+
+本次调整将 WebGPU、关键帧与调试配置收拢到嵌套对象。旧字段仍可用但会输出 warn，新字段优先。映射关系：`keyframePreprocess`→`keyframe.preprocess`，`keyframeSearchOptimized`→`keyframe.searchOptimized`，`keyframeEntryExpandOnGPU`→`keyframe.entryExpandOnGPU`，`keyframeSearchIndexed`→`keyframe.searchIndexed`，`keyframeSearchIndexedMinKeyframes`→`keyframe.searchIndexedMinKeyframes`，`timelineFlat`→`keyframe.timelineFlat`；`debugWebGPUIO`→`debug.webgpuIO`，`physicsValidation`→`debug.physicsValidation`；`webgpuCulling`→`webgpu.culling`，`webgpuStatesConditionalUpload`→`webgpu.statesConditionalUpload`，`webgpuForceStatesUpload`→`webgpu.forceStatesUpload`，`webgpuBatchedSubmit`→`webgpu.batchedSubmit`，`webgpuReadbackMode`→`webgpu.readbackMode`，`webgpuOutputBufferReuse`→`webgpu.outputBufferReuse`。
+
+旧配置：
+```ts
+const config = {
+  keyframeSearchOptimized: true,
+  webgpuReadbackMode: 'visible',
+  debugWebGPUIO: true,
+};
+```
+新配置：
+```ts
+const config = {
+  keyframe: { searchOptimized: true },
+  webgpu: { readbackMode: 'visible' },
+  debug: { webgpuIO: true },
+};
+```
+
 ## Frame-based Sampling
 
 `MotionAppConfig` 支持配置采样模式：

@@ -6,7 +6,7 @@ export interface PendingReadback {
   archetypeId: string;
   entityIds: ArrayLike<number>;
   stagingBuffer: GPUBuffer;
-  mapPromise: Promise<void>;
+  mapPromise: PendingReadbackPromise;
   timestamp: number;
   timeoutMs: number;
   byteSize: number;
@@ -34,6 +34,11 @@ export interface PendingReadback {
   // Cleanup invoked by AsyncReadbackManager after unmap or on clear. Must be idempotent.
   release?: () => void;
   released?: boolean;
+}
+
+export interface PendingReadbackPromise {
+  promise: Promise<void>;
+  settled: boolean;
 }
 
 export class AsyncReadbackManager {
@@ -64,11 +69,12 @@ export class AsyncReadbackManager {
     release?: () => void,
   ): void {
     const startTime = getNowMs();
+    const pendingPromise: PendingReadbackPromise = { promise: mapPromise, settled: false };
     const entry: PendingReadback = {
       archetypeId,
       entityIds,
       stagingBuffer,
-      mapPromise,
+      mapPromise: pendingPromise,
       timestamp: getNowMs(),
       timeoutMs,
       byteSize,
@@ -81,15 +87,14 @@ export class AsyncReadbackManager {
     };
 
     // Attach settled flag handler
-    (mapPromise as any).settled = false;
-    mapPromise
+    pendingPromise.promise
       .then(() => {
-        (entry.mapPromise as any).settled = true;
+        pendingPromise.settled = true;
         entry.resolveTime = getNowMs();
       })
       .catch(() => {
         // Ignore map errors here, handled in drain
-        (entry.mapPromise as any).settled = true;
+        pendingPromise.settled = true;
         entry.resolveTime = getNowMs();
       });
 
@@ -107,11 +112,12 @@ export class AsyncReadbackManager {
     release?: () => void,
   ): void {
     const startTime = getNowMs();
+    const pendingPromise: PendingReadbackPromise = { promise: mapPromise, settled: false };
     const entry: PendingReadback = {
       archetypeId,
       entityIds: [],
       stagingBuffer,
-      mapPromise,
+      mapPromise: pendingPromise,
       timestamp: getNowMs(),
       timeoutMs,
       byteSize,
@@ -121,14 +127,13 @@ export class AsyncReadbackManager {
       startTime,
     };
 
-    (mapPromise as any).settled = false;
-    mapPromise
+    pendingPromise.promise
       .then(() => {
-        (entry.mapPromise as any).settled = true;
+        pendingPromise.settled = true;
         entry.resolveTime = getNowMs();
       })
       .catch(() => {
-        (entry.mapPromise as any).settled = true;
+        pendingPromise.settled = true;
         entry.resolveTime = getNowMs();
       });
 
@@ -192,7 +197,7 @@ export class AsyncReadbackManager {
 
       // Try to resolve (non-blocking check)
       try {
-        const settled = (p.mapPromise as any).settled ?? false;
+        const settled = p.mapPromise.settled;
         if (!settled) {
           continue;
         }

@@ -1,6 +1,6 @@
 import { createDebugger, getNowMs, isFatalError } from '@g-motion/shared';
-import { getPersistentGPUBufferManager } from '@g-motion/webgpu';
-import type { EngineServices, MotionAppConfig, SystemContext, SystemDef } from './plugin';
+import { getPersistentGPUBufferManager } from '@g-motion/webgpu/internal';
+import type { EngineServices, NormalizedMotionAppConfig, SystemContext, SystemDef } from './plugin';
 import { FrameSampler } from './utils';
 
 const warn = createDebugger('SchedulerProcessor', 'warn');
@@ -23,7 +23,7 @@ export class SchedulerProcessor {
     dtMs: number;
     services: EngineServices;
     systems: SystemDef[];
-    getWorld: () => { config: MotionAppConfig } | null;
+    getWorld: () => { config: NormalizedMotionAppConfig } | null;
   }): void {
     const { dtMs, services, systems, getWorld } = params;
 
@@ -39,7 +39,7 @@ export class SchedulerProcessor {
     this.engineFrame++;
     this.elapsedMs += dtMs;
 
-    const config: MotionAppConfig = services.config ?? getWorld()?.config ?? {};
+    const config: NormalizedMotionAppConfig = services.config ?? getWorld()?.config ?? {};
     const sampling = this.frameSampler.compute(this.elapsedMs, config);
     const samplingRate =
       typeof config.metricsSamplingRate === 'number' ? config.metricsSamplingRate : 1;

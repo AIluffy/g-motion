@@ -3,15 +3,15 @@ import type {
   PhysicsBatchDescriptor,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import {
   dispatchPhysicsBatch,
   getPersistentGPUBufferManager,
   markPhysicsGPUEntity,
   PHYSICS_STATE_STRIDE,
   setPendingReadbackCount,
-} from '@g-motion/webgpu';
-import type { MotionAppConfig } from '../../../plugin';
+} from '@g-motion/webgpu/internal';
+import type { NormalizedMotionAppConfig } from '../../../plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';
 
@@ -28,7 +28,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   engine: WebGPUEngine;
   device: GPUDevice;
   processor: ComputeBatchProcessor;
-  config: MotionAppConfig;
+  config: NormalizedMotionAppConfig;
   batch: PhysicsBatchDescriptor;
   dtMs: number;
   dtSec: number;
@@ -101,8 +101,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
     ).buffer;
   }
 
-  const validateEnabled =
-    config.physicsValidation === true || config.debug?.physicsValidation === true;
+  const validateEnabled = config.debug?.physicsValidation === true;
   if (validateEnabled && physics.stateData) {
     physicsValidationShadow.set(baseArchetypeId, {
       slotCount,

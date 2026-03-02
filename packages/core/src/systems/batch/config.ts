@@ -14,10 +14,10 @@ export const DEFAULT_MAX_BATCH_SIZE = 1024;
 /**
  * Available workgroup sizes for GPU compute dispatch
  * Adaptive selection based on entity count:
- * - < 64 entities: WG=16
- * - < 256 entities: WG=32
- * - < 1024 entities: WG=64
- * - >= 1024 entities: WG=128
+ * - ≤ 32 entities: WG=32
+ * - ≤ 128 entities: WG=64
+ * - ≤ 512 entities: WG=128
+ * - > 512 entities: WG=256
  */
 export const WORKGROUP_SIZES = [
   WebGPUConstants.WORKGROUP.SIZE_SMALL,

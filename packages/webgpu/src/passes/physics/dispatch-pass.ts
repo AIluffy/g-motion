@@ -1,5 +1,9 @@
 import { getGPUMetricsProvider } from '../../metrics-provider';
-import { getPipelineForWorkgroup, selectWorkgroupSize } from '../../pipeline';
+import {
+  getPipelineForWorkgroup,
+  recordWorkgroupTiming,
+  selectWorkgroupSize,
+} from '../../pipeline';
 import type { TimingHelper, TimingToken } from '../../timing-helper';
 import { createDebugger } from '@g-motion/shared';
 import type { WebGPUFrameEncoder } from '../../command-encoder';
@@ -44,9 +48,10 @@ export async function dispatchPhysicsBatch(input: {
     throw new Error('dispatchPhysicsBatch: slotCount must be > 0');
   }
 
-  const pipeline = await getPipelineForWorkgroup(device, workgroupHint, 'physics');
+  const workgroupSize = selectWorkgroupSize(workgroupHint);
+  const pipeline = await getPipelineForWorkgroup(device, workgroupSize, 'physics');
   if (!pipeline) {
-    throw new Error(`dispatchPhysicsBatch: failed to get pipeline for workgroup ${workgroupHint}`);
+    throw new Error(`dispatchPhysicsBatch: failed to get pipeline for workgroup ${workgroupSize}`);
   }
 
   const bindGroup = device.createBindGroup({
@@ -59,7 +64,6 @@ export async function dispatchPhysicsBatch(input: {
     ],
   });
 
-  const workgroupSize = selectWorkgroupSize(workgroupHint);
   const workgroupsX = Math.ceil(slotCount / workgroupSize);
 
   if (frame) {
@@ -102,7 +106,9 @@ export async function dispatchPhysicsBatch(input: {
                 gpuComputeTimeMs: gpuTimeMs,
                 gpuComputeTimeNs: gpuTimeNs,
                 workgroupsDispatched: workgroupsX,
+                workgroupSize,
               });
+              recordWorkgroupTiming(archetypeId, workgroupSize, gpuTimeMs);
             })
             .catch((error) => {
               warn('timingHelper.getResult failed', { archetypeId, slotCount, error });

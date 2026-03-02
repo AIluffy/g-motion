@@ -77,9 +77,8 @@ export function packEntityStates(input: StatePackerInput): PackedStates {
     const i = entityIndicesBuf[eIndex];
     const stateObj = stateBuffer[i] as MotionStateData;
 
-    const status = typedStatus
-      ? (typedStatus[i] as unknown as MotionStatus)
-      : (stateObj.status as unknown as MotionStatus);
+    const statusValue = typedStatus ? typedStatus[i] : Number(stateObj.status ?? MotionStatus.Idle);
+    const status = isMotionStatus(statusValue) ? statusValue : MotionStatus.Idle;
 
     if (status === MotionStatus.Running) runningCount++;
     else if (status === MotionStatus.Paused) pausedCount++;
@@ -96,16 +95,16 @@ export function packEntityStates(input: StatePackerInput): PackedStates {
     statesData[offset] = startTime;
     statesData[offset + 1] = currentTime;
     statesData[offset + 2] = playbackRate;
-    statesData[offset + 3] = status as unknown as number;
+    statesData[offset + 3] = status;
 
-    version = hashMotionStateVersionStep(
-      version,
-      startTime,
-      currentTime,
-      playbackRate,
-      status as unknown as number,
-    );
+    version = hashMotionStateVersionStep(version, startTime, currentTime, playbackRate, status);
   }
 
   return { data: statesData, version, runningCount, pausedCount };
 }
+
+const isMotionStatus = (value: number): value is MotionStatus =>
+  value === MotionStatus.Idle ||
+  value === MotionStatus.Running ||
+  value === MotionStatus.Paused ||
+  value === MotionStatus.Finished;

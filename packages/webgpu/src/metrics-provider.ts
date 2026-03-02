@@ -36,6 +36,7 @@ export interface GPUBatchMetric {
   gpuComputeTimeMs?: number;
   gpuComputeTimeNs?: number;
   workgroupsDispatched?: number;
+  workgroupSize?: number;
 }
 
 export interface GPUArchetypeTiming {
@@ -292,20 +293,27 @@ class InMemoryGPUMetricsProvider implements GPUMetricsProvider {
   }
 }
 
-let provider: GPUMetricsProvider | null = null;
+let defaultProvider: GPUMetricsProvider | null = null;
+
+export function createGPUMetricsProvider(): GPUMetricsProvider {
+  return new InMemoryGPUMetricsProvider();
+}
+
+export function setDefaultGPUMetricsProvider(customProvider: GPUMetricsProvider | null): void {
+  defaultProvider = customProvider;
+}
 
 export function getGPUMetricsProvider(): GPUMetricsProvider {
-  if (!provider) {
-    const impl = new InMemoryGPUMetricsProvider();
-    provider = impl;
+  if (!defaultProvider) {
+    defaultProvider = new InMemoryGPUMetricsProvider();
   }
-  return provider;
+  return defaultProvider;
 }
 
 export function setGPUMetricsProvider(customProvider: GPUMetricsProvider): void {
-  provider = customProvider;
+  defaultProvider = customProvider;
 }
 
 export function __resetGPUMetricsProviderForTests(): void {
-  provider = null;
+  defaultProvider = null;
 }

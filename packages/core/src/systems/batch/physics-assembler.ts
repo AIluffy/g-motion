@@ -21,7 +21,7 @@ import type {
   Track,
 } from '@g-motion/shared';
 import { MotionStatus } from '../../components/state';
-import { PHYSICS_STATE_STRIDE } from '@g-motion/webgpu';
+import { PHYSICS_STATE_STRIDE } from '@g-motion/webgpu/internal';
 import type { ArchetypeTypedBuffer } from '../../archetype';
 import { writeEmptySlot, writeInertiaSlot, writeSpringSlot } from './physics-slots';
 

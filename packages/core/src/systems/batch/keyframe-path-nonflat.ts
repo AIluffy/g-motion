@@ -11,8 +11,10 @@
 
 import type { TimelineData, Track } from '@g-motion/shared';
 import { KEYFRAME_FLOATS } from './constants';
-import type { BezierKf, PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
-import { getFlatTracks, tryReusePackedCache, writeSingleKeyframe } from './keyframe-utils';
+import type { KeyframeLike } from './keyframe-pack';
+import { packSingleKeyframe } from './keyframe-pack';
+import type { PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
+import { getFlatTracks, tryReusePackedCache } from './keyframe-utils';
 import { bufferCache } from './utils';
 
 export function serializeNonFlatPath(
@@ -56,7 +58,7 @@ export function serializeNonFlatPath(
   const writeTrack = (track: Track) => {
     if (!Array.isArray(track) || track.length === 0) return;
     for (const kf of track) {
-      writeSingleKeyframe(keyframesData, w, kf as BezierKf);
+      packSingleKeyframe(kf as KeyframeLike, keyframesData, w);
       w += KEYFRAME_FLOATS;
     }
   };

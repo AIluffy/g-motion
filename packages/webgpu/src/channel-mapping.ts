@@ -179,13 +179,19 @@ export class GPUChannelMappingRegistry {
 /**
  * Global singleton instance
  */
-let registryInstance: GPUChannelMappingRegistry | null = null;
+let defaultRegistry: GPUChannelMappingRegistry | null = null;
 
 export function getGPUChannelMappingRegistry(): GPUChannelMappingRegistry {
-  if (!registryInstance) {
-    registryInstance = new GPUChannelMappingRegistry();
+  if (!defaultRegistry) {
+    defaultRegistry = new GPUChannelMappingRegistry();
   }
-  return registryInstance;
+  return defaultRegistry;
+}
+
+export function setDefaultGPUChannelMappingRegistry(
+  registry: GPUChannelMappingRegistry | null,
+): void {
+  defaultRegistry = registry;
 }
 
 function createPrimitiveChannelTable(batchId: string): BatchChannelTable {

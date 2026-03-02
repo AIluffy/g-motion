@@ -14,5 +14,6 @@ export {
   dispatchPhysicsBatch,
   getPipelineForWorkgroup,
   initWebGPUCompute,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
+export { enqueueGPUResults } from '@g-motion/webgpu/internal';
 export { WebGPUComputeSystem } from './system';

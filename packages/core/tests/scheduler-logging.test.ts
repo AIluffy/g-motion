@@ -7,7 +7,7 @@ import {
   drainGPUResults,
   enqueueGPUResults,
   setPendingReadbackCount,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { panic } from '@g-motion/shared';
 import { AppContext } from '../src/context';

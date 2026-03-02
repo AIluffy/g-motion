@@ -3,7 +3,8 @@ import { EntityManager } from './entity';
 import { SystemScheduler } from './scheduler';
 import type { Archetype } from './archetype';
 import type { ComponentValue } from '@g-motion/shared';
-import type { MotionAppConfig } from './plugin';
+import type { MotionAppConfig, NormalizedMotionAppConfig } from './plugin';
+import { normalizeConfig } from './plugin';
 import { ArchetypeManager, type MotionStatusCoordinator } from './archetypeManager';
 import { SystemCoordinator } from './systemCoordinator';
 
@@ -23,7 +24,7 @@ export class World {
   readonly registry = new ComponentRegistry();
   readonly entityManager = new EntityManager();
   readonly scheduler = new SystemScheduler();
-  private _config: MotionAppConfig;
+  private _config: NormalizedMotionAppConfig;
   private systemCoordinator: SystemCoordinator;
   private archetypeManager: ArchetypeManager;
 
@@ -34,7 +35,7 @@ export class World {
     const namespaceOffset = World.worldCounter++ * 1_000_000;
     this.entityManager.setOffset(namespaceOffset);
 
-    this._config = { ...config };
+    this._config = normalizeConfig(config ?? {});
 
     let systems: SystemCoordinator | undefined;
     const motion: MotionStatusCoordinator = {
@@ -55,12 +56,12 @@ export class World {
     return new World(config);
   }
 
-  get config(): MotionAppConfig {
+  get config(): NormalizedMotionAppConfig {
     return this._config;
   }
 
   setConfig(config?: MotionAppConfig): void {
-    this._config = { ...config };
+    this._config = normalizeConfig(config ?? {});
   }
 
   resetState(): void {

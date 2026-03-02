@@ -164,6 +164,9 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
+      '@webgpu/types':
+        specifier: ^0.1.67
+        version: 0.1.67
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -239,6 +242,9 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
+      '@webgpu/types':
+        specifier: ^0.1.67
+        version: 0.1.67
       jsdom:
         specifier: ^27.2.0
         version: 27.2.0
@@ -264,6 +270,9 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
+      '@webgpu/types':
+        specifier: ^0.1.67
+        version: 0.1.67
       jsdom:
         specifier: ^27.2.0
         version: 27.2.0

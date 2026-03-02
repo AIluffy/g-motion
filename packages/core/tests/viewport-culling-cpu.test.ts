@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
-  __resetCullingPassForTests,
   collectViewportCullingCPUInputs,
   ENTITY_BOUNDS_STRIDE,
   RENDER_STATE_EX_STRIDE,
-} from '@g-motion/webgpu';
+} from '@g-motion/webgpu/internal';
+import { __resetCullingPassForTests } from '@g-motion/webgpu/testing';
 
 describe('Viewport culling CPU inputs', () => {
   beforeEach(() => {

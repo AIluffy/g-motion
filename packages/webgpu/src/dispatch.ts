@@ -4,7 +4,7 @@ import { getGPUMetricsProvider } from './metrics-provider';
 import type { OutputBufferReadbackTag } from './output-buffer-pool';
 import { acquirePooledOutputBuffer } from './output-buffer-pool';
 import { getPersistentGPUBufferManager } from './persistent-buffer-manager';
-import { getPipelineForWorkgroup, selectWorkgroupSize } from './pipeline';
+import { getPipelineForWorkgroup, recordWorkgroupTiming, selectWorkgroupSize } from './pipeline';
 import type { TimingHelper, TimingToken } from './timing-helper';
 export { dispatchPhysicsBatch } from './passes/physics/dispatch-pass';
 
@@ -28,6 +28,13 @@ export async function dispatchGPUBatch(
   entityCount: number;
   archetypeId: string;
 }> {
+  const getBufferSize = (buffer: GPUBuffer): number | undefined => {
+    if ('size' in buffer && typeof (buffer as GPUBuffer & { size: number }).size === 'number') {
+      return (buffer as GPUBuffer & { size: number }).size;
+    }
+    return undefined;
+  };
+
   if (batch.entityCount === 0) {
     throw new Error('dispatchGPUBatch: entityCount must be > 0');
   }
@@ -40,33 +47,34 @@ export async function dispatchGPUBatch(
     statesConditionalUploadEnabled && typeof batch.statesVersion === 'number'
       ? batch.statesVersion
       : undefined;
+  const keyframesContentVersion =
+    typeof batch.keyframesVersion === 'number' ? batch.keyframesVersion : undefined;
   const shouldForceUploadStates = forceStatesUploadEnabled || !statesConditionalUploadEnabled;
 
-  const stateGPUBuffer = bufferManager.getOrCreateBuffer(
+  const stateGPUBuffer = bufferManager.uploadIfChanged(
     `states:${archetypeId}`,
     batch.statesData,
     (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as GPUBufferUsageFlags,
     {
       label: `state-${archetypeId}`,
       allowGrowth: true,
-      skipChangeDetection: shouldForceUploadStates,
-      contentVersion: statesContentVersion,
-      forceUpdate: forceStatesUploadEnabled,
+      forceUpdate: shouldForceUploadStates,
+      versionHint: statesContentVersion,
     },
   );
 
-  const keyframeGPUBuffer = bufferManager.getOrCreateBuffer(
+  const keyframeGPUBuffer = bufferManager.uploadIfChanged(
     `keyframes:${archetypeId}`,
     batch.keyframesData,
     (GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST) as GPUBufferUsageFlags,
     {
       label: `keyframes-${archetypeId}`,
       allowGrowth: true,
-      contentVersion: batch.keyframesVersion,
+      versionHint: keyframesContentVersion,
     },
   );
 
-  const stateBufferSize = (stateGPUBuffer as { size?: number }).size;
+  const stateBufferSize = getBufferSize(stateGPUBuffer);
   const floatsPerState = 4;
   const bytesPerState = floatsPerState * 4;
   const entityCapacity =
@@ -97,14 +105,13 @@ export async function dispatchGPUBatch(
     });
   }
 
-  const pipeline = await getPipelineForWorkgroup(device, batch.workgroupHint, 'interp');
+  const workgroupSize = selectWorkgroupSize(batch.workgroupHint);
+  const pipeline = await getPipelineForWorkgroup(device, workgroupSize, 'interp');
   if (!pipeline) {
     stateGPUBuffer.destroy();
     keyframeGPUBuffer.destroy();
     outputBuffer.destroy();
-    throw new Error(
-      `dispatchGPUBatch: failed to get pipeline for workgroup ${batch.workgroupHint}`,
-    );
+    throw new Error(`dispatchGPUBatch: failed to get pipeline for workgroup ${workgroupSize}`);
   }
 
   const bindGroup = device.createBindGroup({
@@ -116,7 +123,6 @@ export async function dispatchGPUBatch(
     ],
   });
 
-  const workgroupSize = selectWorkgroupSize(batch.workgroupHint);
   const workgroupsX = Math.ceil(batch.entityCount / workgroupSize);
 
   if (frame) {
@@ -159,7 +165,9 @@ export async function dispatchGPUBatch(
                 gpuComputeTimeMs: gpuTimeMs,
                 gpuComputeTimeNs: gpuTimeNs,
                 workgroupsDispatched: workgroupsX,
+                workgroupSize,
               });
+              recordWorkgroupTiming(archetypeId, workgroupSize, gpuTimeMs);
             })
             .catch(() => {});
         }
