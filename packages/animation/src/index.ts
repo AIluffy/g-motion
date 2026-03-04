@@ -11,6 +11,7 @@ import {
 } from './api/mark';
 import { isVisualTargetCached } from './api/visual-target';
 import { registerAnimationSystems } from './registery';
+import type { MotionTarget } from './types';
 
 const initializedWorlds = new WeakSet<World>();
 
@@ -134,12 +135,12 @@ export function inspectTargets(
   };
 }
 
-export const motion = (target: any, options?: MotionOptions) => {
+export const motion = <T extends MotionTarget = any>(target: T, options?: MotionOptions) => {
   const world = WorldProvider.useWorld();
   initEngine(world);
   const root = typeof document !== 'undefined' ? document : null;
   const builderTarget = normalizeTargets(target, root, options);
-  return builderMotion(builderTarget);
+  return builderMotion<T>(builderTarget as T);
 };
 
 type ScopedMotionFn = ((target: any) => ReturnType<typeof builderMotion>) & {
@@ -173,4 +174,5 @@ export * from './api/control';
 export * from './api/gpu-status';
 export * from './api/mark';
 export * from './api/visual-target';
+export * from './types';
 export { engine } from './engine';

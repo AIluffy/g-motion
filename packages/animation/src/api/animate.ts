@@ -3,9 +3,10 @@ import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
 import type { AnimationOptions } from './animation-options';
+import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types';
 import { motion } from '..';
 
-export interface AnimateOptions extends AnimationOptions {
+export interface AnimateOptions<TValue = any> extends AnimationOptions<TValue> {
   times?: number[];
 }
 
@@ -156,11 +157,17 @@ function applyAnimateMark(
   builder.mark(buildKeyframeMarks(keys, to, keyframeCount, totalDuration, options));
 }
 
+export function animate<T extends MotionTarget = any>(
+  target: T,
+  to: AnimatableProps<MotionTargetValue<T>>,
+  options?: AnimateOptions<AnimatableProps<MotionTargetValue<T>>>,
+): AnimationControl & PromiseLike<void>;
+
 export function animate(
   target: any,
   to: number | Record<string, unknown>,
   options?: AnimateOptions,
-): AnimationControl {
+): AnimationControl & PromiseLike<void> {
   const builder = motion(target);
   const targetType = getTargetType(target);
 
@@ -177,5 +184,5 @@ export function animate(
     });
   }
 
-  return builder.play();
+  return builder.play() as AnimationControl & PromiseLike<void>;
 }

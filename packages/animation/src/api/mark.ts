@@ -1,24 +1,20 @@
 import { InertiaOptions, Keyframe, SpringOptions, TimelineData } from '@g-motion/core';
-import {
-  Easing,
-  createDebugger,
-  isArrayLike,
-  isDev,
-  isDomElement,
-  isNodeList,
-  panic,
-  resolveDomElements,
-} from '@g-motion/shared';
+import { createDebugger, isArrayLike, isDev, isDomElement, isNodeList, panic, resolveDomElements } from '@g-motion/shared';
+import type { Easing } from '@g-motion/shared';
+import type { AnimatableProps, StaggerValue } from '../types';
 
-export type MarkOptions = {
-  to?: any | ((index: number, entityId: number, target?: any) => any);
+export interface MarkOptions<T = any> {
+  to?:
+    | AnimatableProps<T>
+    | ((index: number, entityId: number, target?: T) => AnimatableProps<T>);
+  from?: AnimatableProps<T>;
   at?: number | ((index: number, entityId: number) => number);
   /**
    * @deprecated 请使用 at
    * @see at
    */
   time?: number | ((index: number, entityId: number) => number);
-  duration?: number; // Relative duration (used with previous mark's end time)
+  duration?: number;
   ease?: Easing;
   /**
    * @deprecated 请使用 ease
@@ -29,11 +25,12 @@ export type MarkOptions = {
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
   spring?: SpringOptions;
   inertia?: InertiaOptions;
-  stagger?: number | ((index: number) => number); // Linear or function-based stagger
-};
+  stagger?: StaggerValue;
+}
 
-export type ResolvedMarkOptions = Omit<MarkOptions, 'to'> & {
-  to: any;
+
+export type ResolvedMarkOptions<T = any> = Omit<MarkOptions<T>, 'to'> & {
+  to: AnimatableProps<T>;
   time: number;
 };
 
@@ -72,9 +69,9 @@ export function resolveTimeValue(
   return currentTime + 1000;
 }
 
-export function resolveMarkOptions(
-  raw: MarkOptions,
-  target: any,
+export function resolveMarkOptions<T = any>(
+  raw: MarkOptions<T>,
+  target: T,
   currentTime: number,
   index: number,
   entityId: number,

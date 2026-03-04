@@ -2,17 +2,17 @@ import type { MarkOptions, ResolvedMarkOptions } from './mark';
 import { normalizeMarkOptions, validateMarkOptions } from './validation';
 
 export class AnimationValidator {
-  normalizeMark(rawOptions: MarkOptions): MarkOptions {
+  normalizeMark<T = any>(rawOptions: MarkOptions<T>): MarkOptions<T> {
     return normalizeMarkOptions(rawOptions);
   }
 
-  validateMark(rawOptions: MarkOptions): MarkOptions {
+  validateMark<T = any>(rawOptions: MarkOptions<T>): MarkOptions<T> {
     const normalized = this.normalizeMark(rawOptions);
     validateMarkOptions(normalized);
     return normalized;
   }
 
-  validateResolvedMark(resolved: ResolvedMarkOptions): void {
+  validateResolvedMark<T = any>(resolved: ResolvedMarkOptions<T>): void {
     validateMarkOptions(resolved);
   }
 }

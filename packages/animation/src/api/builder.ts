@@ -5,6 +5,7 @@ import { applyAdjust } from './adjust';
 import { AnimationControl, registerControlWithScope } from './control';
 import type { DomAnimationScope } from './control';
 import type { AnimationOptions } from './animation-options';
+import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types';
 import { addKeyframesForTarget } from './keyframes';
 import {
   computeMaxTime,
@@ -26,8 +27,7 @@ import { buildRenderComponent } from './render';
 import type { VisualTarget } from './visual-target';
 import { getOrCreateVisualTarget } from './visual-target';
 
-export interface PlayOptions extends AnimationOptions {}
-
+export interface PlayOptions<TValue = any> extends AnimationOptions<TValue> {}
 
 type TrackMarkOptions = Pick<
   MarkOptions,
@@ -39,37 +39,40 @@ type TrackMarkOptions = Pick<
  * @param target - The number, object, selector, or array of targets to animate.
  * @returns A MotionBuilder instance.
  */
-export function motion(target: any, opts?: { world?: World; scope?: DomAnimationScope }) {
-  return new MotionBuilder(target, opts);
+export function motion<T extends MotionTarget = any>(
+  target: T,
+  opts?: { world?: World; scope?: DomAnimationScope },
+) {
+  return new MotionBuilder<T>(target, opts);
 }
 
 /**
  * Fluent API builder for defining animation sequences.
  * Supports both single and multi-entity animations.
  */
-export class MotionBuilder {
+export class MotionBuilder<T = any> {
   private validator = new AnimationValidator();
   private componentRegistrar = new ComponentRegistrar();
   private gpuChannelMapper = new GPUChannelMapper();
   private tracks: TimelineData = new Map();
   private currentTime = 0;
-  private targets: any[];
+  private targets: MotionTargetValue<T>[];
   private isBatch: boolean;
   // Precompiled batch templates: static marks resolved once
   private batchTemplates: BatchTemplate[] = [];
   private timelineVersion = 0;
-  private playOptions: AnimationOptions | undefined;
+  private playOptions: AnimationOptions<AnimatableProps<MotionTargetValue<T>>> | undefined;
   private visualTarget?: VisualTarget;
   private cachedTargetType?: TargetType;
   private scope?: DomAnimationScope;
 
-  constructor(target: any, opts?: { world?: World; scope?: DomAnimationScope }) {
+  constructor(target: T, opts?: { world?: World; scope?: DomAnimationScope }) {
     // Normalize to array for unified handling
     if (Array.isArray(target)) {
-      this.targets = target;
+      this.targets = target as MotionTargetValue<T>[];
       this.isBatch = target.length > 1;
     } else {
-      this.targets = [target];
+      this.targets = [target as MotionTargetValue<T>];
       this.isBatch = false;
     }
     // Optional world injection for DI
@@ -78,7 +81,7 @@ export class MotionBuilder {
   }
 
   /** For compatibility - get the primary target */
-  private get target(): any {
+  private get target(): MotionTargetValue<T> {
     return this.targets[0];
   }
 
@@ -133,14 +136,14 @@ export class MotionBuilder {
    * Accepts a single mark or an array of mark definitions.
    * Supports per-entity functions for batch animations.
    */
-  mark(optionsBatch: MarkOptions | MarkOptions[]): this {
+  mark(optionsBatch: MarkOptions<MotionTargetValue<T>> | MarkOptions<MotionTargetValue<T>>[]): this {
     const optsArray = Array.isArray(optionsBatch) ? optionsBatch : [optionsBatch];
 
     // Store precompiled templates for batch animation (don't process tracks yet)
     if (this.isBatch) {
       const normalizedOptions = optsArray.map((opt) => this.validator.validateMark(opt));
-      const staticResolved: ResolvedMarkOptions[] = [];
-      const dynamic: MarkOptions[] = [];
+      const staticResolved: ResolvedMarkOptions<MotionTargetValue<T>>[] = [];
+      const dynamic: MarkOptions<MotionTargetValue<T>>[] = [];
       for (const opt of normalizedOptions) {
         const isTimeStatic =
           typeof opt.at === 'number' || typeof opt.duration === 'number' || opt.at === undefined;
@@ -165,17 +168,17 @@ export class MotionBuilder {
     return this;
   }
 
-  option(options: AnimationOptions): this {
+  option(options: AnimationOptions<AnimatableProps<MotionTargetValue<T>>>): this {
     this.playOptions = { ...(this.playOptions ?? {}), ...options };
     return this;
   }
 
-  play(options?: AnimationOptions): AnimationControl {
+  play(options?: AnimationOptions<AnimatableProps<MotionTargetValue<T>>>): AnimationControl {
     if (this.isBatch) {
       return this.playBatch(options);
     }
 
-    const resolvedOptions: AnimationOptions = {
+    const resolvedOptions: AnimationOptions<AnimatableProps<MotionTargetValue<T>>> = {
       ...(this.playOptions ?? {}),
       ...(options ?? {}),
     };
@@ -272,8 +275,8 @@ export class MotionBuilder {
     return control;
   }
 
-  private playBatch(options?: AnimationOptions): AnimationControl {
-    const resolvedOptions: AnimationOptions = {
+  private playBatch(options?: AnimationOptions<AnimatableProps<MotionTargetValue<T>>>): AnimationControl {
+    const resolvedOptions: AnimationOptions<AnimatableProps<MotionTargetValue<T>>> = {
       ...(this.playOptions ?? {}),
       ...(options ?? {}),
     };
@@ -284,7 +287,7 @@ export class MotionBuilder {
       options: resolvedOptions,
       injectedWorld,
       createBuilder: (target) =>
-        new MotionBuilder(target, { world: injectedWorld, scope: this.scope }),
+        new MotionBuilder<MotionTargetValue<T>>(target, { world: injectedWorld, scope: this.scope }),
     });
   }
 
@@ -326,7 +329,7 @@ export class MotionBuilder {
   // ============================================================================
   // Private: Mark Processing Helpers
   // ============================================================================
-  private processSingleMark(rawOptions: MarkOptions): void {
+  private processSingleMark(rawOptions: MarkOptions<MotionTargetValue<T>>): void {
     const visualTarget = this.getVisualTarget();
     const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
 
@@ -338,7 +341,7 @@ export class MotionBuilder {
   }
 
   // Apply a pre-resolved mark without re-resolving per entity
-  addResolvedMark(resolved: ResolvedMarkOptions): void {
+  addResolvedMark(resolved: ResolvedMarkOptions<MotionTargetValue<T>>): void {
     this.validator.validateResolvedMark(resolved);
     const easing = resolved.ease;
     const visualTarget = this.getVisualTarget();
