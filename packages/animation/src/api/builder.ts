@@ -4,6 +4,7 @@ import { BatchTemplate, runBatchAnimation } from '../batch-runner';
 import { applyAdjust } from './adjust';
 import { AnimationControl, registerControlWithScope } from './control';
 import type { DomAnimationScope } from './control';
+import type { AnimationOptions } from './animation-options';
 import { addKeyframesForTarget } from './keyframes';
 import {
   computeMaxTime,
@@ -25,12 +26,8 @@ import { buildRenderComponent } from './render';
 import type { VisualTarget } from './visual-target';
 import { getOrCreateVisualTarget } from './visual-target';
 
-type PlayOptions = {
-  onUpdate?: (val: any) => void;
-  delay?: number;
-  repeat?: number;
-  onComplete?: () => void;
-};
+export interface PlayOptions extends AnimationOptions {}
+
 
 type TrackMarkOptions = Pick<
   MarkOptions,
@@ -61,7 +58,7 @@ export class MotionBuilder {
   // Precompiled batch templates: static marks resolved once
   private batchTemplates: BatchTemplate[] = [];
   private timelineVersion = 0;
-  private playOptions: PlayOptions | undefined;
+  private playOptions: AnimationOptions | undefined;
   private visualTarget?: VisualTarget;
   private cachedTargetType?: TargetType;
   private scope?: DomAnimationScope;
@@ -141,12 +138,10 @@ export class MotionBuilder {
 
     // Store precompiled templates for batch animation (don't process tracks yet)
     if (this.isBatch) {
-      for (const opt of optsArray) {
-        this.validator.validateMark(opt);
-      }
+      const normalizedOptions = optsArray.map((opt) => this.validator.validateMark(opt));
       const staticResolved: ResolvedMarkOptions[] = [];
       const dynamic: MarkOptions[] = [];
-      for (const opt of optsArray) {
+      for (const opt of normalizedOptions) {
         const isTimeStatic =
           typeof opt.at === 'number' || typeof opt.duration === 'number' || opt.at === undefined;
         const isToStatic = typeof opt.to !== 'function';
@@ -166,21 +161,21 @@ export class MotionBuilder {
       return this;
     }
 
-    optsArray.forEach((opts) => this.processSingleMark(opts));
+    optsArray.forEach((opts) => this.processSingleMark(this.validator.validateMark(opts)));
     return this;
   }
 
-  option(options: PlayOptions): this {
+  option(options: AnimationOptions): this {
     this.playOptions = { ...(this.playOptions ?? {}), ...options };
     return this;
   }
 
-  play(options?: PlayOptions): AnimationControl {
+  play(options?: AnimationOptions): AnimationControl {
     if (this.isBatch) {
       return this.playBatch(options);
     }
 
-    const resolvedOptions: PlayOptions = {
+    const resolvedOptions: AnimationOptions = {
       ...(this.playOptions ?? {}),
       ...(options ?? {}),
     };
@@ -277,8 +272,8 @@ export class MotionBuilder {
     return control;
   }
 
-  private playBatch(options?: PlayOptions): AnimationControl {
-    const resolvedOptions: PlayOptions = {
+  private playBatch(options?: AnimationOptions): AnimationControl {
+    const resolvedOptions: AnimationOptions = {
       ...(this.playOptions ?? {}),
       ...(options ?? {}),
     };
@@ -332,7 +327,6 @@ export class MotionBuilder {
   // Private: Mark Processing Helpers
   // ============================================================================
   private processSingleMark(rawOptions: MarkOptions): void {
-    this.validator.validateMark(rawOptions);
     const visualTarget = this.getVisualTarget();
     const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
 

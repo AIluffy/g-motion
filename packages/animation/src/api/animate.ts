@@ -1,18 +1,12 @@
-import { panic, type Easing } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
 import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
+import type { AnimationOptions } from './animation-options';
 import { motion } from '..';
 
-export interface AnimateOptions {
-  duration?: number;
-  delay?: number;
-  ease?: Easing;
-  repeat?: number;
-  repeatType?: 'loop' | 'reverse';
+export interface AnimateOptions extends AnimationOptions {
   times?: number[];
-  onUpdate?: (latest: any) => void;
-  onComplete?: () => void;
 }
 
 const DEFAULT_DURATION = 300;
@@ -176,6 +170,8 @@ export function animate(
     builder.option({
       delay: options.delay,
       repeat: options.repeat,
+      repeatType: options.repeatType,
+      direction: options.direction,
       onUpdate: options.onUpdate,
       onComplete: options.onComplete,
     });

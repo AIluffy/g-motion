@@ -13,8 +13,18 @@ import {
 export type MarkOptions = {
   to?: any | ((index: number, entityId: number, target?: any) => any);
   at?: number | ((index: number, entityId: number) => number);
+  /**
+   * @deprecated 请使用 at
+   * @see at
+   */
+  time?: number | ((index: number, entityId: number) => number);
   duration?: number; // Relative duration (used with previous mark's end time)
   ease?: Easing;
+  /**
+   * @deprecated 请使用 ease
+   * @see ease
+   */
+  easing?: Easing;
   interp?: 'linear' | 'bezier' | 'hold' | 'autoBezier';
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
   spring?: SpringOptions;
@@ -22,7 +32,7 @@ export type MarkOptions = {
   stagger?: number | ((index: number) => number); // Linear or function-based stagger
 };
 
-export type ResolvedMarkOptions = Omit<MarkOptions, 'to' | 'time'> & {
+export type ResolvedMarkOptions = Omit<MarkOptions, 'to'> & {
   to: any;
   time: number;
 };
@@ -48,6 +58,12 @@ export function resolveTimeValue(
   if (typeof opts.at === 'number') {
     return opts.at;
   }
+  if (typeof opts.time === 'function') {
+    return opts.time(index, entityId);
+  }
+  if (typeof opts.time === 'number') {
+    return opts.time;
+  }
 
   if (typeof opts.duration === 'number') {
     return currentTime + opts.duration;
@@ -70,6 +86,8 @@ export function resolveMarkOptions(
     ...raw,
     to,
     time,
+    at: raw.at ?? raw.time,
+    ease: raw.ease ?? raw.easing,
   };
 }
 

@@ -167,6 +167,7 @@ export { FrameSampler } from '@g-motion/shared';
 export type { FrameRoundingMode } from '@g-motion/shared';
 export * from './api/adjust';
 export * from './api/animate';
+export * from './api/animation-options';
 export * from './api/builder';
 export * from './api/control';
 export * from './api/gpu-status';
