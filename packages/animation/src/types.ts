@@ -1,3 +1,5 @@
+import type { Easing } from '@g-motion/shared';
+
 export type CSSTransformProps = {
   x?: number;
   y?: number;
@@ -37,4 +39,15 @@ export type AnimatableProps<T> = T extends (infer U)[]
         ? number
         : Record<string, number>;
 
-export type StaggerValue = number | ((index: number) => number);
+export interface StaggerOptions {
+  each: number;
+  from?: 'first' | 'last' | 'center' | 'edges' | number;
+  grid?: [rows: number, cols: number];
+  ease?: Easing;
+  axis?: 'x' | 'y';
+}
+
+export type StaggerValue =
+  | number
+  | StaggerOptions
+  | ((index: number, total: number) => number);
