@@ -10,21 +10,21 @@ import {
   type TargetType,
 } from './api/mark';
 import { isVisualTargetCached } from './api/visual-target';
-import { registerAnimationSystems } from './registery';
-import type { MotionTarget } from './types';
+import { registerAnimationSystems } from './runtime/animation-system-registry';
+import type { MotionTarget } from './types/animation-target-types';
 
 const initializedWorlds = new WeakSet<World>();
 
 type MotionStatusListenerWorld = World & {
-  addMotionStatusListener: (listener: (event: {
-    entityId: number;
-    prevStatus?: number;
-    nextStatus: number;
-  }) => void) => void;
+  addMotionStatusListener: (
+    listener: (event: { entityId: number; prevStatus?: number; nextStatus: number }) => void,
+  ) => void;
 };
 
 function supportsMotionStatusListener(world: World): world is MotionStatusListenerWorld {
-  return typeof (world as Partial<MotionStatusListenerWorld>).addMotionStatusListener === 'function';
+  return (
+    typeof (world as Partial<MotionStatusListenerWorld>).addMotionStatusListener === 'function'
+  );
 }
 
 function initEngine(world: World) {
@@ -175,5 +175,5 @@ export * from './api/gpu-status';
 export * from './api/mark';
 export * from './api/visual-target';
 export * from './api/timeline-api';
-export * from './types';
-export { engine } from './engine';
+export * from './types/animation-target-types';
+export { engine } from './config/engine-config';

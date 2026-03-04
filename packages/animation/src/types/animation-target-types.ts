@@ -20,12 +20,7 @@ export type CSSNumericProps = {
   height?: number;
 };
 
-export type MotionTarget =
-  | string
-  | Element
-  | number
-  | Record<string, number>
-  | MotionTarget[];
+export type MotionTarget = string | Element | number | Record<string, number> | MotionTarget[];
 
 export type MotionTargetValue<T> = T extends (infer U)[] ? U : T;
 
@@ -47,7 +42,4 @@ export interface StaggerOptions {
   axis?: 'x' | 'y';
 }
 
-export type StaggerValue =
-  | number
-  | StaggerOptions
-  | ((index: number, total: number) => number);
+export type StaggerValue = number | StaggerOptions | ((index: number, total: number) => number);

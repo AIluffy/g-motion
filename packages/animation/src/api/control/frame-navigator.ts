@@ -1,7 +1,7 @@
 import type { MotionAppConfig } from '@g-motion/core';
 import type { TimelineComponentData } from '@g-motion/shared';
 import { markBatchSamplingSeekInvalidation } from '@g-motion/core';
-import type { MotionStateComponentData } from '../../component-types';
+import type { MotionStateComponentData } from '../../types/ecs-component-types';
 import { FrameSampler } from '@g-motion/shared';
 import type { BatchCoordinator } from './batch-coordinator';
 

@@ -9,12 +9,10 @@ import {
   resolveDomElements,
 } from '@g-motion/shared';
 import type { Easing } from '@g-motion/shared';
-import type { AnimatableProps, StaggerValue } from '../types';
+import type { AnimatableProps, StaggerValue } from '../types/animation-target-types';
 
 export interface MarkOptions<T = any> {
-  to?:
-    | AnimatableProps<T>
-    | ((index: number, entityId: number, target?: T) => AnimatableProps<T>);
+  to?: AnimatableProps<T> | ((index: number, entityId: number, target?: T) => AnimatableProps<T>);
   from?: AnimatableProps<T>;
   at?: number | ((index: number, entityId: number) => number);
   duration?: number;
@@ -69,10 +67,13 @@ export function resolveMarkOptions<T = any>(
 ): ResolvedMarkOptions<T> {
   const time = resolveTimeValue(raw, currentTime, index, entityId);
   const to = typeof raw.to === 'function' ? raw.to(index, entityId, target) : raw.to;
+  if (to === undefined) {
+    panic('Mark "to" is required', { raw, index, entityId });
+  }
 
   return {
     ...raw,
-    to,
+    to: to as AnimatableProps<T>,
     time,
   };
 }
@@ -232,7 +233,7 @@ function createTargetErrorHandlers(params: {
   handleSelectorDomEnvMissing: (selector: string, reason: string) => void;
   handleSelectorResolutionError: (selector: string, reason: string) => void;
 } {
-  const { input, root, strict, options } = params;
+  const { options } = params;
 
   const handleTargetError = (message: string, context: Record<string, unknown>, fatal: boolean) => {
     if (fatal) {

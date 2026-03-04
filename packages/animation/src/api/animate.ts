@@ -3,7 +3,7 @@ import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
 import type { AnimationOptions } from './animation-options';
-import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types';
+import type { AnimatableProps, MotionTarget } from '../types/animation-target-types';
 import { motion } from '..';
 
 export interface AnimateOptions<TValue = unknown> extends AnimationOptions<TValue> {
@@ -116,7 +116,7 @@ function buildKeyframeMarks(
 function applyAnimateMark(
   builder: { mark(mark: MarkOptions | MarkOptions[]): unknown },
   to: unknown,
-  options: AnimateOptions | undefined,
+  options: AnimateOptions<any> | undefined,
   targetType: TargetType,
 ): void {
   const totalDuration = options?.duration ?? DEFAULT_DURATION;
@@ -127,20 +127,32 @@ function applyAnimateMark(
   }
 
   if (!isKeyframeObject(to)) {
-    builder.mark({ to: to as Record<string, number>, duration: totalDuration, ease: options?.ease });
+    builder.mark({
+      to: to as Record<string, number>,
+      duration: totalDuration,
+      ease: options?.ease,
+    });
     return;
   }
 
   if (!hasAnyKeyframeArrays(to)) {
     const markTo = targetType === TargetType.Primitive ? normalizePrimitiveObjectTo(to) : to;
-    builder.mark({ to: markTo as Record<string, number>, duration: totalDuration, ease: options?.ease });
+    builder.mark({
+      to: markTo as Record<string, number>,
+      duration: totalDuration,
+      ease: options?.ease,
+    });
     return;
   }
 
   const keys = Object.keys(to);
   const keyframeCount = resolveKeyframeCount(keys, to);
   if (keyframeCount <= 1) {
-    builder.mark({ to: to as Record<string, number>, duration: totalDuration, ease: options?.ease });
+    builder.mark({
+      to: to as Record<string, number>,
+      duration: totalDuration,
+      ease: options?.ease,
+    });
     return;
   }
 
@@ -149,8 +161,8 @@ function applyAnimateMark(
 
 export function animate<T extends MotionTarget>(
   target: T,
-  to: AnimatableProps<MotionTargetValue<T>>,
-  options?: AnimateOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>,
+  to: AnimatableProps<any>,
+  options?: AnimateOptions<any>,
 ): AnimationControl & PromiseLike<void> {
   const builder = motion(target);
   const targetType = getTargetType(target);

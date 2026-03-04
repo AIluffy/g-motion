@@ -1,7 +1,7 @@
 import type { AnimationOptions } from './animation-options';
 import { motion } from '..';
 import { AnimationControl } from './control';
-import type { AnimatableProps, MotionTarget } from '../types';
+import type { AnimatableProps, MotionTarget } from '../types/animation-target-types';
 
 export type TimelineSegment<T extends MotionTarget = any> = [
   target: T,
@@ -45,13 +45,20 @@ function parseRelativeAt(at: string, prevStart: number, prevEnd: number): number
   return prevEnd;
 }
 
-function resolveSegmentStart(at: number | string | undefined, prevStart: number, prevEnd: number): number {
+function resolveSegmentStart(
+  at: number | string | undefined,
+  prevStart: number,
+  prevEnd: number,
+): number {
   if (typeof at === 'number') return at;
   if (typeof at === 'string') return parseRelativeAt(at, prevStart, prevEnd);
   return prevEnd;
 }
 
-function resolveSegmentDuration(options: SegmentOptions | undefined, defaults?: Partial<AnimationOptions>): number {
+function resolveSegmentDuration(
+  options: SegmentOptions | undefined,
+  defaults?: Partial<AnimationOptions>,
+): number {
   const d = options?.duration ?? defaults?.duration ?? DEFAULT_SEGMENT_DURATION;
   return Number.isFinite(d) ? Math.max(0, d as number) : DEFAULT_SEGMENT_DURATION;
 }

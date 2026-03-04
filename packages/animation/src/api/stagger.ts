@@ -1,5 +1,5 @@
 import type { Easing } from '@g-motion/shared';
-import type { StaggerOptions, StaggerValue } from '../types';
+import type { StaggerOptions, StaggerValue } from '../types/animation-target-types';
 
 function applyNamedEase(name: string, t: number): number {
   const x = Math.min(1, Math.max(0, t));
@@ -26,10 +26,6 @@ function applyNamedEase(name: string, t: number): number {
 function applyEase(ease: Easing | undefined, value: number): number {
   if (!ease) return value;
   const x = Math.min(1, Math.max(0, value));
-  if (typeof ease === 'function') {
-    const eased = ease(x);
-    return Number.isFinite(eased) ? Math.min(1, Math.max(0, eased)) : x;
-  }
   return applyNamedEase(ease, x);
 }
 
@@ -123,7 +119,9 @@ export function resolveStagger(stagger: StaggerValue, index: number, total: numb
 
   let maxDistance = 0;
   for (let i = 0; i < safeTotal; i++) {
-    const d = options.grid ? distanceGrid(i, safeTotal, options) : distance1D(i, safeTotal, options);
+    const d = options.grid
+      ? distanceGrid(i, safeTotal, options)
+      : distance1D(i, safeTotal, options);
     if (d > maxDistance) maxDistance = d;
   }
 

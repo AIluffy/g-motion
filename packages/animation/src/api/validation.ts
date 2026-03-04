@@ -1,6 +1,6 @@
 import type { InertiaOptions } from '@g-motion/core';
 import { createDebugger, panic } from '@g-motion/shared';
-import type { StaggerOptions, StaggerValue } from '../types';
+import type { StaggerOptions, StaggerValue } from '../types/animation-target-types';
 
 const warn = createDebugger('Validation', 'warn');
 
@@ -59,9 +59,12 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
         panic(`Stagger axis must be 'x' or 'y', got: ${String(staggerOptions.axis)}`);
       }
     } else {
-      panic(`Stagger must be a number, function, or options object, got: ${typeof options.stagger}`, {
-        providedType: typeof options.stagger,
-      });
+      panic(
+        `Stagger must be a number, function, or options object, got: ${typeof options.stagger}`,
+        {
+          providedType: typeof options.stagger,
+        },
+      );
     }
   }
 
@@ -89,7 +92,12 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
     }
   }
 
-  if (!options.spring && !options.inertia && options.at === undefined && options.duration === undefined) {
+  if (
+    !options.spring &&
+    !options.inertia &&
+    options.at === undefined &&
+    options.duration === undefined
+  ) {
     panic(`Mark must have either 'at' (absolute) or 'duration' (relative)`, {
       at: options.at,
       duration: options.duration,

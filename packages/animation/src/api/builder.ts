@@ -1,11 +1,16 @@
 import { MotionStatus, TimelineData, World, WorldProvider } from '@g-motion/core';
 import { getNowMs } from '@g-motion/shared';
-import { BatchTemplate, runBatchAnimation } from '../batch-runner';
+import type { ComponentValue } from '@g-motion/shared';
+import { BatchTemplate, runBatchAnimation } from '../runtime/batch-animation-runner';
 import { applyAdjust } from './adjust';
 import { AnimationControl, registerControlWithScope } from './control';
 import type { DomAnimationScope } from './control';
 import type { AnimationOptions } from './animation-options';
-import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types';
+import type {
+  AnimatableProps,
+  MotionTarget,
+  MotionTargetValue,
+} from '../types/animation-target-types';
 import { addKeyframesForTarget } from './keyframes';
 import {
   computeMaxTime,
@@ -19,7 +24,7 @@ import {
 export type { MarkOptions, ResolvedMarkOptions } from './mark';
 import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
 import { analyzeSpringTracks } from '@g-motion/plugin-spring';
-import { ComponentRegistrar } from '../registery';
+import { ComponentRegistrar } from '../runtime/animation-system-registry';
 import { AnimationValidator } from './animation-validator';
 import { GPUChannelMapper } from './gpu-channel-mapper';
 import { buildRenderComponent } from './render';
@@ -50,9 +55,7 @@ export class MotionBuilder<T extends MotionTarget> {
   private isBatch: boolean;
   private batchTemplates: BatchTemplate[] = [];
   private timelineVersion = 0;
-  private playOptions:
-    | AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>
-    | undefined;
+  private playOptions: AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>> | undefined;
   private visualTarget?: VisualTarget;
   private cachedTargetType?: TargetType;
   private scope?: DomAnimationScope;
@@ -88,9 +91,9 @@ export class MotionBuilder<T extends MotionTarget> {
   }
 
   set(prop: string, timeOrDuration: number, to: number, options: TrackMarkOptions = {}): this {
-    const payload: MarkOptions<MotionTargetValue<T>> = {
+    const payload: MarkOptions = {
       ...options,
-      to: { [prop]: to } as AnimatableProps<MotionTargetValue<T>>,
+      to: { [prop]: to },
     };
 
     if (options.duration !== undefined) {
@@ -99,7 +102,7 @@ export class MotionBuilder<T extends MotionTarget> {
       payload.at = timeOrDuration;
     }
 
-    this.mark([payload]);
+    this.mark([payload as MarkOptions<MotionTargetValue<T>>]);
     return this;
   }
 
@@ -111,28 +114,28 @@ export class MotionBuilder<T extends MotionTarget> {
   }
 
   mark(
-    optionsBatch:
-      | MarkOptions<MotionTargetValue<T>>
-      | MarkOptions<MotionTargetValue<T>>[],
+    optionsBatch: MarkOptions<MotionTargetValue<T>> | MarkOptions<MotionTargetValue<T>>[],
   ): this {
     const optsArray = Array.isArray(optionsBatch) ? optionsBatch : [optionsBatch];
 
     if (this.isBatch) {
-      const normalizedOptions = optsArray.map((opt) => this.validator.validateMark(opt));
-      const staticResolved: ResolvedMarkOptions<MotionTargetValue<T>>[] = [];
-      const dynamic: MarkOptions<MotionTargetValue<T>>[] = [];
+      const normalizedOptions: MarkOptions[] = optsArray.map((opt) =>
+        this.validator.validateMark(opt as MarkOptions),
+      );
+      const staticResolved: ResolvedMarkOptions[] = [];
+      const dynamic: MarkOptions[] = [];
       for (const opt of normalizedOptions) {
         const isTimeStatic =
-          typeof opt.at === 'number' || typeof opt.duration === 'number' || opt.at === undefined;
-        const isToStatic = typeof opt.to !== 'function';
+          typeof opt.at === 'number' || typeof opt.duration === 'number' || !opt.at;
+        const isToStatic = typeof (opt as MarkOptions).to !== 'function';
         if (isTimeStatic && isToStatic) {
-          const resolved = resolveMarkOptions(opt, this.target, this.currentTime, 0, 0);
+          const resolved = resolveMarkOptions<any>(opt, this.target, this.currentTime, 0, 0);
           staticResolved.push(resolved);
         } else {
           dynamic.push(opt);
         }
       }
-      this.batchTemplates.push({ staticResolved, dynamic });
+      this.batchTemplates.push({ staticResolved, dynamic } as BatchTemplate);
       for (const opt of optsArray) {
         const timeVal = resolveTimeValue(opt, this.currentTime, 0, 0);
         this.currentTime = Math.max(this.currentTime, timeVal);
@@ -173,7 +176,7 @@ export class MotionBuilder<T extends MotionTarget> {
       this.target,
     );
 
-    const components: Record<string, unknown> = {
+    const components: Record<string, ComponentValue | undefined> = {
       MotionState: {
         delay: resolvedOptions.delay ?? 0,
         startTime: getNowMs(),
@@ -257,17 +260,19 @@ export class MotionBuilder<T extends MotionTarget> {
       ...(options ?? {}),
     };
 
-    return runBatchAnimation({
-      targets: this.targets,
+    const batchParams: Parameters<typeof runBatchAnimation>[0] = {
+      targets: this.targets as unknown[],
       templates: this.batchTemplates,
       options: resolvedOptions,
       injectedWorld: this.injectedWorld,
       createBuilder: (target) =>
-        new MotionBuilder<MotionTargetValue<T>>(target as MotionTargetValue<T>, {
+        new MotionBuilder<any>(target, {
           world: this.injectedWorld,
           scope: this.scope,
         }),
-    }) as AnimationControl & PromiseLike<void>;
+    };
+
+    return runBatchAnimation(batchParams) as AnimationControl & PromiseLike<void>;
   }
 
   toJSON() {
@@ -300,7 +305,13 @@ export class MotionBuilder<T extends MotionTarget> {
 
   private processSingleMark(rawOptions: MarkOptions<MotionTargetValue<T>>): void {
     const visualTarget = this.getVisualTarget();
-    const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
+    const resolved = resolveMarkOptions<any>(
+      rawOptions as MarkOptions,
+      this.target,
+      this.currentTime,
+      0,
+      0,
+    ) as ResolvedMarkOptions;
 
     const targetType = this.cachedTargetType ?? getTargetType(this.target);
     const easing = resolved.ease;
@@ -309,7 +320,7 @@ export class MotionBuilder<T extends MotionTarget> {
     this.timelineVersion++;
   }
 
-  addResolvedMark(resolved: ResolvedMarkOptions<MotionTargetValue<T>>): void {
+  addResolvedMark(resolved: ResolvedMarkOptions): void {
     this.validator.validateResolvedMark(resolved);
     const easing = resolved.ease;
     const visualTarget = this.getVisualTarget();

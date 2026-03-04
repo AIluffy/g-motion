@@ -1,6 +1,6 @@
-import { AnimationControl } from './api/control';
-import { MarkOptions, ResolvedMarkOptions } from './api/mark';
-import { resolveStagger } from './api/stagger';
+import { AnimationControl } from '../api/control';
+import { MarkOptions, ResolvedMarkOptions } from '../api/mark';
+import { resolveStagger } from '../api/stagger';
 
 export type BatchTemplate = { staticResolved: ResolvedMarkOptions[]; dynamic: MarkOptions[] };
 
@@ -76,7 +76,12 @@ export function runBatchAnimation(params: {
       if (tpl.dynamic.length) {
         const resolvedMarks: MarkOptions[] = [];
         for (const rawMark of tpl.dynamic) {
-          const { resolved, stagger } = resolveMarkForEntity(rawMark, index, target, params.targets.length);
+          const { resolved, stagger } = resolveMarkForEntity(
+            rawMark,
+            index,
+            target,
+            params.targets.length,
+          );
           resolvedMarks.push(resolved);
           totalStagger = Math.max(totalStagger, stagger);
         }
