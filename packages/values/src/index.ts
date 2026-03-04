@@ -7,7 +7,7 @@
  * @module values
  */
 
-import { defaultRegistry } from './registry';
+import { defaultRegistry } from './core/registry';
 import {
   numberParser,
   stringParser,
@@ -20,9 +20,9 @@ import {
   borderRadiusParser,
 } from './parsers';
 
-export * from './types';
-export * from './registry';
-export * from './cache';
+export * from './core/types';
+export * from './core/registry';
+export * from './core/cache';
 export * from './parsers';
 
 defaultRegistry.register(numberParser, { priority: 100 });

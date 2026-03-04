@@ -6,7 +6,7 @@
  * @module values/parsers/shadow/parser
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../core/types';
 import type { ShadowsValue, ShadowValue } from './types';
 import {
   BOX_SHADOW_PATTERN,

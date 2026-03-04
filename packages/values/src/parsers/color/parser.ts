@@ -6,7 +6,7 @@
  * @module values/parsers/color/parser
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../core/types';
 import type { ColorValue, ColorInterpolationMode } from './types';
 import {
   HEX_PATTERN,

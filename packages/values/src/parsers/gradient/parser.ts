@@ -6,7 +6,7 @@
  * @module values/parsers/gradient/parser
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../core/types';
 import type { GradientValue, GradientType } from './types';
 import {
   GRADIENT_PATTERN,

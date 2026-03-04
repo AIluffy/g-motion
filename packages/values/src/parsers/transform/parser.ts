@@ -6,7 +6,7 @@
  * @module values/parsers/transform/parser
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../core/types';
 import type { TransformProperties } from './types';
 import { TransformComposer } from './composer';
 import { TRANSFORM_DETECT_REGEX } from './utils';

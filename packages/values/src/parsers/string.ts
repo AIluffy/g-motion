@@ -7,7 +7,7 @@
  * @module values/parsers/string
  */
 
-import { ValueType, ValueParser, ParsedValue } from '../types';
+import { ValueType, ValueParser, ParsedValue } from '../core/types';
 
 /**
  * Parser for string values

@@ -6,7 +6,7 @@
  * @module values/parsers/border-radius/utils
  */
 
-import { ValueType, ValueParseError } from '../../types';
+import { ValueType, ValueParseError } from '../../core/types';
 import type { UnitValue } from '../unit';
 import { unitParser } from '../unit';
 

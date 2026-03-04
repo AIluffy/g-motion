@@ -10,7 +10,7 @@
  * @module values/parsers/unit
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../core/types';
 
 /**
  * Unit value representation

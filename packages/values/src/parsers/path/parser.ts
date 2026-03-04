@@ -6,7 +6,7 @@
  * @module values/parsers/path/parser
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../core/types';
 import type { PathValue } from './types';
 import { parsePath, PATH_DETECT_REGEX } from './utils';
 import { serializePath } from './serialize';

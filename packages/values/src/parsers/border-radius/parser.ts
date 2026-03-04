@@ -6,7 +6,7 @@
  * @module values/parsers/border-radius/parser
  */
 
-import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../types';
+import { ValueType, ValueParser, ParsedValue, ValueParseError } from '../../core/types';
 import type { BorderRadiusValue, BorderRadiusCorner, BorderRadiusContext } from './types';
 import { BORDER_RADIUS_PATTERNS, parseRadiusValues, expandRadiusValues } from './utils';
 import { normalizeUnits } from './convert';

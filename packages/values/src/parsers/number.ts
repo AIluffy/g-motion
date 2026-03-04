@@ -6,7 +6,7 @@
  * @module values/parsers/number
  */
 
-import { ValueType, ValueParser, ParsedValue } from '../types';
+import { ValueType, ValueParser, ParsedValue } from '../core/types';
 
 /**
  * Parser for numeric values
