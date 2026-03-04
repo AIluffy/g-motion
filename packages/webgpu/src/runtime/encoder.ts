@@ -1,4 +1,4 @@
-import type { GPUTimestampQueryManager } from './timestamp-query-manager';
+import type { GPUTimestampQueryManager } from '../gpu/timestamp';
 
 type CopyCommand = {
   src: GPUBuffer;

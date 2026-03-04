@@ -7,7 +7,7 @@ import {
   FRUSTUM_PLANES_FLOATS,
   RENDER_STATE_EX_STRIDE,
 } from '../../culling-shader';
-import type { ViewportCullingBatchDescriptor } from '../../types';
+import type { ViewportCullingBatchDescriptor } from '../../runtime/types';
 import { resolveViewportBounds } from './viewport-bounds';
 import { getNowMs } from '@g-motion/shared';
 

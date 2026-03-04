@@ -6,8 +6,8 @@ export {
   __getOutputBufferPoolStatsForTests,
   __resetOutputBufferPoolForTests,
 } from './output-buffer-pool';
-export { __resetGPUMetricsProviderForTests } from './metrics-provider';
-export { createTestGPUContext, resetGPUContext } from './gpu-context';
+export { __resetGPUMetricsProviderForTests } from './runtime/metrics';
+export { createTestGPUContext, resetGPUContext } from './runtime/context';
 export {
   __getKeyframeSearchShaderModeForTests,
   __resetKeyframePassesForTests,

@@ -1,5 +1,5 @@
-import { PipelineManager } from './pipeline-manager';
-import type { WorkgroupSize } from './pipeline-manager';
+import { PipelineManager } from './pipelines';
+import type { WorkgroupSize } from './pipelines';
 
 export class GPUPipelineRegistry {
   private pipelineManager: PipelineManager;

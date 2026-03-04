@@ -1,10 +1,10 @@
-import type { AsyncReadbackManager } from './async-readback';
-import { BufferManager } from './buffer-manager';
-import type { PersistentGPUBufferManager } from './persistent-buffer-manager';
-import { ReadbackManager } from './readback-manager';
-import type { StagingBufferPool } from './staging-pool';
-import type { GPUTimestampQueryManager } from './timestamp-query-manager';
-import type { GPURuntimeState } from './gpu-runtime-state';
+import type { AsyncReadbackManager } from '../async-readback';
+import { BufferManager } from '../buffer-manager';
+import type { PersistentGPUBufferManager } from '../persistent-buffer-manager';
+import { ReadbackManager } from '../readback-manager';
+import type { StagingBufferPool } from '../staging-pool';
+import type { GPUTimestampQueryManager } from './timestamp';
+import type { GPURuntimeState } from './state';
 
 export class GPUFrameCoordinator {
   private _bufferManager: BufferManager;

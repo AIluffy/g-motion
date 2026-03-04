@@ -6,7 +6,7 @@
  * entity/channel combination.
  */
 
-import type { WebGPUFrameEncoder } from '../../command-encoder';
+import type { WebGPUFrameEncoder } from '../../runtime/encoder';
 import { CHANNEL_MAP_STRIDE, RAW_KEYFRAME_STRIDE } from '../../keyframe-preprocess-shader';
 import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
 import { tryRunKeyframeInterpPassWithGpuEntryExpand } from './interp-pass-gpu-expand';

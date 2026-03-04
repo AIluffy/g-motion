@@ -1,12 +1,12 @@
-import type { GPUChannelMappingRegistry } from './channel-mapping';
-import { GPUChannelMappingRegistry as GPUChannelRegistry } from './channel-mapping';
-import { setDefaultGPUChannelMappingRegistry } from './channel-mapping';
-import type { GPUMetricsProvider } from './metrics-provider';
-import { createGPUMetricsProvider, setDefaultGPUMetricsProvider } from './metrics-provider';
+import type { GPUChannelMappingRegistry } from './channels';
+import { GPUChannelMappingRegistry as GPUChannelRegistry } from './channels';
+import { setDefaultGPUChannelMappingRegistry } from './channels';
+import type { GPUMetricsProvider } from './metrics';
+import { createGPUMetricsProvider, setDefaultGPUMetricsProvider } from './metrics';
 import type { WebGPUEngine, WebGPUEngineConfig } from './engine';
 import { WebGPUEngine as Engine, setDefaultWebGPUEngine } from './engine';
-import type { GPUSyncManager } from './sync-manager';
-import { GPUSyncManager as SyncManager, setDefaultGPUSyncManager } from './sync-manager';
+import type { GPUSyncManager } from './sync';
+import { GPUSyncManager as SyncManager, setDefaultGPUSyncManager } from './sync';
 
 export interface GPUContext {
   readonly engine: WebGPUEngine;

@@ -1,11 +1,11 @@
 import { createDebugger } from '@g-motion/shared';
-import { DeviceManager } from './device-manager';
-import { GPUTimestampQueryManager } from './timestamp-query-manager';
-import type { DeviceInitResult } from './types';
-import type { GPUFrameCoordinator } from './gpu-frame-coordinator';
-import type { GPUPipelineRegistry } from './gpu-pipeline-registry';
-import type { GPURuntimeState } from './gpu-runtime-state';
-import type { WebGPUEngineConfig } from './engine';
+import { DeviceManager } from './device';
+import { GPUTimestampQueryManager } from './timestamp';
+import type { DeviceInitResult } from '../runtime/types';
+import type { GPUFrameCoordinator } from './frame';
+import type { GPUPipelineRegistry } from './registry';
+import type { GPURuntimeState } from './state';
+import type { WebGPUEngineConfig } from '../runtime/engine';
 
 const warn = createDebugger('GPUDeviceLifecycle', 'warn');
 

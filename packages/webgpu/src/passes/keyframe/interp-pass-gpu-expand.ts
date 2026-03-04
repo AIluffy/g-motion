@@ -1,4 +1,4 @@
-import type { WebGPUFrameEncoder } from '../../command-encoder';
+import type { WebGPUFrameEncoder } from '../../runtime/encoder';
 import { acquirePooledOutputBuffer, releasePooledOutputBuffer } from '../../output-buffer-pool';
 import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
 import {

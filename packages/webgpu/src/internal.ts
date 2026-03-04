@@ -7,9 +7,9 @@ export {
   recordWorkgroupTiming,
   selectWorkgroupSize,
   setForcedWorkgroupSize,
-} from './pipeline';
-export type { WorkgroupSize } from './pipeline';
-export { initWebGPUCompute } from './initialization';
+} from './gpu/workgroup';
+export type { WorkgroupSize } from './gpu/workgroup';
+export { initWebGPUCompute } from './runtime/init';
 export {
   createGPUContext,
   createTestGPUContext,
@@ -17,8 +17,8 @@ export {
   getDefaultGPUContext,
   resetGPUContext,
   setDefaultGPUContext,
-} from './gpu-context';
-export type { GPUContext, GPUContextConfig } from './gpu-context';
+} from './runtime/context';
+export type { GPUContext, GPUContextConfig } from './runtime/context';
 export {
   clearPhysicsGPUEntities,
   consumeForcedGPUStateSyncEntityIds,
@@ -34,8 +34,8 @@ export {
   setGPUResultWakeup,
   setPendingReadbackCount,
   unmarkPhysicsGPUEntity,
-} from './sync-manager';
-export type { GPUResultPacket, GPUSyncManager } from './sync-manager';
+} from './runtime/sync';
+export type { GPUResultPacket, GPUSyncManager } from './runtime/sync';
 export { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
 export { runKeyframeInterpPass, runKeyframePreprocessPass } from './passes/keyframe';
 export type { KeyframePreprocessResult, KeyframeSearchResultGPU } from './passes/keyframe';

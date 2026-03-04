@@ -1,5 +1,5 @@
-import { getWebGPUEngine } from './engine';
-import type { WorkgroupSize } from './pipeline-manager';
+import { getWebGPUEngine } from '../runtime/engine';
+import type { WorkgroupSize } from './pipelines';
 
 export function cachePipeline(
   device: GPUDevice,

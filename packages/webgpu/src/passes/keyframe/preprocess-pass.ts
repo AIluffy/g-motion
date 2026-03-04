@@ -5,14 +5,14 @@
  * Organizes keyframes into a format optimized for the search and interpolation passes.
  */
 
-import type { KeyframePreprocessBatchDescriptor } from '../../types';
-import type { WebGPUFrameEncoder } from '../../command-encoder';
+import type { KeyframePreprocessBatchDescriptor } from '../../runtime/types';
+import type { WebGPUFrameEncoder } from '../../runtime/encoder';
 import {
   CHANNEL_MAP_STRIDE,
   PACKED_KEYFRAME_STRIDE,
   RAW_KEYFRAME_STRIDE,
 } from '../../keyframe-preprocess-shader';
-import { getGPUMetricsProvider } from '../../metrics-provider';
+import { getGPUMetricsProvider } from '../../runtime/metrics';
 import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
 import { s_keyframePreprocessCPUCache } from './caches';
 import { getKeyframePreprocessPipeline } from './pipelines';

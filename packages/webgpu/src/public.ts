@@ -1,17 +1,17 @@
-export { getWebGPUEngine, resetWebGPUEngine, WebGPUEngine } from './engine';
-export type { WebGPUEngineConfig } from './engine';
+export { getWebGPUEngine, resetWebGPUEngine, WebGPUEngine } from './runtime/engine';
+export type { WebGPUEngineConfig } from './runtime/engine';
 export {
   createGPUContext,
   destroyGPUContext,
   getDefaultGPUContext,
   setDefaultGPUContext,
-} from './gpu-context';
-export type { GPUContext, GPUContextConfig } from './gpu-context';
-export { createWebGPUFrameEncoder } from './command-encoder';
-export type { WebGPUFrameEncoder } from './command-encoder';
-export { dispatchGPUBatch, dispatchPhysicsBatch } from './dispatch';
-export { ensureWebGPUInitialized, ensureWebGPUPipelines, initializeWebGPU } from './initialization';
-export type { InitConfig, WebGPUInitializationDeps, WebGPUInitResult } from './initialization';
+} from './runtime/context';
+export type { GPUContext, GPUContextConfig } from './runtime/context';
+export { createWebGPUFrameEncoder } from './runtime/encoder';
+export type { WebGPUFrameEncoder } from './runtime/encoder';
+export { dispatchGPUBatch, dispatchPhysicsBatch } from './runtime/dispatch';
+export { ensureWebGPUInitialized, ensureWebGPUPipelines, initializeWebGPU } from './runtime/init';
+export type { InitConfig, WebGPUInitializationDeps, WebGPUInitResult } from './runtime/init';
 export {
   disableGPUOutputFormatPass,
   enableGPUOutputFormatPass,
@@ -87,7 +87,7 @@ export {
   unpackInterleavedOutputs,
 } from './output-format-shader';
 export type { InterleavedOutputData, OutputChannelDesc } from './output-format-shader';
-export { NonNegativeRollingAverage, TimingHelper } from './timing-helper';
+export { NonNegativeRollingAverage, TimingHelper } from './gpu/timing';
 export { StagingBufferPool } from './staging-pool';
 export type { StagingBufferEntry } from './staging-pool';
 export { AsyncReadbackManager } from './async-readback';
@@ -104,12 +104,12 @@ export {
   isMatrix3DTransformChannels,
   isStandardTransformChannels,
   registerGPUChannelMappingForTracks,
-} from './channel-mapping';
+} from './runtime/channels';
 export type {
   GPUChannelMappingRegistrationMode,
   BatchChannelTable,
   ChannelMapping,
-} from './channel-mapping';
+} from './runtime/channels';
 export type {
   GPUBatchBuffers,
   GPUBatchDescriptor,
@@ -120,13 +120,13 @@ export type {
   ViewportCullingBatchDescriptor,
   GPUBatchContextWithArchetypes,
   DeviceInitResult,
-} from './types';
+} from './runtime/types';
 export {
   createGPUMetricsProvider,
   getGPUMetricsProvider,
   setDefaultGPUMetricsProvider,
   setGPUMetricsProvider,
-} from './metrics-provider';
+} from './runtime/metrics';
 export type {
   GPUBatchStatus,
   GPUBatchMetric,
@@ -134,4 +134,4 @@ export type {
   SystemTimingStat,
   GPUMemoryStats,
   GPUMetricsProvider,
-} from './metrics-provider';
+} from './runtime/metrics';

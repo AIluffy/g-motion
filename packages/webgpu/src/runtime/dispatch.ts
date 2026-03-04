@@ -1,12 +1,16 @@
 import type { GPUBatchDescriptor } from './types';
-import type { WebGPUFrameEncoder } from './command-encoder';
-import { getGPUMetricsProvider } from './metrics-provider';
-import type { OutputBufferReadbackTag } from './output-buffer-pool';
-import { acquirePooledOutputBuffer } from './output-buffer-pool';
-import { getPersistentGPUBufferManager } from './persistent-buffer-manager';
-import { getPipelineForWorkgroup, recordWorkgroupTiming, selectWorkgroupSize } from './pipeline';
-import type { GPUTimestampQueryManager } from './timestamp-query-manager';
-export { dispatchPhysicsBatch } from './passes/physics/dispatch-pass';
+import type { WebGPUFrameEncoder } from './encoder';
+import { getGPUMetricsProvider } from './metrics';
+import type { OutputBufferReadbackTag } from '../output-buffer-pool';
+import { acquirePooledOutputBuffer } from '../output-buffer-pool';
+import { getPersistentGPUBufferManager } from '../persistent-buffer-manager';
+import {
+  getPipelineForWorkgroup,
+  recordWorkgroupTiming,
+  selectWorkgroupSize,
+} from '../gpu/workgroup';
+import type { GPUTimestampQueryManager } from '../gpu/timestamp';
+export { dispatchPhysicsBatch } from '../passes/physics/dispatch-pass';
 
 export async function dispatchGPUBatch(
   device: GPUDevice,

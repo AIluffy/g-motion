@@ -5,8 +5,8 @@
  * Handles color encoding, value clamping, and format conversion.
  */
 
-import type { ChannelMapping } from '../channel-mapping';
-import { isStandardTransformChannels } from '../channel-mapping';
+import type { ChannelMapping } from '../runtime/channels';
+import { isStandardTransformChannels } from '../runtime/channels';
 import {
   createStandardChannelMapping,
   OUTPUT_FORMAT,
@@ -16,7 +16,7 @@ import { outputFormatBufferPool, trackBuffer } from './buffer-pool';
 import { getOutputFormatPipeline } from './pipeline';
 import { resetOutputFormatPassState } from './pipeline';
 import { makeChannelsKey } from './types';
-import type { WebGPUFrameEncoder } from '../command-encoder';
+import type { WebGPUFrameEncoder } from '../runtime/encoder';
 
 let outputFormatPassEnabled = true;
 

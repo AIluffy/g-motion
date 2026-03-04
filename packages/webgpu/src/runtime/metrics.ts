@@ -1,5 +1,5 @@
 import { createDebugger, isDev } from '@g-motion/shared';
-import type { OutputFormatPoolStats } from './output-format';
+import type { OutputFormatPoolStats } from '../output-format';
 
 const debug = createDebugger('GPUMetrics');
 const warn = createDebugger('GPUMetrics', 'warn');

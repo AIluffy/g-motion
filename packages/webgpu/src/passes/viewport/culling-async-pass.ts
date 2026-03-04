@@ -5,8 +5,8 @@
  * Returns a promise for the readback operation.
  */
 
-import type { ViewportCullingBatchDescriptor } from '../../types';
-import type { WebGPUFrameEncoder } from '../../command-encoder';
+import type { ViewportCullingBatchDescriptor } from '../../runtime/types';
+import type { WebGPUFrameEncoder } from '../../runtime/encoder';
 import { getCullingCompactPipeline } from './culling-pipeline';
 import { collectViewportCullingCPUInputs } from './culling-types';
 

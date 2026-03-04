@@ -7,10 +7,10 @@
 import { runOutputFormatPass, releaseOutputFormatBuffer } from './output-format';
 import { StagingBufferPool } from './staging-pool';
 import { AsyncReadbackManager } from './async-readback';
-import { setPendingReadbackCount } from './sync-manager';
+import { setPendingReadbackCount } from './runtime/sync';
 import { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
-import type { WebGPUFrameEncoder } from './command-encoder';
-import type { GPUMetricsProvider } from './metrics-provider';
+import type { WebGPUFrameEncoder } from './runtime/encoder';
+import type { GPUMetricsProvider } from './runtime/metrics';
 
 export interface ProcessOutputBufferInput {
   archetypeId: string;

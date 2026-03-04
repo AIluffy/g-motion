@@ -5,7 +5,7 @@
  * Culls entities outside the viewport and compacts the output buffer.
  */
 
-import type { ViewportCullingBatchDescriptor } from '../../types';
+import type { ViewportCullingBatchDescriptor } from '../../runtime/types';
 import { getCullingCompactPipeline } from './culling-pipeline';
 import { collectViewportCullingCPUInputs } from './culling-types';
 

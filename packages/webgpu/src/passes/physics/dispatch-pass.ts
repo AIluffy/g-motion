@@ -1,12 +1,12 @@
-import { getGPUMetricsProvider } from '../../metrics-provider';
+import { getGPUMetricsProvider } from '../../runtime/metrics';
 import {
   getPipelineForWorkgroup,
   recordWorkgroupTiming,
   selectWorkgroupSize,
-} from '../../pipeline';
-import type { GPUTimestampQueryManager } from '../../timestamp-query-manager';
+} from '../../gpu/workgroup';
+import type { GPUTimestampQueryManager } from '../../gpu/timestamp';
 import { createDebugger } from '@g-motion/shared';
-import type { WebGPUFrameEncoder } from '../../command-encoder';
+import type { WebGPUFrameEncoder } from '../../runtime/encoder';
 
 const warn = createDebugger('WebGPUDispatch', 'warn');
 

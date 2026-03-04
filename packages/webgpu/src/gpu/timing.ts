@@ -6,7 +6,7 @@
  * Handles feature detection, state management, and async result retrieval.
  */
 
-import { GPUTimestampQueryManager } from './timestamp-query-manager';
+import { GPUTimestampQueryManager } from './timestamp';
 
 export type TimingToken = { index: number; encoder: GPUCommandEncoder };
 

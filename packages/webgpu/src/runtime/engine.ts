@@ -1,19 +1,19 @@
-import type { AsyncReadbackManager } from './async-readback';
-import { BufferManager } from './buffer-manager';
-import type { DeviceManager } from './device-manager';
-import { ReadbackManager } from './readback-manager';
-import type { PersistentGPUBufferManager } from './persistent-buffer-manager';
-import type { StagingBufferPool } from './staging-pool';
-import type { GPUTimestampQueryManager } from './timestamp-query-manager';
+import type { AsyncReadbackManager } from '../async-readback';
+import { BufferManager } from '../buffer-manager';
+import type { DeviceManager } from '../gpu/device';
+import { ReadbackManager } from '../readback-manager';
+import type { PersistentGPUBufferManager } from '../persistent-buffer-manager';
+import type { StagingBufferPool } from '../staging-pool';
+import type { GPUTimestampQueryManager } from '../gpu/timestamp';
 import type { DeviceInitResult } from './types';
-import type { PipelineManager, WorkgroupSize } from './pipeline-manager';
-import { clearKeyframePipelineCache } from './passes/keyframe/pipelines';
-import { clearViewportCullingPipelineCache } from './passes/viewport/culling-pipeline';
-import { clearOutputFormatPipelineCache } from './output-format/pipeline';
-import { GPUDeviceLifecycle } from './gpu-device-lifecycle';
-import { GPUFrameCoordinator } from './gpu-frame-coordinator';
-import { GPUPipelineRegistry } from './gpu-pipeline-registry';
-import { GPURuntimeState } from './gpu-runtime-state';
+import type { PipelineManager, WorkgroupSize } from '../gpu/pipelines';
+import { clearKeyframePipelineCache } from '../passes/keyframe/pipelines';
+import { clearViewportCullingPipelineCache } from '../passes/viewport/culling-pipeline';
+import { clearOutputFormatPipelineCache } from '../output-format/pipeline';
+import { GPUDeviceLifecycle } from '../gpu/lifecycle';
+import { GPUFrameCoordinator } from '../gpu/frame';
+import { GPUPipelineRegistry } from '../gpu/registry';
+import { GPURuntimeState } from '../gpu/state';
 
 export interface ComputeMetrics {
   dispatchCount: number;

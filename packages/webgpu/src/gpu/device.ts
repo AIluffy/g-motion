@@ -1,6 +1,6 @@
 import { createDebugger } from '@g-motion/shared';
-import type { WebGPUEngineConfig } from './engine';
-import type { DeviceInitResult } from './types';
+import type { WebGPUEngineConfig } from '../runtime/engine';
+import type { DeviceInitResult } from '../runtime/types';
 
 const warn = createDebugger('DeviceManager', 'warn');
 

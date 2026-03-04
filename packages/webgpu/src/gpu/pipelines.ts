@@ -1,6 +1,6 @@
 import { createDebugger, panic, WebGPUConstants } from '@g-motion/shared';
-import type { GPUMetricsProvider } from './metrics-provider';
-import { getGPUMetricsProvider } from './metrics-provider';
+import type { GPUMetricsProvider } from '../runtime/metrics';
+import { getGPUMetricsProvider } from '../runtime/metrics';
 
 const warn = createDebugger('PipelineManager', 'warn');
 
