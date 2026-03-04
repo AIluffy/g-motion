@@ -1,6 +1,6 @@
 import type { MotionPlugin } from '@g-motion/core';
 import { registerPlugin } from '@g-motion/core';
-import { SpringComponentSchema } from './component';
+import { SpringComponentSchema } from './physics/schema';
 import springShaderCode from './shaders/spring.wgsl?raw';
 
 // Shader definition for plugin manifest
@@ -40,12 +40,12 @@ export const springPlugin: MotionPlugin = {
 registerPlugin(springPlugin);
 
 // Re-export all exports from sub-modules
-export { SpringComponentSchema } from './component';
-export { analyzeSpringTracks, buildSpringComponent } from './analyzer';
+export { SpringComponentSchema } from './physics/schema';
+export { analyzeSpringTracks, buildSpringComponent } from './physics/tracks';
 export type { SpringOptions } from '@g-motion/core';
 
 // Re-export shader code for external use
 export { default as SPRING_GPU_SHADER } from './shaders/spring.wgsl?raw';
 
 // Re-export spring utilities
-export { SPRING_PRESETS, calculateCriticalDamping } from './component';
+export { SPRING_PRESETS, calculateCriticalDamping } from './physics/schema';

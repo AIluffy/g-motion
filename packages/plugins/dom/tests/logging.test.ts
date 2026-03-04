@@ -4,7 +4,7 @@
  */
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { globalDebugController } from '@g-motion/shared';
-import { createDOMRenderer } from '../src/renderer';
+import { createDOMRenderer } from '../src/render/renderer';
 
 describe('DOMRenderer Logging', () => {
   let consoleDebugSpy: ReturnType<typeof vi.spyOn>;

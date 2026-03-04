@@ -1,5 +1,5 @@
 import { describe, bench, beforeEach } from 'vitest';
-import { createDOMRenderer } from '../src/renderer';
+import { createDOMRenderer } from '../src/render/renderer';
 import { JSDOM } from 'jsdom';
 
 describe('DOM Batch Rendering Performance', () => {

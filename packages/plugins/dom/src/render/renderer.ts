@@ -5,14 +5,14 @@ import {
   createDebugger,
   resolveDomElements,
 } from '@g-motion/shared';
-import { DomStyleBatcher, initializeElementForGPU } from './dom-style-batcher';
+import { DomStyleBatcher, initializeElementForGPU } from './style-batcher';
 import {
   buildTransformString,
   excludedStyleKeys,
   resolveTransformValues,
   TransformTyped,
   TransformTypedBuffers,
-} from './dom-transform';
+} from './transform';
 
 const debug = createDebugger('DOMRenderer');
 

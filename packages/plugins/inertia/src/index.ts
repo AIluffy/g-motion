@@ -1,6 +1,6 @@
 import type { MotionPlugin } from '@g-motion/core';
 import { registerPlugin } from '@g-motion/core';
-import { InertiaComponentSchema } from './component';
+import { InertiaComponentSchema } from './physics/schema';
 import inertiaShaderCode from './shaders/inertia.wgsl?raw';
 
 // Shader definition for plugin manifest
@@ -40,9 +40,9 @@ export const inertiaPlugin: MotionPlugin = {
 registerPlugin(inertiaPlugin);
 
 // Re-export all exports from sub-modules
-export { InertiaComponentSchema } from './component';
-export { VelocityTracker } from './velocity-tracker';
-export { analyzeInertiaTracks, buildInertiaComponent } from './analyzer';
+export { InertiaComponentSchema } from './physics/schema';
+export { VelocityTracker } from './physics/velocity';
+export { analyzeInertiaTracks, buildInertiaComponent } from './physics/tracks';
 export type { InertiaOptions } from '@g-motion/core';
 
 // Re-export shader code for external use

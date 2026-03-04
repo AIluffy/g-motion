@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createDOMRenderer, DOMRendererConfig } from '../src/renderer';
+import { createDOMRenderer, DOMRendererConfig } from '../src/render/renderer';
 import { createDOMPlugin } from '../src/index';
 
 describe('GPU Acceleration Configuration', () => {

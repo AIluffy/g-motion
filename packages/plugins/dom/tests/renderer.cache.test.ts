@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createDOMRenderer } from '../src/renderer';
+import { createDOMRenderer } from '../src/render/renderer';
 
 describe('DOM renderer selector cache', () => {
   let container: HTMLElement;

@@ -2,7 +2,7 @@ import type { MotionApp, MotionPlugin } from '@g-motion/core';
 import { createDebugger, createDomTargetResolver } from '@g-motion/shared';
 import { registerTargetResolver, TargetResolver, TargetType } from '@g-motion/animation';
 import { TransformComponent } from './components/transform';
-import { createDOMRenderer, DOMRendererConfig } from './renderer';
+import { createDOMRenderer, DOMRendererConfig } from './render/renderer';
 
 const debugLog = createDebugger('DOM');
 
@@ -55,4 +55,4 @@ export const createDOMPlugin = (options: DOMPluginOptions = {}): MotionPlugin =>
 export const DOMPlugin: MotionPlugin = createDOMPlugin();
 
 export * from './components/transform';
-export * from './renderer';
+export * from './render/renderer';
