@@ -17,7 +17,6 @@ import {
   TargetType,
 } from './mark';
 export type { MarkOptions, ResolvedMarkOptions } from './mark';
-// Import physics analyzers from plugins
 import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
 import { analyzeSpringTracks } from '@g-motion/plugin-spring';
 import { ComponentRegistrar } from '../registery';
@@ -27,30 +26,21 @@ import { buildRenderComponent } from './render';
 import type { VisualTarget } from './visual-target';
 import { getOrCreateVisualTarget } from './visual-target';
 
-export interface PlayOptions<TValue = any> extends AnimationOptions<TValue> {}
+export interface PlayOptions<TValue = unknown> extends AnimationOptions<TValue> {}
 
 type TrackMarkOptions = Pick<
   MarkOptions,
   'duration' | 'ease' | 'interp' | 'bezier' | 'spring' | 'inertia'
 >;
 
-/**
- * Creates a new animation builder for the given target.
- * @param target - The number, object, selector, or array of targets to animate.
- * @returns A MotionBuilder instance.
- */
-export function motion<T extends MotionTarget = any>(
+export function motion<T extends MotionTarget>(
   target: T,
   opts?: { world?: World; scope?: DomAnimationScope },
-) {
+): MotionBuilder<T> {
   return new MotionBuilder<T>(target, opts);
 }
 
-/**
- * Fluent API builder for defining animation sequences.
- * Supports both single and multi-entity animations.
- */
-export class MotionBuilder<T = any> {
+export class MotionBuilder<T extends MotionTarget> {
   private validator = new AnimationValidator();
   private componentRegistrar = new ComponentRegistrar();
   private gpuChannelMapper = new GPUChannelMapper();
@@ -58,16 +48,17 @@ export class MotionBuilder<T = any> {
   private currentTime = 0;
   private targets: MotionTargetValue<T>[];
   private isBatch: boolean;
-  // Precompiled batch templates: static marks resolved once
   private batchTemplates: BatchTemplate[] = [];
   private timelineVersion = 0;
-  private playOptions: AnimationOptions<AnimatableProps<MotionTargetValue<T>>> | undefined;
+  private playOptions:
+    | AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>
+    | undefined;
   private visualTarget?: VisualTarget;
   private cachedTargetType?: TargetType;
   private scope?: DomAnimationScope;
+  private injectedWorld?: World;
 
   constructor(target: T, opts?: { world?: World; scope?: DomAnimationScope }) {
-    // Normalize to array for unified handling
     if (Array.isArray(target)) {
       this.targets = target as MotionTargetValue<T>[];
       this.isBatch = target.length > 1;
@@ -75,12 +66,10 @@ export class MotionBuilder<T = any> {
       this.targets = [target as MotionTargetValue<T>];
       this.isBatch = false;
     }
-    // Optional world injection for DI
-    (this as any)._world = opts?.world;
+    this.injectedWorld = opts?.world;
     this.scope = opts?.scope;
   }
 
-  /** For compatibility - get the primary target */
   private get target(): MotionTargetValue<T> {
     return this.targets[0];
   }
@@ -94,24 +83,14 @@ export class MotionBuilder<T = any> {
     return vt;
   }
 
-  track(prop: string): this {
-    // For chaining: builder.track('x').mark({...})
-    // The property is stored for the next mark() call
-    (this as any)._pendingTrackProperty = prop;
+  track(_prop: string): this {
     return this;
   }
 
-  /**
-   * Shorthand to set a property value at a specific time or duration.
-   * @param prop - The property to set
-   * @param timeOrDuration - Time in ms (if options.duration set) or absolute time
-   * @param to - The target value
-   * @param options - Optional mark settings (duration, easing, etc.)
-   */
   set(prop: string, timeOrDuration: number, to: number, options: TrackMarkOptions = {}): this {
-    const payload: MarkOptions & { to: Record<string, number> } = {
+    const payload: MarkOptions<MotionTargetValue<T>> = {
       ...options,
-      to: { [prop]: to },
+      to: { [prop]: to } as AnimatableProps<MotionTargetValue<T>>,
     };
 
     if (options.duration !== undefined) {
@@ -120,26 +99,24 @@ export class MotionBuilder<T = any> {
       payload.at = timeOrDuration;
     }
 
-    this.mark([payload as MarkOptions]);
+    this.mark([payload]);
     return this;
   }
 
-  adjust(params: { offset?: number; scale?: number }): MotionBuilder {
+  adjust(params: { offset?: number; scale?: number }): MotionBuilder<T> {
     this.tracks = applyAdjust(this.tracks, params);
     this.currentTime = computeMaxTime(this.tracks);
     this.timelineVersion++;
     return this;
   }
 
-  /**
-   * Adds one or more keyframe markers to the animation timeline.
-   * Accepts a single mark or an array of mark definitions.
-   * Supports per-entity functions for batch animations.
-   */
-  mark(optionsBatch: MarkOptions<MotionTargetValue<T>> | MarkOptions<MotionTargetValue<T>>[]): this {
+  mark(
+    optionsBatch:
+      | MarkOptions<MotionTargetValue<T>>
+      | MarkOptions<MotionTargetValue<T>>[],
+  ): this {
     const optsArray = Array.isArray(optionsBatch) ? optionsBatch : [optionsBatch];
 
-    // Store precompiled templates for batch animation (don't process tracks yet)
     if (this.isBatch) {
       const normalizedOptions = optsArray.map((opt) => this.validator.validateMark(opt));
       const staticResolved: ResolvedMarkOptions<MotionTargetValue<T>>[] = [];
@@ -156,11 +133,10 @@ export class MotionBuilder<T = any> {
         }
       }
       this.batchTemplates.push({ staticResolved, dynamic });
-      // Update currentTime based on the last mark's time
-      optsArray.forEach((opt) => {
+      for (const opt of optsArray) {
         const timeVal = resolveTimeValue(opt, this.currentTime, 0, 0);
         this.currentTime = Math.max(this.currentTime, timeVal);
-      });
+      }
       return this;
     }
 
@@ -168,23 +144,24 @@ export class MotionBuilder<T = any> {
     return this;
   }
 
-  option(options: AnimationOptions<AnimatableProps<MotionTargetValue<T>>>): this {
+  option(options: AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>): this {
     this.playOptions = { ...(this.playOptions ?? {}), ...options };
     return this;
   }
 
-  play(options?: AnimationOptions<AnimatableProps<MotionTargetValue<T>>>): AnimationControl {
+  play(
+    options?: AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>,
+  ): AnimationControl & PromiseLike<void> {
     if (this.isBatch) {
       return this.playBatch(options);
     }
 
-    const resolvedOptions: AnimationOptions<AnimatableProps<MotionTargetValue<T>>> = {
+    const resolvedOptions: AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>> = {
       ...(this.playOptions ?? {}),
       ...(options ?? {}),
     };
 
-    const injectedWorld = (this as any)._world as World | undefined;
-    const world = injectedWorld ?? WorldProvider.useWorld();
+    const world = this.injectedWorld ?? WorldProvider.useWorld();
     this.componentRegistrar.ensureAnimationSystemsRegistered(world);
     this.componentRegistrar.registerCoreComponents(world);
 
@@ -196,8 +173,7 @@ export class MotionBuilder<T = any> {
       this.target,
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const components: any = {
+    const components: Record<string, unknown> = {
       MotionState: {
         delay: resolvedOptions.delay ?? 0,
         startTime: getNowMs(),
@@ -217,7 +193,6 @@ export class MotionBuilder<T = any> {
       },
     };
 
-    // Add SpringComponent if spring physics is used
     if (hasSpring && springConfig) {
       components.Spring = {
         stiffness: springConfig.stiffness ?? 100,
@@ -229,7 +204,6 @@ export class MotionBuilder<T = any> {
       };
     }
 
-    // Add InertiaComponent if inertia physics is used
     if (hasInertia && inertiaConfig) {
       components.Inertia = buildInertiaComponent(inertiaConfig, inertiaVelocities);
     }
@@ -263,7 +237,7 @@ export class MotionBuilder<T = any> {
     }
 
     const entityId = world.createEntity(components);
-    if (!injectedWorld && typeof (globalThis as any).requestAnimationFrame === 'function') {
+    if (!this.injectedWorld && typeof globalThis.requestAnimationFrame === 'function') {
       world.scheduler.start();
     }
 
@@ -275,29 +249,27 @@ export class MotionBuilder<T = any> {
     return control;
   }
 
-  private playBatch(options?: AnimationOptions<AnimatableProps<MotionTargetValue<T>>>): AnimationControl {
-    const resolvedOptions: AnimationOptions<AnimatableProps<MotionTargetValue<T>>> = {
+  private playBatch(
+    options?: AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>,
+  ): AnimationControl & PromiseLike<void> {
+    const resolvedOptions: AnimationOptions<Partial<AnimatableProps<MotionTargetValue<T>>>> = {
       ...(this.playOptions ?? {}),
       ...(options ?? {}),
     };
-    const injectedWorld = (this as any)._world as World | undefined;
+
     return runBatchAnimation({
       targets: this.targets,
       templates: this.batchTemplates,
       options: resolvedOptions,
-      injectedWorld,
+      injectedWorld: this.injectedWorld,
       createBuilder: (target) =>
-        new MotionBuilder<MotionTargetValue<T>>(target, { world: injectedWorld, scope: this.scope }),
-    });
+        new MotionBuilder<MotionTargetValue<T>>(target as MotionTargetValue<T>, {
+          world: this.injectedWorld,
+          scope: this.scope,
+        }),
+    }) as AnimationControl & PromiseLike<void>;
   }
 
-  // ============================================================================
-  // Private: Batch Animation Helpers
-  // ============================================================================
-
-  /**
-   * Serialize current builder state into the JSON schema shape used by contracts/json-schema.motion-timeline.json
-   */
   toJSON() {
     const tracksArray = Array.from(this.tracks.entries()).map(([property, marks]) => ({
       property,
@@ -326,9 +298,6 @@ export class MotionBuilder<T = any> {
     };
   }
 
-  // ============================================================================
-  // Private: Mark Processing Helpers
-  // ============================================================================
   private processSingleMark(rawOptions: MarkOptions<MotionTargetValue<T>>): void {
     const visualTarget = this.getVisualTarget();
     const resolved = resolveMarkOptions(rawOptions, this.target, this.currentTime, 0, 0);
@@ -340,7 +309,6 @@ export class MotionBuilder<T = any> {
     this.timelineVersion++;
   }
 
-  // Apply a pre-resolved mark without re-resolving per entity
   addResolvedMark(resolved: ResolvedMarkOptions<MotionTargetValue<T>>): void {
     this.validator.validateResolvedMark(resolved);
     const easing = resolved.ease;

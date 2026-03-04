@@ -6,7 +6,7 @@ import type { AnimationOptions } from './animation-options';
 import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types';
 import { motion } from '..';
 
-export interface AnimateOptions<TValue = any> extends AnimationOptions<TValue> {
+export interface AnimateOptions<TValue = unknown> extends AnimationOptions<TValue> {
   times?: number[];
 }
 
@@ -115,58 +115,42 @@ function buildKeyframeMarks(
 
 function applyAnimateMark(
   builder: { mark(mark: MarkOptions | MarkOptions[]): unknown },
-  to: number | Record<string, unknown>,
+  to: unknown,
   options: AnimateOptions | undefined,
   targetType: TargetType,
-) {
+): void {
   const totalDuration = options?.duration ?? DEFAULT_DURATION;
 
   if (targetType === TargetType.Primitive && typeof to === 'number') {
-    const mark: MarkOptions = {
-      to,
-      duration: totalDuration,
-      ease: options?.ease,
-    };
-    builder.mark(mark);
+    builder.mark({ to, duration: totalDuration, ease: options?.ease });
     return;
   }
 
   if (!isKeyframeObject(to)) {
-    const mark: MarkOptions = {
-      to,
-      duration: totalDuration,
-      ease: options?.ease,
-    };
-    builder.mark(mark);
+    builder.mark({ to: to as Record<string, number>, duration: totalDuration, ease: options?.ease });
     return;
   }
 
   if (!hasAnyKeyframeArrays(to)) {
     const markTo = targetType === TargetType.Primitive ? normalizePrimitiveObjectTo(to) : to;
-    builder.mark({ to: markTo, duration: totalDuration, ease: options?.ease });
+    builder.mark({ to: markTo as Record<string, number>, duration: totalDuration, ease: options?.ease });
     return;
   }
 
   const keys = Object.keys(to);
   const keyframeCount = resolveKeyframeCount(keys, to);
   if (keyframeCount <= 1) {
-    builder.mark({ to, duration: totalDuration, ease: options?.ease });
+    builder.mark({ to: to as Record<string, number>, duration: totalDuration, ease: options?.ease });
     return;
   }
 
   builder.mark(buildKeyframeMarks(keys, to, keyframeCount, totalDuration, options));
 }
 
-export function animate<T extends MotionTarget = any>(
+export function animate<T extends MotionTarget>(
   target: T,
   to: AnimatableProps<MotionTargetValue<T>>,
-  options?: AnimateOptions<AnimatableProps<MotionTargetValue<T>>>,
-): AnimationControl & PromiseLike<void>;
-
-export function animate(
-  target: any,
-  to: number | Record<string, unknown>,
-  options?: AnimateOptions,
+  options?: AnimateOptions<Partial<AnimatableProps<MotionTargetValue<T>>>>,
 ): AnimationControl & PromiseLike<void> {
   const builder = motion(target);
   const targetType = getTargetType(target);
@@ -184,5 +168,5 @@ export function animate(
     });
   }
 
-  return builder.play() as AnimationControl & PromiseLike<void>;
+  return builder.play();
 }

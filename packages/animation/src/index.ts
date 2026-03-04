@@ -135,7 +135,7 @@ export function inspectTargets(
   };
 }
 
-export const motion = <T extends MotionTarget = any>(target: T, options?: MotionOptions) => {
+export const motion = <T extends MotionTarget>(target: T, options?: MotionOptions) => {
   const world = WorldProvider.useWorld();
   initEngine(world);
   const root = typeof document !== 'undefined' ? document : null;

@@ -1,5 +1,13 @@
 import { InertiaOptions, Keyframe, SpringOptions, TimelineData } from '@g-motion/core';
-import { createDebugger, isArrayLike, isDev, isDomElement, isNodeList, panic, resolveDomElements } from '@g-motion/shared';
+import {
+  createDebugger,
+  isArrayLike,
+  isDev,
+  isDomElement,
+  isNodeList,
+  panic,
+  resolveDomElements,
+} from '@g-motion/shared';
 import type { Easing } from '@g-motion/shared';
 import type { AnimatableProps, StaggerValue } from '../types';
 
@@ -9,25 +17,14 @@ export interface MarkOptions<T = any> {
     | ((index: number, entityId: number, target?: T) => AnimatableProps<T>);
   from?: AnimatableProps<T>;
   at?: number | ((index: number, entityId: number) => number);
-  /**
-   * @deprecated 请使用 at
-   * @see at
-   */
-  time?: number | ((index: number, entityId: number) => number);
   duration?: number;
   ease?: Easing;
-  /**
-   * @deprecated 请使用 ease
-   * @see ease
-   */
-  easing?: Easing;
   interp?: 'linear' | 'bezier' | 'hold' | 'autoBezier';
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
   spring?: SpringOptions;
   inertia?: InertiaOptions;
   stagger?: StaggerValue;
 }
-
 
 export type ResolvedMarkOptions<T = any> = Omit<MarkOptions<T>, 'to'> & {
   to: AnimatableProps<T>;
@@ -55,12 +52,6 @@ export function resolveTimeValue(
   if (typeof opts.at === 'number') {
     return opts.at;
   }
-  if (typeof opts.time === 'function') {
-    return opts.time(index, entityId);
-  }
-  if (typeof opts.time === 'number') {
-    return opts.time;
-  }
 
   if (typeof opts.duration === 'number') {
     return currentTime + opts.duration;
@@ -75,7 +66,7 @@ export function resolveMarkOptions<T = any>(
   currentTime: number,
   index: number,
   entityId: number,
-): ResolvedMarkOptions {
+): ResolvedMarkOptions<T> {
   const time = resolveTimeValue(raw, currentTime, index, entityId);
   const to = typeof raw.to === 'function' ? raw.to(index, entityId, target) : raw.to;
 
@@ -83,8 +74,6 @@ export function resolveMarkOptions<T = any>(
     ...raw,
     to,
     time,
-    at: raw.at ?? raw.time,
-    ease: raw.ease ?? raw.easing,
   };
 }
 
@@ -100,7 +89,7 @@ export function computeMaxTime(tracks: TimelineData): number {
   return maxTime;
 }
 
-export function getTargetType(target: any): TargetType {
+export function getTargetType(target: unknown): TargetType {
   if (typeof target === 'number') return TargetType.Primitive;
   if (
     typeof target === 'string' ||
@@ -194,7 +183,7 @@ function getRootDiagnostics(root: TargetScopeRoot): {
         : typeof Element !== 'undefined' && root instanceof Element
           ? 'element'
           : 'custom';
-  const hasQuerySelectorAll = !!root && typeof (root as any).querySelectorAll === 'function';
+  const hasQuerySelectorAll = !!root && typeof (root as ParentNode).querySelectorAll === 'function';
   return { rootKind, hasQuerySelectorAll };
 }
 
@@ -246,66 +235,30 @@ function createTargetErrorHandlers(params: {
   const { input, root, strict, options } = params;
 
   const handleTargetError = (message: string, context: Record<string, unknown>, fatal: boolean) => {
-    const shape = {
-      inputType: typeof input,
-      isArray: Array.isArray(input),
-      arrayLength: Array.isArray(input) ? (input as any[]).length : undefined,
-      isNodeListLike: isNodeList(input),
-      isArrayLikeInput: isArrayLike(input),
-    };
-    const payload = { ...shape, ...context };
     if (fatal) {
-      panic(message, payload);
-    } else {
-      warnTargets(message, payload);
+      panic(message, context);
+      return;
     }
+    warnTargets(message, context);
   };
 
   const handleSelectorDomEnvMissing = (selector: string, reason: string) => {
-    const { rootKind, hasQuerySelectorAll } = getRootDiagnostics(root ?? null);
-    handleTargetError(
-      'DOM environment missing for selector resolution',
-      {
-        selector,
-        root: root ?? null,
-        reason,
-        rootKind,
-        hasQuerySelectorAll,
-      },
-      strict,
-    );
     if (options?.onSelectorError) {
       options.onSelectorError(selector, reason);
     } else {
-      debugResolveTargets('Selector resolution skipped in non-DOM environment', selector);
+      warnTargets(`Selector '${selector}' resolution skipped: ${reason}.`);
     }
   };
 
   const handleSelectorResolutionError = (selector: string, reason: string) => {
-    const { rootKind, hasQuerySelectorAll } = getRootDiagnostics(root ?? null);
-    handleTargetError(
-      'Invalid selector or error during selector resolution',
-      {
-        selector,
-        root,
-        reason,
-        rootKind,
-        hasQuerySelectorAll,
-      },
-      strict,
-    );
     if (options?.onSelectorError) {
       options.onSelectorError(selector, reason);
     } else {
-      debugResolveTargets('Selector resolution error', selector, reason);
+      warnTargets(`Selector '${selector}' failed to resolve: ${reason}.`);
     }
   };
 
-  return {
-    handleTargetError,
-    handleSelectorDomEnvMissing,
-    handleSelectorResolutionError,
-  };
+  return { handleTargetError, handleSelectorDomEnvMissing, handleSelectorResolutionError };
 }
 
 function resolveSelectorWithPolicy(params: {
@@ -325,7 +278,7 @@ function resolveSelectorWithPolicy(params: {
     handleSelectorResolutionError,
   } = params;
 
-  if (!rootNode || typeof (rootNode as any).querySelectorAll !== 'function') {
+  if (!rootNode || typeof (rootNode as ParentNode).querySelectorAll !== 'function') {
     if (policy.reportDomEnvMissing) {
       const reason = 'No DOM root with querySelectorAll available for selector resolution';
       handleSelectorDomEnvMissing(selector, reason);
@@ -439,10 +392,10 @@ function addTargetsFromValue(params: {
   }
 
   if (isArrayLike(value)) {
-    const length = (value as any).length as number;
+    const length = (value as { length: number }).length;
     for (let i = 0; i < length; i++) {
-      if (i in (value as any)) {
-        addTargetsFromValue({ ...params, value: (value as any)[i] });
+      if (i in (value as Record<number, unknown>)) {
+        addTargetsFromValue({ ...params, value: (value as Record<number, unknown>)[i] });
       }
     }
     return;
