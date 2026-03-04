@@ -51,6 +51,66 @@ export interface BufferAlignmentConfig {
   largeAlignmentBytes: number;
 }
 
+export interface DirtyRegion {
+  offset: number;
+  length: number;
+}
+
+const WRITE_BUFFER_ALIGNMENT = 4;
+const PARTIAL_UPLOAD_FALLBACK_RATIO = 0.35;
+
+export class DirtyRegionTracker {
+  private regions: DirtyRegion[] = [];
+
+  markDirty(byteOffset: number, byteLength: number): void {
+    if (byteLength <= 0) {
+      return;
+    }
+
+    const alignedStart = Math.floor(byteOffset / WRITE_BUFFER_ALIGNMENT) * WRITE_BUFFER_ALIGNMENT;
+    const alignedEnd =
+      Math.ceil((byteOffset + byteLength) / WRITE_BUFFER_ALIGNMENT) * WRITE_BUFFER_ALIGNMENT;
+
+    let nextStart = alignedStart;
+    let nextEnd = alignedEnd;
+    const merged: DirtyRegion[] = [];
+    let inserted = false;
+
+    for (const region of this.regions) {
+      const regionEnd = region.offset + region.length;
+      if (regionEnd < nextStart) {
+        merged.push(region);
+        continue;
+      }
+      if (nextEnd < region.offset) {
+        if (!inserted) {
+          merged.push({ offset: nextStart, length: nextEnd - nextStart });
+          inserted = true;
+        }
+        merged.push(region);
+        continue;
+      }
+
+      nextStart = Math.min(nextStart, region.offset);
+      nextEnd = Math.max(nextEnd, regionEnd);
+    }
+
+    if (!inserted) {
+      merged.push({ offset: nextStart, length: nextEnd - nextStart });
+    }
+
+    this.regions = merged;
+  }
+
+  getDirtyRegions(): DirtyRegion[] {
+    return this.regions.map((region) => ({ ...region }));
+  }
+
+  clear(): void {
+    this.regions = [];
+  }
+}
+
 const defaultBufferAlignmentConfig: BufferAlignmentConfig = {
   smallThresholdBytes: 1024,
   mediumThresholdBytes: 64 * 1024,
@@ -88,6 +148,7 @@ export class PersistentGPUBufferManager {
   private device: GPUDevice;
   private buffers = new Map<string, PersistentBuffer>();
   private previousData = new Map<string, Uint8Array>(); // For change detection
+  private previousUploadBytes = new Map<string, Uint8Array>();
   private previousDataHash = new Map<string, number>();
   private previousDataLength = new Map<string, number>();
   private currentFrame = 0;
@@ -230,6 +291,10 @@ export class PersistentGPUBufferManager {
       key,
       new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(),
     );
+    this.previousUploadBytes.set(
+      key,
+      new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice(),
+    );
 
     this.stats.totalUpdates++;
     this.stats.totalBytesProcessed += requiredSize;
@@ -265,6 +330,7 @@ export class PersistentGPUBufferManager {
         existing.buffer.destroy();
         this.buffers.delete(key);
         this.previousData.delete(key);
+        this.previousUploadBytes.delete(key);
       } else {
         throw new Error(
           `Buffer '${key}' size mismatch: has ${existing.size}, needs ${requiredSize}`,
@@ -359,11 +425,52 @@ export class PersistentGPUBufferManager {
         this.previousDataLength.set(key, bytes.byteLength);
       }
 
-      this.uploadData(existing.buffer, data, key, offset, size);
+      const previousBytes = this.previousUploadBytes.get(key);
+      const tracker = new DirtyRegionTracker();
+      let dirtyBytes = 0;
+      if (previousBytes && previousBytes.byteLength === bytes.byteLength) {
+        for (let i = 0; i < bytes.byteLength; i++) {
+          if (bytes[i] !== previousBytes[i]) {
+            tracker.markDirty(i, 1);
+          }
+        }
+        for (const region of tracker.getDirtyRegions()) {
+          dirtyBytes += region.length;
+        }
+      } else {
+        tracker.markDirty(0, bytes.byteLength);
+        dirtyBytes = bytes.byteLength;
+      }
+
+      const dirtyRegions = tracker.getDirtyRegions();
+      const shouldUploadAll =
+        options?.forceUpdate ||
+        dirtyRegions.length === 0 ||
+        dirtyBytes / Math.max(size, WRITE_BUFFER_ALIGNMENT) > PARTIAL_UPLOAD_FALLBACK_RATIO;
+
+      if (shouldUploadAll) {
+        this.uploadData(existing.buffer, data, key, offset, size);
+      } else {
+        for (const region of dirtyRegions) {
+          this.uploadData(
+            existing.buffer,
+            data,
+            key,
+            offset + region.offset,
+            region.length,
+            region.offset,
+          );
+        }
+      }
+
+      this.previousUploadBytes.set(key, bytes.slice());
       existing.version++;
       existing.isDirty = false;
       this.stats.totalUpdates++;
-      this.stats.totalBytesProcessed += size;
+      this.stats.totalBytesProcessed += shouldUploadAll ? size : dirtyBytes;
+      if (!shouldUploadAll) {
+        this.stats.bytesSkipped += Math.max(0, size - dirtyBytes);
+      }
       return existing.buffer;
     }
 
@@ -372,6 +479,7 @@ export class PersistentGPUBufferManager {
         existing.buffer.destroy();
         this.buffers.delete(key);
         this.previousData.delete(key);
+        this.previousUploadBytes.delete(key);
         this.previousDataHash.delete(key);
         this.previousDataLength.delete(key);
       } else {
@@ -396,6 +504,7 @@ export class PersistentGPUBufferManager {
     const bytes = new Uint8Array(data.buffer, data.byteOffset, size);
     this.previousDataHash.set(key, crc32(bytes));
     this.previousDataLength.set(key, bytes.byteLength);
+    this.previousUploadBytes.set(key, bytes.slice());
 
     const persistentBuffer: PersistentBuffer = {
       buffer,
@@ -492,13 +601,15 @@ export class PersistentGPUBufferManager {
     _key: string,
     offset = 0,
     size?: number,
+    dataOffset = 0,
   ): void {
     const uploadSize = size || data.byteLength;
+    const sourceByteOffset = data.byteOffset + dataOffset;
 
     // Use queue.writeBuffer for small updates (more efficient)
     if (uploadSize < 64 * 1024) {
       // < 64KB
-      this.device.queue.writeBuffer(buffer, offset, data.buffer, data.byteOffset, uploadSize);
+      this.device.queue.writeBuffer(buffer, offset, data.buffer, sourceByteOffset, uploadSize);
     } else {
       // For larger updates, use mapped buffer (single allocation)
       const tempBuffer = this.device.createBuffer({
@@ -508,7 +619,7 @@ export class PersistentGPUBufferManager {
       });
 
       new Uint8Array(tempBuffer.getMappedRange()).set(
-        new Uint8Array(data.buffer, data.byteOffset, uploadSize),
+        new Uint8Array(data.buffer, sourceByteOffset, uploadSize),
       );
       tempBuffer.unmap();
 
@@ -583,6 +694,7 @@ export class PersistentGPUBufferManager {
     for (const key of toRemove) {
       this.buffers.delete(key);
       this.previousData.delete(key);
+      this.previousUploadBytes.delete(key);
       this.previousDataHash.delete(key);
       this.previousDataLength.delete(key);
     }
@@ -645,6 +757,7 @@ export class PersistentGPUBufferManager {
     }
     this.buffers.clear();
     this.previousData.clear();
+    this.previousUploadBytes.clear();
     this.previousDataHash.clear();
     this.previousDataLength.clear();
     this.currentFrame = 0;
