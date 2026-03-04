@@ -174,5 +174,6 @@ export * from './api/control';
 export * from './api/gpu-status';
 export * from './api/mark';
 export * from './api/visual-target';
+export * from './api/timeline-api';
 export * from './types';
 export { engine } from './engine';
