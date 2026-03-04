@@ -4,8 +4,8 @@ import { App, appWorld, app as globalApp, registerBuiltInRenderers } from './app
 import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
-import type { SystemScheduler } from './scheduler';
-import { clearPipelineCache } from './systems/webgpu';
+import type { SystemScheduler } from '../scheduler/scheduler';
+import { clearPipelineCache } from '../systems/webgpu';
 import { World } from './world';
 import { WorldProvider } from './world-provider';
 

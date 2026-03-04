@@ -5,7 +5,7 @@ import {
   unmarkPhysicsGPUEntity,
 } from '@g-motion/webgpu/internal';
 import { MotionStatus } from '../../../components/state';
-import type { World } from '../../../world';
+import type { World } from '../../../runtime/world';
 import {
   applyMatrixTransform,
   applyPrimitiveValue,

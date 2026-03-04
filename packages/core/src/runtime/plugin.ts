@@ -235,10 +235,10 @@ export function normalizeConfig(config: MotionAppConfig = {}): NormalizedMotionA
 
 export interface EngineServices {
   world: import('./world').World;
-  scheduler: import('./scheduler').SystemScheduler;
+  scheduler: import('../scheduler/scheduler').SystemScheduler;
   app: MotionApp;
   config: NormalizedMotionAppConfig;
-  batchProcessor: import('./systems/batch').ComputeBatchProcessor;
+  batchProcessor: import('../systems/batch').ComputeBatchProcessor;
   metrics: import('@g-motion/webgpu').GPUMetricsProvider;
   appContext: import('./context').AppContext;
 }

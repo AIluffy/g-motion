@@ -1,4 +1,4 @@
-import { SCHEDULER_LIMITS } from './constants';
+import { SCHEDULER_LIMITS } from '../constants';
 import { getNowMs } from '@g-motion/shared';
 
 export class SchedulerLoop {

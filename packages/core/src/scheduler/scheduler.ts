@@ -4,11 +4,11 @@ import {
   getPendingReadbackCount,
   setGPUResultWakeup,
 } from '@g-motion/webgpu/internal';
-import { WebGPUConstants } from './constants';
-import type { EngineServices, SystemDef } from './plugin';
-import { SchedulerLoop } from './scheduler-loop';
-import { SchedulerProcessor } from './scheduler-processor';
-import { WorldProvider } from './world-provider';
+import { WebGPUConstants } from '../constants';
+import type { EngineServices, SystemDef } from '../runtime/plugin';
+import { SchedulerLoop } from './loop';
+import { SchedulerProcessor } from './processor';
+import { WorldProvider } from '../runtime/world-provider';
 
 const GPU_TAIL_KEEP_ALIVE_MS = WebGPUConstants.GPU.TAIL_KEEP_ALIVE_MS;
 

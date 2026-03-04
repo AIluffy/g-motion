@@ -1,4 +1,4 @@
-import type { NormalizedMotionAppConfig } from '../../../plugin';
+import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
 import { getOutputFormatBufferPoolStats } from '@g-motion/webgpu/internal';
 import type { GPUMetricsProvider, WebGPUInitResult } from '@g-motion/webgpu/internal';

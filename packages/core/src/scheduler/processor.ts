@@ -1,7 +1,12 @@
 import { createDebugger, getNowMs, isFatalError } from '@g-motion/shared';
 import { getPersistentGPUBufferManager } from '@g-motion/webgpu/internal';
-import type { EngineServices, NormalizedMotionAppConfig, SystemContext, SystemDef } from './plugin';
-import { FrameSampler } from './utils';
+import type {
+  EngineServices,
+  NormalizedMotionAppConfig,
+  SystemContext,
+  SystemDef,
+} from '../runtime/plugin';
+import { FrameSampler } from '../utils';
 
 const warn = createDebugger('SchedulerProcessor', 'warn');
 

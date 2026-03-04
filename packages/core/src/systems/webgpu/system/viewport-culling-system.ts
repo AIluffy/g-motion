@@ -10,7 +10,7 @@ import {
   setPendingReadbackCount,
   tryReleasePooledOutputBufferFromTag,
 } from '@g-motion/webgpu/internal';
-import type { World } from '../../../world';
+import type { World } from '../../../runtime/world';
 import type { ComputeBatchProcessor } from '../../batch';
 
 export type CullingReadbackTag = {

@@ -22,8 +22,8 @@ import {
   type RawKeyframeValueEvaluator,
 } from '@g-motion/webgpu/internal';
 import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '@g-motion/webgpu/internal';
-import { SchedulingConstants } from '../../constants/scheduling';
-import type { SystemContext, SystemDef } from '../../plugin';
+import { SchedulingConstants } from '../../constants';
+import type { SystemContext, SystemDef } from '../../runtime/plugin';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
 import { resolveArchetypeBuffers } from './archetype-buffers';
 import { buildAnimationBatch } from './batch-builder';
@@ -83,7 +83,7 @@ export const BatchSamplingSystem: SystemDef = {
     if (!staticReuseEnabled || seekInvalidation) processor.clearArchetypeBatches();
 
     // Archetype work-slicing
-    let toProcess: Iterable<import('../../archetype').Archetype>;
+    let toProcess: Iterable<import('../../ecs/archetype').Archetype>;
     const perFrame =
       !seekInvalidation && config.workSlicing?.enabled
         ? config.workSlicing.batchSamplingArchetypesPerFrame

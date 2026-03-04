@@ -1,4 +1,4 @@
-import { ComponentDef } from '../../plugin';
+import { ComponentDef } from '../../runtime/plugin';
 
 export const TimelineComponent: ComponentDef = {
   schema: {

@@ -1,4 +1,4 @@
-import { SchedulingConstants } from '../constants/scheduling';
+import { SchedulingConstants } from '../constants';
 
 export type FrameSamplerConfig = {
   samplingFps?: number;

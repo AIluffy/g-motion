@@ -1,4 +1,4 @@
-import { ComponentDef } from './plugin';
+import { ComponentDef } from '../runtime/plugin';
 
 export class ComponentRegistry {
   private components = new Map<string, ComponentDef>();

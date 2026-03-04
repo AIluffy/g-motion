@@ -1,11 +1,11 @@
 import { createDebugger } from '@g-motion/shared';
 import { SystemContext, SystemDef } from '../index';
-import { getRendererName } from '../renderer-code';
+import { getRendererName } from '../render/renderer-code';
 import { extractTransformTypedBuffers } from '../utils/archetype-helpers';
 import { getRendererGroupCache } from './renderer-group-cache';
 
-import type { Archetype, ComponentValue } from '../archetype';
-import type { RendererBatchContext } from '../plugin';
+import type { Archetype, ComponentValue } from '../ecs/archetype';
+import type { RendererBatchContext } from '../runtime/plugin';
 
 type TransformTypedBuffers = ReturnType<typeof extractTransformTypedBuffers>;
 type TransformTypedPayload = { index: number; buffers: TransformTypedBuffers };

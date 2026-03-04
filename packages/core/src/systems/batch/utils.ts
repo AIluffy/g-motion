@@ -6,7 +6,7 @@
 
 import { BatchBufferCache } from './buffer-cache';
 import { resetArchetypeBufferCache } from './archetype-buffer-cache';
-import type { Archetype } from '../../archetype';
+import type { Archetype } from '../../ecs/archetype';
 
 // Module-level caches and state
 const keyframesPackedCache = new Map<

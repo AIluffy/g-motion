@@ -1,5 +1,5 @@
 import { MotionStatus } from '../components/state';
-import type { SystemContext, SystemDef } from '../plugin';
+import type { SystemContext, SystemDef } from '../runtime/plugin';
 import { getNowMs } from '@g-motion/shared';
 
 export const TimeSystem: SystemDef = {

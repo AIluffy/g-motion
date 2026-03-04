@@ -1,5 +1,5 @@
 import type { ComponentDef, ComponentType, ComponentValue } from '@g-motion/shared';
-import { ARCHETYPE_DEFAULTS } from './constants';
+import { ARCHETYPE_DEFAULTS } from '../constants';
 
 export type { ComponentValue } from '@g-motion/shared';
 

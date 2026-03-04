@@ -1,12 +1,12 @@
-import { ComponentRegistry } from './registry';
-import { EntityManager } from './entity';
-import { SystemScheduler } from './scheduler';
-import type { Archetype } from './archetype';
+import { ComponentRegistry } from '../ecs/registry';
+import { EntityManager } from '../ecs/entities';
+import { SystemScheduler } from '../scheduler/scheduler';
+import type { Archetype } from '../ecs/archetype';
 import type { ComponentValue } from '@g-motion/shared';
 import type { MotionAppConfig, NormalizedMotionAppConfig } from './plugin';
 import { normalizeConfig } from './plugin';
-import { ArchetypeManager, type MotionStatusCoordinator } from './archetype-manager';
-import { SystemCoordinator } from './system-coordinator';
+import { ArchetypeManager, type MotionStatusCoordinator } from '../ecs/archetypes';
+import { SystemCoordinator } from './status';
 
 /**
  * Component data type

@@ -13,7 +13,7 @@ import {
   runKeyframeInterpPass,
   runKeyframePreprocessPass,
 } from '@g-motion/webgpu/internal';
-import type { World } from '../../../world';
+import type { World } from '../../../runtime/world';
 import type { ComputeBatchProcessor } from '../../batch';
 import { debugIO, firstEntityChannelPreview, float32Preview } from '../debug';
 import { maybeRunViewportCulling } from './viewport-culling-system';

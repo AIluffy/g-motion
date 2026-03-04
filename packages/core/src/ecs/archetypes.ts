@@ -1,9 +1,9 @@
 import type { ComponentRegistry } from './registry';
-import type { EntityManager } from './entity';
+import type { EntityManager } from './entities';
 import { Archetype, ArchetypeInternal, type ComponentValue } from './archetype';
-import { ARCHETYPE_DEFAULTS } from './constants';
+import { ARCHETYPE_DEFAULTS } from '../constants';
 import { panic } from '@g-motion/shared';
-import type { ComponentDef } from './plugin';
+import type { ComponentDef } from '../runtime/plugin';
 
 type ComponentData = Record<string, ComponentValue | undefined>;
 

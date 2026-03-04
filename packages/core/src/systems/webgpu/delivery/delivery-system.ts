@@ -5,7 +5,7 @@
  * Handles primitive values, transform matrices, and channel-specific formats.
  */
 
-import type { SystemContext, SystemDef } from '../../../plugin';
+import type { SystemContext, SystemDef } from '../../../runtime/plugin';
 import { drainGPUResultsInto } from '@g-motion/webgpu/internal';
 import type { GPUResultPacket } from '@g-motion/webgpu/internal';
 import {
@@ -16,7 +16,7 @@ import {
 } from '@g-motion/webgpu/internal';
 import type { ChannelMapping } from '@g-motion/webgpu/internal';
 import { createDebugger, isDev } from '@g-motion/shared';
-import { getRendererCode } from '../../../renderer-code';
+import { getRendererCode } from '../../../render/renderer-code';
 import { applyGPUResultPacket } from './apply-results';
 
 const s_gpuResultPacketsScratch: GPUResultPacket[] = [];

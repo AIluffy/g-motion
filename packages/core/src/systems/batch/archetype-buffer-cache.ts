@@ -38,7 +38,7 @@ export interface CachedArchetypeBuffers {
   lastAccessFrame: number;
 }
 
-import type { Archetype } from '../../archetype';
+import type { Archetype } from '../../ecs/archetype';
 
 /**
  * Archetype Buffer Cache Manager

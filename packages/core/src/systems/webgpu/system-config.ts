@@ -1,4 +1,4 @@
-import type { NormalizedMotionAppConfig } from '../../plugin';
+import type { NormalizedMotionAppConfig } from '../../runtime/plugin';
 
 export type WebGPUReadbackMode = 'full' | 'visible';
 

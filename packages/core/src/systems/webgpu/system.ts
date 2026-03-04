@@ -32,7 +32,7 @@ import {
   __resetOutputFormatPassForTests,
   __resetViewportCullingPassForTests,
 } from '@g-motion/webgpu/testing';
-import type { SystemContext, SystemDef } from '../../plugin';
+import type { SystemContext, SystemDef } from '../../runtime/plugin';
 import type { GPUFrameContext } from './frame-context';
 import { createGPUFrameContext } from './frame-context';
 

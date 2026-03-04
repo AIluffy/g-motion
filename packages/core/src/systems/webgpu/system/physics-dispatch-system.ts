@@ -11,7 +11,7 @@ import {
   PHYSICS_STATE_STRIDE,
   setPendingReadbackCount,
 } from '@g-motion/webgpu/internal';
-import type { NormalizedMotionAppConfig } from '../../../plugin';
+import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';
 

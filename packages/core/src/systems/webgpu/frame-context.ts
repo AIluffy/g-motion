@@ -1,4 +1,4 @@
-import type { SystemContext } from '../../plugin';
+import type { SystemContext } from '../../runtime/plugin';
 import {
   isKeyframeEntryExpandOnGPUEnabled,
   isKeyframeSearchIndexedEnabled,

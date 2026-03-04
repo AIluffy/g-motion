@@ -9,7 +9,7 @@ import {
   buildTransformTypedBuffers,
   type TransformTypedBuffers,
 } from '@g-motion/shared';
-import { Archetype } from '../archetype';
+import { Archetype } from '../ecs/archetype';
 
 /**
  * Transform component field names

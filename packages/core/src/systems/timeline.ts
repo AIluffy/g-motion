@@ -1,5 +1,5 @@
 import { MotionStatus } from '../components/state';
-import { SystemContext, SystemDef } from '../plugin';
+import { SystemContext, SystemDef } from '../runtime/plugin';
 import { getNowMs } from '@g-motion/shared';
 
 function mod(n: number, d: number): number {

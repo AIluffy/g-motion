@@ -13,7 +13,7 @@
  * Expected savings: 0.1-0.3ms/frame + 30% GC reduction
  */
 
-import type { RendererDef } from '../plugin';
+import type { RendererDef } from '../runtime/plugin';
 
 export interface RendererGroupCacheConfig {
   maxCacheAge: number;

@@ -14,7 +14,7 @@
 
 import type { MotionStateData } from '@g-motion/shared';
 import { MotionStatus } from '../../components/state';
-import { getRendererCode } from '../../renderer-code';
+import { getRendererCode } from '../../render/renderer-code';
 import { getEntityIndicesScratchByArchetype } from './utils';
 
 export interface PhysicsFilterInput {

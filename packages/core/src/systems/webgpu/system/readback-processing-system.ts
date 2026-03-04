@@ -8,7 +8,7 @@ import {
   setPendingReadbackCount,
   tryReleasePooledOutputBufferFromTag,
 } from '@g-motion/webgpu/internal';
-import type { NormalizedMotionAppConfig } from '../../../plugin';
+import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow, stepPhysicsShadow } from '../physics-validation';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';

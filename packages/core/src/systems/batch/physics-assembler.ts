@@ -22,7 +22,7 @@ import type {
 } from '@g-motion/shared';
 import { MotionStatus } from '../../components/state';
 import { PHYSICS_STATE_STRIDE } from '@g-motion/webgpu/internal';
-import type { ArchetypeTypedBuffer } from '../../archetype';
+import type { ArchetypeTypedBuffer } from '../../ecs/archetype';
 import { writeEmptySlot, writeInertiaSlot, writeSpringSlot } from './physics-slots';
 
 export interface PhysicsAssemblerInput {

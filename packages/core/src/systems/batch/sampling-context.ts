@@ -13,9 +13,9 @@ import type {
   RawKeyframeGenerationOptions,
   RawKeyframeValueEvaluator,
 } from '@g-motion/webgpu/internal';
-import type { Archetype } from '../../archetype';
-import { SchedulingConstants } from '../../constants/scheduling';
-import type { SystemContext } from '../../plugin';
+import type { Archetype } from '../../ecs/archetype';
+import { SchedulingConstants } from '../../constants';
+import type { SystemContext } from '../../runtime/plugin';
 import {
   getArchetypeCursor,
   getArchetypeScratch,

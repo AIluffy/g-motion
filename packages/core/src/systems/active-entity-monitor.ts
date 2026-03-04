@@ -1,5 +1,5 @@
-import type { SystemContext } from '../plugin';
-import { SystemDef } from '../plugin';
+import type { SystemContext } from '../runtime/plugin';
+import { SystemDef } from '../runtime/plugin';
 
 export const ActiveEntityMonitorSystem: SystemDef = {
   name: 'ActiveEntityMonitorSystem',

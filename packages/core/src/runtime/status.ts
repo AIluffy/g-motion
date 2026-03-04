@@ -1,7 +1,7 @@
-import type { Archetype } from './archetype';
-import { ArchetypeInternal } from './archetype';
-import type { SystemScheduler } from './scheduler';
-import type { ArchetypeManager } from './archetype-manager';
+import type { Archetype } from '../ecs/archetype';
+import { ArchetypeInternal } from '../ecs/archetype';
+import type { SystemScheduler } from '../scheduler/scheduler';
+import type { ArchetypeManager } from '../ecs/archetypes';
 import type { MotionStatusListener, World } from './world';
 
 export class SystemCoordinator {

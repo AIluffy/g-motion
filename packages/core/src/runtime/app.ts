@@ -3,13 +3,13 @@ import { createDebugger } from '@g-motion/shared';
 import { getAppContext } from './context';
 import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
 import { MotionApp, MotionAppConfig } from './plugin';
-import { getRendererCode } from './renderer-code';
+import { getRendererCode } from '../render/renderer-code';
 import type { World } from './world';
 import { WorldProvider } from './world-provider';
 
 const debug = createDebugger('Core');
 
-export { getRendererCode, getRendererName } from './renderer-code';
+export { getRendererCode, getRendererName } from '../render/renderer-code';
 
 // App facade implementing MotionApp interface
 export class App implements MotionApp {

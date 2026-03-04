@@ -8,7 +8,7 @@
  * is a single function call rather than 15+ lines of cache-miss/hit logic.
  */
 
-import type { Archetype } from '../../archetype';
+import type { Archetype } from '../../ecs/archetype';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
 
 export interface ResolvedArchetypeBuffers {

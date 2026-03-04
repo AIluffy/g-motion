@@ -4,8 +4,15 @@
  * Centralizes magic numbers to improve code readability and maintainability
  */
 
-import { SchedulingConstants } from './constants/scheduling';
 import { WebGPUConstants } from '@g-motion/shared';
+
+export const SchedulingConstants = {
+  MAX_FRAME_TIME_MS: 100,
+  DEFAULT_SAMPLING_FPS: 60,
+  DEFAULT_KEYFRAME_INTERVAL_MS: 16,
+  FRAME_BUDGET_MS_DEFAULT: 12,
+  WORK_SLICING_ENABLED: true,
+} as const;
 
 /**
  * Archetype default settings
@@ -17,7 +24,7 @@ export const ARCHETYPE_DEFAULTS = {
   GROWTH_FACTOR: 2,
 } as const;
 
-export { SchedulingConstants, WebGPUConstants };
+export { WebGPUConstants };
 
 /**
  * WebGPU workgroup size hints for optimal GPU utilization
