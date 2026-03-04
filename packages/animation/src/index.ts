@@ -2,7 +2,7 @@ import { getEngineForWorld, MotionStatus, World, WorldProvider } from '@g-motion
 import { getDomEnvironment } from '@g-motion/shared';
 import { motion as builderMotion } from './api/builder';
 import type { DomAnimationScope } from './api/control';
-import { AnimationControl, registerControlWithScope } from './api/control';
+import { AnimationControl } from './api/control';
 import {
   resolveTargets,
   type SelectorCache,
@@ -12,37 +12,48 @@ import {
 import { isVisualTargetCached } from './api/visual-target';
 import { registerAnimationSystems } from './registery';
 
+const initializedWorlds = new WeakSet<World>();
+
+type MotionStatusListenerWorld = World & {
+  addMotionStatusListener: (listener: (event: {
+    entityId: number;
+    prevStatus?: number;
+    nextStatus: number;
+  }) => void) => void;
+};
+
+function supportsMotionStatusListener(world: World): world is MotionStatusListenerWorld {
+  return typeof (world as Partial<MotionStatusListenerWorld>).addMotionStatusListener === 'function';
+}
+
 function initEngine(world: World) {
+  if (initializedWorlds.has(world)) return;
+  initializedWorlds.add(world);
+
   getEngineForWorld(world);
 
-  if (typeof (world as any).addMotionStatusListener === 'function') {
-    if (!(world as any).__motionStatusHookInstalled) {
-      (world as any).addMotionStatusListener(
-        ({
+  if (supportsMotionStatusListener(world)) {
+    world.addMotionStatusListener(
+      ({
+        entityId,
+        prevStatus,
+        nextStatus,
+      }: {
+        entityId: number;
+        prevStatus?: number;
+        nextStatus: number;
+      }) => {
+        AnimationControl.handleMotionStatusChange(
+          world,
           entityId,
-          prevStatus,
-          nextStatus,
-        }: {
-          entityId: number;
-          prevStatus?: number;
-          nextStatus: number;
-        }) => {
-          AnimationControl.handleMotionStatusChange(
-            world,
-            entityId,
-            prevStatus as MotionStatus | undefined,
-            nextStatus as MotionStatus,
-          );
-        },
-      );
-      (world as any).__motionStatusHookInstalled = true;
-    }
+          prevStatus as MotionStatus | undefined,
+          nextStatus as MotionStatus,
+        );
+      },
+    );
   }
 
-  if (!(world as any).__animationSystemsRegistered) {
-    registerAnimationSystems(world);
-    (world as any).__animationSystemsRegistered = true;
-  }
+  registerAnimationSystems(world);
 }
 
 type MotionOptions = {
@@ -145,14 +156,7 @@ export function createScopedMotion(root: Element): ScopedMotionFn {
 
   const scopedMotion = ((target: any) => {
     const builderTarget = normalizeTargets(target, scope.root);
-    const builder = builderMotion(builderTarget);
-    const originalPlay = builder.play.bind(builder) as (options?: any) => any;
-    (builder as any).play = (options?: any) => {
-      const control = originalPlay(options);
-      registerControlWithScope(scope, control);
-      return control;
-    };
-    return builder;
+    return builderMotion(builderTarget, { world, scope });
   }) as ScopedMotionFn;
 
   scopedMotion.scope = scope;

@@ -2,7 +2,8 @@ import { MotionStatus, TimelineData, World, WorldProvider } from '@g-motion/core
 import { getNowMs } from '@g-motion/shared';
 import { BatchTemplate, runBatchAnimation } from '../batch-runner';
 import { applyAdjust } from './adjust';
-import { AnimationControl } from './control';
+import { AnimationControl, registerControlWithScope } from './control';
+import type { DomAnimationScope } from './control';
 import { addKeyframesForTarget } from './keyframes';
 import {
   computeMaxTime,
@@ -41,7 +42,7 @@ type TrackMarkOptions = Pick<
  * @param target - The number, object, selector, or array of targets to animate.
  * @returns A MotionBuilder instance.
  */
-export function motion(target: any, opts?: { world?: World }) {
+export function motion(target: any, opts?: { world?: World; scope?: DomAnimationScope }) {
   return new MotionBuilder(target, opts);
 }
 
@@ -63,8 +64,9 @@ export class MotionBuilder {
   private playOptions: PlayOptions | undefined;
   private visualTarget?: VisualTarget;
   private cachedTargetType?: TargetType;
+  private scope?: DomAnimationScope;
 
-  constructor(target: any, opts?: { world?: World }) {
+  constructor(target: any, opts?: { world?: World; scope?: DomAnimationScope }) {
     // Normalize to array for unified handling
     if (Array.isArray(target)) {
       this.targets = target;
@@ -75,6 +77,7 @@ export class MotionBuilder {
     }
     // Optional world injection for DI
     (this as any)._world = opts?.world;
+    this.scope = opts?.scope;
   }
 
   /** For compatibility - get the primary target */
@@ -268,6 +271,9 @@ export class MotionBuilder {
 
     const control = new AnimationControl(entityId, undefined, false, world);
     AnimationControl.registerOnComplete(control, resolvedOptions.onComplete);
+    if (this.scope) {
+      registerControlWithScope(this.scope, control);
+    }
     return control;
   }
 
@@ -282,7 +288,8 @@ export class MotionBuilder {
       templates: this.batchTemplates,
       options: resolvedOptions,
       injectedWorld,
-      createBuilder: (target) => new MotionBuilder(target, { world: injectedWorld }),
+      createBuilder: (target) =>
+        new MotionBuilder(target, { world: injectedWorld, scope: this.scope }),
     });
   }
 
