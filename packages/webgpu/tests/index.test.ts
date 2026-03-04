@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AdaptiveWorkgroupSelector, PipelineManager } from '../src/pipeline-manager';
-import { PersistentGPUBufferManager } from '../src/persistent-buffer-manager';
+import { DirtyRegionTracker, PersistentGPUBufferManager } from '../src/persistent-buffer-manager';
 import { WebGPUConstants } from '@g-motion/shared';
 import {
   clearViewportCullingPipelineCache,
@@ -45,8 +45,16 @@ function createMockGPUDeviceForBuffers() {
   const mappedRanges: ArrayBuffer[] = [];
   const queue = {
     writeCalls: 0,
-    writeBuffer: () => {
+    writeArgs: [] as Array<{ offset: number; dataOffset: number; size: number }>,
+    writeBuffer: (
+      _buffer: unknown,
+      offset: number,
+      _data: ArrayBufferLike,
+      dataOffset: number,
+      size: number,
+    ) => {
       queue.writeCalls += 1;
+      queue.writeArgs.push({ offset, dataOffset, size });
     },
   };
   const device = {
@@ -176,6 +184,29 @@ describe('AdaptiveWorkgroupSelector behavior', () => {
   });
 });
 
+describe('DirtyRegionTracker', () => {
+  it('自动合并重叠和相邻区域，并按 4 字节对齐', () => {
+    const tracker = new DirtyRegionTracker();
+
+    tracker.markDirty(1, 2);
+    tracker.markDirty(4, 4);
+    tracker.markDirty(13, 1);
+
+    expect(tracker.getDirtyRegions()).toEqual([
+      { offset: 0, length: 8 },
+      { offset: 12, length: 4 },
+    ]);
+  });
+
+  it('clear 会清空所有脏区间', () => {
+    const tracker = new DirtyRegionTracker();
+    tracker.markDirty(0, 8);
+    tracker.clear();
+
+    expect(tracker.getDirtyRegions()).toEqual([]);
+  });
+});
+
 describe('PersistentGPUBufferManager uploadIfChanged version hint', () => {
   it('版本号一致时跳过内容检查与上传', () => {
     ensureGPUBufferUsageMock();
@@ -212,6 +243,34 @@ describe('PersistentGPUBufferManager uploadIfChanged version hint', () => {
     manager.uploadIfChanged('states:c', dataB, 1, { versionHint: 2 });
 
     expect(queue.writeCalls).toBe(1);
+  });
+
+  it('仅上传变化的子区域', () => {
+    ensureGPUBufferUsageMock();
+    const { device, queue } = createMockGPUDeviceForBuffers();
+    const manager = new PersistentGPUBufferManager(device);
+    const dataA = new Float32Array([1, 2, 3, 4, 5, 6]);
+    const dataB = new Float32Array([1, 99, 3, 4, 5, 6]);
+
+    manager.uploadIfChanged('states:d', dataA, 1, { versionHint: 1 });
+    manager.uploadIfChanged('states:d', dataB, 1, { versionHint: 2 });
+
+    expect(queue.writeCalls).toBe(1);
+    expect(queue.writeArgs[0]).toEqual({ offset: 4, dataOffset: 4, size: 4 });
+  });
+
+  it('脏区域超过阈值时退化为全量上传', () => {
+    ensureGPUBufferUsageMock();
+    const { device, queue } = createMockGPUDeviceForBuffers();
+    const manager = new PersistentGPUBufferManager(device);
+    const dataA = new Float32Array([1, 2, 3, 4, 5, 6, 7, 8]);
+    const dataB = new Float32Array([11, 12, 13, 4, 5, 6, 7, 8]);
+
+    manager.uploadIfChanged('states:e', dataA, 1, { versionHint: 1 });
+    manager.uploadIfChanged('states:e', dataB, 1, { versionHint: 2 });
+
+    expect(queue.writeCalls).toBe(1);
+    expect(queue.writeArgs[0]).toEqual({ offset: 0, dataOffset: 0, size: dataB.byteLength });
   });
 });
 
