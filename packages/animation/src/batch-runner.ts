@@ -1,5 +1,6 @@
 import { AnimationControl } from './api/control';
 import { MarkOptions, ResolvedMarkOptions } from './api/mark';
+import { resolveStagger } from './api/stagger';
 
 export type BatchTemplate = { staticResolved: ResolvedMarkOptions[]; dynamic: MarkOptions[] };
 
@@ -24,20 +25,15 @@ function resolveMarkForEntity(
   rawMark: MarkOptions,
   entityIndex: number,
   target: any,
+  total: number,
 ): { resolved: MarkOptions; stagger: number } {
   const resolvedTo =
     typeof rawMark.to === 'function' ? rawMark.to(entityIndex, 0, target) : rawMark.to;
 
   const resolvedTime = typeof rawMark.at === 'function' ? rawMark.at(entityIndex, 0) : rawMark.at;
 
-  let stagger = 0;
-  if (rawMark.stagger !== undefined) {
-    if (typeof rawMark.stagger === 'function') {
-      stagger = rawMark.stagger(entityIndex);
-    } else if (typeof rawMark.stagger === 'number') {
-      stagger = entityIndex * rawMark.stagger;
-    }
-  }
+  const stagger =
+    rawMark.stagger !== undefined ? resolveStagger(rawMark.stagger, entityIndex, total) : 0;
 
   return {
     resolved: {
@@ -80,7 +76,7 @@ export function runBatchAnimation(params: {
       if (tpl.dynamic.length) {
         const resolvedMarks: MarkOptions[] = [];
         for (const rawMark of tpl.dynamic) {
-          const { resolved, stagger } = resolveMarkForEntity(rawMark, index, target);
+          const { resolved, stagger } = resolveMarkForEntity(rawMark, index, target, params.targets.length);
           resolvedMarks.push(resolved);
           totalStagger = Math.max(totalStagger, stagger);
         }

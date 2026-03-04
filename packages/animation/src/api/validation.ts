@@ -1,5 +1,6 @@
 import type { InertiaOptions } from '@g-motion/core';
 import { createDebugger, panic } from '@g-motion/shared';
+import type { StaggerOptions, StaggerValue } from '../types';
 
 const warn = createDebugger('Validation', 'warn');
 
@@ -8,17 +9,16 @@ const SUPPORTED_INTERP = new Set(['linear', 'bezier', 'hold', 'autoBezier', 'spr
 const DEFAULT_INERTIA_DECEL = 4; // approx half-life 250ms (1000/4)
 
 export interface MarkValidationOptions {
-  to?: any;
+  to?: unknown;
   duration?: number;
   delay?: number;
-  time?: number | ((index: number, entityId: number) => number);
+  at?: number | ((index: number, entityId: number) => number);
   interp?: string;
   ease?: string | ((t: number) => number);
-  easing?: string | ((t: number) => number);
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
-  spring?: any;
+  spring?: unknown;
   inertia?: InertiaOptions;
-  stagger?: number | ((index: number) => number);
+  stagger?: StaggerValue;
 }
 
 export function validateMarkOptions(options: MarkValidationOptions): void {
@@ -30,19 +30,41 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
   }
 
   if (options.stagger !== undefined) {
-    if (typeof options.stagger !== 'number' && typeof options.stagger !== 'function') {
-      panic(`Stagger must be a number or function, got: ${typeof options.stagger}`, {
+    if (typeof options.stagger === 'number') {
+      if (options.stagger < 0) {
+        panic(`Stagger must be non-negative, got: ${options.stagger}ms`, {
+          providedValue: options.stagger,
+        });
+      }
+    } else if (typeof options.stagger === 'function') {
+      // valid
+    } else if (typeof options.stagger === 'object' && options.stagger !== null) {
+      const staggerOptions = options.stagger as StaggerOptions;
+      if (!Number.isFinite(staggerOptions.each) || staggerOptions.each < 0) {
+        panic(`Stagger options.each must be a non-negative number, got: ${staggerOptions.each}`, {
+          providedValue: staggerOptions.each,
+        });
+      }
+      if (staggerOptions.grid !== undefined) {
+        const [rows, cols] = staggerOptions.grid;
+        if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows <= 0 || cols <= 0) {
+          panic(`Stagger grid must be [rows, cols] with positive numbers, got: [${rows}, ${cols}]`);
+        }
+      }
+      if (
+        staggerOptions.axis !== undefined &&
+        staggerOptions.axis !== 'x' &&
+        staggerOptions.axis !== 'y'
+      ) {
+        panic(`Stagger axis must be 'x' or 'y', got: ${String(staggerOptions.axis)}`);
+      }
+    } else {
+      panic(`Stagger must be a number, function, or options object, got: ${typeof options.stagger}`, {
         providedType: typeof options.stagger,
-      });
-    }
-    if (typeof options.stagger === 'number' && options.stagger < 0) {
-      panic(`Stagger must be non-negative, got: ${options.stagger}ms`, {
-        providedValue: options.stagger,
       });
     }
   }
 
-  // Validate duration
   if (options.duration !== undefined) {
     if (typeof options.duration !== 'number') {
       panic(`Mark duration must be a number, got: ${typeof options.duration}`, {
@@ -56,35 +78,24 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
     }
   }
 
-  // Validate time
-  if (typeof options.time === 'number') {
-    if (options.time < 0) {
-      panic(`Mark time must be non-negative, got: ${options.time}ms`, {
-        providedValue: options.time,
+  if (typeof options.at === 'number') {
+    if (options.at < 0) {
+      panic(`Mark at must be non-negative, got: ${options.at}ms`, {
+        providedValue: options.at,
       });
     }
-    // Warn if both time and duration provided (time takes precedence)
     if (options.duration !== undefined) {
-      warn(
-        `[Motion] Mark has both 'time' (absolute) and 'duration' (relative). Using 'time', ignoring 'duration'.`,
-      );
+      warn(`[Motion] Mark has both 'at' (absolute) and 'duration' (relative). Using 'at'.`);
     }
   }
 
-  // Validate time and duration at least one is present (non-physics marks)
-  if (
-    !options.spring &&
-    !options.inertia &&
-    options.time === undefined &&
-    options.duration === undefined
-  ) {
-    panic(`Mark must have either 'time' (absolute) or 'duration' (relative)`, {
-      time: options.time,
+  if (!options.spring && !options.inertia && options.at === undefined && options.duration === undefined) {
+    panic(`Mark must have either 'at' (absolute) or 'duration' (relative)`, {
+      at: options.at,
       duration: options.duration,
     });
   }
 
-  // Validate interp
   if (options.interp && !SUPPORTED_INTERP.has(options.interp)) {
     panic(
       `Unsupported interp value: '${options.interp}'. Supported: ${Array.from(SUPPORTED_INTERP).join(', ')}`,
@@ -92,23 +103,12 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
     );
   }
 
-  // Validate easing
-  if (
-    options.easing &&
-    typeof options.easing !== 'function' &&
-    typeof options.easing !== 'string'
-  ) {
-    panic(`Mark easing must be a function or string name, got: ${typeof options.easing}`, {
-      providedType: typeof options.easing,
+  if (options.ease && typeof options.ease !== 'function' && typeof options.ease !== 'string') {
+    panic(`Mark easing must be a function or string name, got: ${typeof options.ease}`, {
+      providedType: typeof options.ease,
     });
   }
 
-  // Ease alias maps to easing; disallow both
-  if (options.ease && options.easing) {
-    panic(`Provide either 'ease' or 'easing', not both. Use 'easing' (preferred).`);
-  }
-
-  // Validate bezier control points
   if (options.bezier) {
     const { cx1, cy1, cx2, cy2 } = options.bezier;
     if (
@@ -119,12 +119,6 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
     ) {
       panic(
         `Bezier control points must be numbers, got: { cx1: ${typeof cx1}, cy1: ${typeof cy1}, cx2: ${typeof cx2}, cy2: ${typeof cy2} }`,
-        {
-          cx1Types: typeof cx1,
-          cy1Types: typeof cy1,
-          cx2Types: typeof cx2,
-          cy2Types: typeof cy2,
-        },
       );
     }
     if (cx1 < 0 || cx1 > 1 || cx2 < 0 || cx2 > 1) {
@@ -137,10 +131,7 @@ export function validateMarkOptions(options: MarkValidationOptions): void {
 }
 
 export function normalizeMarkOptions<T extends MarkValidationOptions>(options: T): T {
-  const normalized = { ...options } as T;
-  if ((normalized as any).ease && !(normalized as any).easing) {
-    (normalized as any).easing = (normalized as any).ease;
-  }
+  const normalized = { ...options };
 
   if (normalized.inertia) {
     const inertia = { ...normalized.inertia };
@@ -148,5 +139,5 @@ export function normalizeMarkOptions<T extends MarkValidationOptions>(options: T
     normalized.inertia = inertia;
   }
 
-  return normalized;
+  return normalized as T;
 }

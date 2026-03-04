@@ -8,8 +8,23 @@ import { PlaybackController } from './control/playback-controller';
 
 const warn = createDebugger('AnimationControl', 'warn');
 
+function createAbortError(): Error {
+  if (typeof DOMException === 'function') {
+    return new DOMException('Animation was canceled', 'AbortError');
+  }
+  const err = new Error('Animation was canceled');
+  err.name = 'AbortError';
+  return err;
+}
+
+type ControlLifecycleState = {
+  entityToControls: Map<number, Set<AnimationControl>>;
+  controlFinishedEntities: WeakMap<AnimationControl, Set<number>>;
+};
+
 type WorldWithAnimationCoordinator = World & {
   __motionAnimationCoordinator?: AnimationCoordinator;
+  __motionControlLifecycleState?: ControlLifecycleState;
 };
 
 function getAnimationCoordinator(world: World): AnimationCoordinator {
@@ -20,10 +35,53 @@ function getAnimationCoordinator(world: World): AnimationCoordinator {
   return w.__motionAnimationCoordinator;
 }
 
-export class AnimationControl {
+function getControlLifecycleState(world: World): ControlLifecycleState {
+  const w = world as WorldWithAnimationCoordinator;
+  if (!w.__motionControlLifecycleState) {
+    w.__motionControlLifecycleState = {
+      entityToControls: new Map<number, Set<AnimationControl>>(),
+      controlFinishedEntities: new WeakMap<AnimationControl, Set<number>>(),
+    };
+  }
+  return w.__motionControlLifecycleState;
+}
+
+function registerControlLifecycle(control: AnimationControl): void {
+  const state = getControlLifecycleState(control.getWorldInternal());
+  state.controlFinishedEntities.set(control, new Set<number>());
+  const ids = control.getEntityIds();
+  for (const id of ids) {
+    let controls = state.entityToControls.get(id);
+    if (!controls) {
+      controls = new Set<AnimationControl>();
+      state.entityToControls.set(id, controls);
+    }
+    controls.add(control);
+  }
+}
+
+function unregisterControlLifecycle(control: AnimationControl): void {
+  const state = getControlLifecycleState(control.getWorldInternal());
+  state.controlFinishedEntities.delete(control);
+  const ids = control.getEntityIds();
+  for (const id of ids) {
+    const controls = state.entityToControls.get(id);
+    if (!controls) continue;
+    controls.delete(control);
+    if (controls.size === 0) {
+      state.entityToControls.delete(id);
+    }
+  }
+}
+
+export class AnimationControl implements PromiseLike<void> {
   private coordinator: BatchCoordinator;
   private playback: PlaybackController;
   private frames: FrameNavigator;
+  private _isFinishedSettled = false;
+  private _resolveFinished!: () => void;
+  private _rejectFinished!: (reason?: unknown) => void;
+  readonly finished: Promise<void>;
 
   constructor(
     entityId: number | number[],
@@ -34,10 +92,25 @@ export class AnimationControl {
     this.coordinator = new BatchCoordinator({ entityId, controls, isBatch, world });
     this.playback = new PlaybackController(this.coordinator);
     this.frames = new FrameNavigator(this.coordinator);
+
+    this.finished = new Promise<void>((resolve, reject) => {
+      this._resolveFinished = resolve;
+      this._rejectFinished = reject;
+    });
+
+    registerControlLifecycle(this);
+
+    if (isBatch && controls && controls.length > 0) {
+      void Promise.all(controls.map((control) => control.finished)).then(
+        () => this.resolveFinished(),
+        (err) => this.rejectFinished(err),
+      );
+    }
   }
 
   stop() {
     this.playback.stop();
+    this.resolveFinished();
   }
 
   pause() {
@@ -51,6 +124,15 @@ export class AnimationControl {
   /** Reverse playback direction using negative playbackRate. */
   reverse() {
     this.playback.reverse();
+  }
+
+  /**
+   * Cancel animation and reject `finished` with AbortError.
+   * This gives callers a way to distinguish canceled flows from normally completed flows.
+   */
+  cancel() {
+    this.playback.stop();
+    this.rejectFinished(createAbortError());
   }
 
   /** Check if current playback is reversed (negative playbackRate) */
@@ -108,6 +190,11 @@ export class AnimationControl {
     return (this.getPlaybackRate() || 1) * 60;
   }
 
+
+  getWorldInternal(): World {
+    return this.coordinator.getWorld();
+  }
+
   /** Get the entity IDs in this animation (or batch) */
   getEntityIds(): number[] {
     return this.coordinator.getEntityIds();
@@ -128,6 +215,19 @@ export class AnimationControl {
     return this.coordinator.isBatchAnimation();
   }
 
+  then<TResult1 = void, TResult2 = never>(
+    onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return this.finished.then(onfulfilled, onrejected);
+  }
+
+  catch<TResult = never>(
+    onrejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null,
+  ): Promise<void | TResult> {
+    return this.finished.catch(onrejected);
+  }
+
   /**
    * Clean up animation and optionally remove entities
    * @param removeEntities - Whether to remove entities from world (default: true)
@@ -146,7 +246,25 @@ export class AnimationControl {
       world.flushDeletions();
     }
 
+    unregisterControlLifecycle(this);
     this.coordinator.clearReferences();
+
+    // destroy 表示主动清理资源，不应打断 Promise 链路，因此视为正常完成。
+    this.resolveFinished();
+  }
+
+  private resolveFinished(): void {
+    if (this._isFinishedSettled) return;
+    this._isFinishedSettled = true;
+    unregisterControlLifecycle(this);
+    this._resolveFinished();
+  }
+
+  private rejectFinished(reason: unknown): void {
+    if (this._isFinishedSettled) return;
+    this._isFinishedSettled = true;
+    unregisterControlLifecycle(this);
+    this._rejectFinished(reason);
   }
 
   static registerOnComplete(control: AnimationControl, onComplete?: () => void): void {
@@ -165,6 +283,24 @@ export class AnimationControl {
     prevStatus: MotionStatus | undefined,
     nextStatus: MotionStatus,
   ): void {
+    if (nextStatus === MotionStatus.Finished && prevStatus !== MotionStatus.Finished) {
+      const lifecycle = getControlLifecycleState(world);
+      const controls = lifecycle.entityToControls.get(entityId);
+      if (controls) {
+        for (const control of controls) {
+          let finishedSet = lifecycle.controlFinishedEntities.get(control);
+          if (!finishedSet) {
+            finishedSet = new Set<number>();
+            lifecycle.controlFinishedEntities.set(control, finishedSet);
+          }
+          finishedSet.add(entityId);
+          if (finishedSet.size >= control.getCount()) {
+            control.resolveFinished();
+          }
+        }
+      }
+    }
+
     const completed = getAnimationCoordinator(world).handleStatusChange(
       entityId,
       prevStatus,

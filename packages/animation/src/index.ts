@@ -2,7 +2,7 @@ import { getEngineForWorld, MotionStatus, World, WorldProvider } from '@g-motion
 import { getDomEnvironment } from '@g-motion/shared';
 import { motion as builderMotion } from './api/builder';
 import type { DomAnimationScope } from './api/control';
-import { AnimationControl, registerControlWithScope } from './api/control';
+import { AnimationControl } from './api/control';
 import {
   resolveTargets,
   type SelectorCache,
@@ -11,38 +11,50 @@ import {
 } from './api/mark';
 import { isVisualTargetCached } from './api/visual-target';
 import { registerAnimationSystems } from './registery';
+import type { MotionTarget } from './types';
+
+const initializedWorlds = new WeakSet<World>();
+
+type MotionStatusListenerWorld = World & {
+  addMotionStatusListener: (listener: (event: {
+    entityId: number;
+    prevStatus?: number;
+    nextStatus: number;
+  }) => void) => void;
+};
+
+function supportsMotionStatusListener(world: World): world is MotionStatusListenerWorld {
+  return typeof (world as Partial<MotionStatusListenerWorld>).addMotionStatusListener === 'function';
+}
 
 function initEngine(world: World) {
+  if (initializedWorlds.has(world)) return;
+  initializedWorlds.add(world);
+
   getEngineForWorld(world);
 
-  if (typeof (world as any).addMotionStatusListener === 'function') {
-    if (!(world as any).__motionStatusHookInstalled) {
-      (world as any).addMotionStatusListener(
-        ({
+  if (supportsMotionStatusListener(world)) {
+    world.addMotionStatusListener(
+      ({
+        entityId,
+        prevStatus,
+        nextStatus,
+      }: {
+        entityId: number;
+        prevStatus?: number;
+        nextStatus: number;
+      }) => {
+        AnimationControl.handleMotionStatusChange(
+          world,
           entityId,
-          prevStatus,
-          nextStatus,
-        }: {
-          entityId: number;
-          prevStatus?: number;
-          nextStatus: number;
-        }) => {
-          AnimationControl.handleMotionStatusChange(
-            world,
-            entityId,
-            prevStatus as MotionStatus | undefined,
-            nextStatus as MotionStatus,
-          );
-        },
-      );
-      (world as any).__motionStatusHookInstalled = true;
-    }
+          prevStatus as MotionStatus | undefined,
+          nextStatus as MotionStatus,
+        );
+      },
+    );
   }
 
-  if (!(world as any).__animationSystemsRegistered) {
-    registerAnimationSystems(world);
-    (world as any).__animationSystemsRegistered = true;
-  }
+  registerAnimationSystems(world);
 }
 
 type MotionOptions = {
@@ -123,12 +135,12 @@ export function inspectTargets(
   };
 }
 
-export const motion = (target: any, options?: MotionOptions) => {
+export const motion = <T extends MotionTarget>(target: T, options?: MotionOptions) => {
   const world = WorldProvider.useWorld();
   initEngine(world);
   const root = typeof document !== 'undefined' ? document : null;
   const builderTarget = normalizeTargets(target, root, options);
-  return builderMotion(builderTarget);
+  return builderMotion<T>(builderTarget as T);
 };
 
 type ScopedMotionFn = ((target: any) => ReturnType<typeof builderMotion>) & {
@@ -145,14 +157,7 @@ export function createScopedMotion(root: Element): ScopedMotionFn {
 
   const scopedMotion = ((target: any) => {
     const builderTarget = normalizeTargets(target, scope.root);
-    const builder = builderMotion(builderTarget);
-    const originalPlay = builder.play.bind(builder) as (options?: any) => any;
-    (builder as any).play = (options?: any) => {
-      const control = originalPlay(options);
-      registerControlWithScope(scope, control);
-      return control;
-    };
-    return builder;
+    return builderMotion(builderTarget, { world, scope });
   }) as ScopedMotionFn;
 
   scopedMotion.scope = scope;
@@ -163,9 +168,12 @@ export { FrameSampler } from '@g-motion/shared';
 export type { FrameRoundingMode } from '@g-motion/shared';
 export * from './api/adjust';
 export * from './api/animate';
+export * from './api/animation-options';
 export * from './api/builder';
 export * from './api/control';
 export * from './api/gpu-status';
 export * from './api/mark';
 export * from './api/visual-target';
+export * from './api/timeline-api';
+export * from './types';
 export { engine } from './engine';
