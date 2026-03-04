@@ -1,9 +1,9 @@
 import type { MotionAppConfig } from '@g-motion/core';
 import type { TimelineComponentData } from '@g-motion/shared';
 import { markBatchSamplingSeekInvalidation } from '@g-motion/core';
-import type { MotionStateComponentData } from '../../types/ecs-component-types';
+import type { MotionStateComponentData } from '../../types/ecs';
 import { FrameSampler } from '@g-motion/shared';
-import type { BatchCoordinator } from './batch-coordinator';
+import type { BatchCoordinator } from './batch';
 
 export class FrameNavigator {
   constructor(private coordinator: BatchCoordinator) {}

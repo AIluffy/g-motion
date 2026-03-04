@@ -1,16 +1,12 @@
 import { MotionStatus, TimelineData, World, WorldProvider } from '@g-motion/core';
 import { getNowMs } from '@g-motion/shared';
 import type { ComponentValue } from '@g-motion/shared';
-import { BatchTemplate, runBatchAnimation } from '../runtime/batch-animation-runner';
+import { BatchTemplate, runBatchAnimation } from '../runtime/batch-runner';
 import { applyAdjust } from './adjust';
 import { AnimationControl, registerControlWithScope } from './control';
 import type { DomAnimationScope } from './control';
-import type { AnimationOptions } from './animation-options';
-import type {
-  AnimatableProps,
-  MotionTarget,
-  MotionTargetValue,
-} from '../types/animation-target-types';
+import type { AnimationOptions } from './options';
+import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types/targets';
 import { addKeyframesForTarget } from './keyframes';
 import {
   computeMaxTime,
@@ -24,9 +20,9 @@ import {
 export type { MarkOptions, ResolvedMarkOptions } from './mark';
 import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
 import { analyzeSpringTracks } from '@g-motion/plugin-spring';
-import { ComponentRegistrar } from '../runtime/animation-system-registry';
-import { AnimationValidator } from './animation-validator';
-import { GPUChannelMapper } from './gpu-channel-mapper';
+import { ComponentRegistrar } from '../runtime/system-registry';
+import { AnimationValidator } from './validator';
+import { GPUChannelMapper } from './gpu-channels';
 import { buildRenderComponent } from './render';
 import type { VisualTarget } from './visual-target';
 import { getOrCreateVisualTarget } from './visual-target';

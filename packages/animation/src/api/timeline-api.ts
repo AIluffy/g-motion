@@ -1,7 +1,7 @@
-import type { AnimationOptions } from './animation-options';
+import type { AnimationOptions } from './options';
 import { motion } from '..';
 import { AnimationControl } from './control';
-import type { AnimatableProps, MotionTarget } from '../types/animation-target-types';
+import type { AnimatableProps, MotionTarget } from '../types/targets';
 
 export type TimelineSegment<T extends MotionTarget = any> = [
   target: T,

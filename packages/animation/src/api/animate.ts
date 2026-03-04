@@ -2,8 +2,8 @@ import { panic } from '@g-motion/shared';
 import { TargetType, getTargetType } from './mark';
 import type { AnimationControl } from './control';
 import type { MarkOptions } from './mark';
-import type { AnimationOptions } from './animation-options';
-import type { AnimatableProps, MotionTarget } from '../types/animation-target-types';
+import type { AnimationOptions } from './options';
+import type { AnimatableProps, MotionTarget } from '../types/targets';
 import { motion } from '..';
 
 export interface AnimateOptions<TValue = unknown> extends AnimationOptions<TValue> {

@@ -8,13 +8,13 @@
 src/
   index.ts                                # 包入口与统一导出
   config/
-    engine-config.ts                      # 全局引擎配置
+    engine.ts                      # 全局引擎配置
   runtime/
-    animation-system-registry.ts          # 系统/组件注册
-    batch-animation-runner.ts             # 批量动画执行器
+    system-registry.ts          # 系统/组件注册
+    batch-runner.ts             # 批量动画执行器
   types/
-    animation-target-types.ts             # 目标与动画属性类型
-    ecs-component-types.ts                # ECS 组件类型定义
+    targets.ts             # 目标与动画属性类型
+    ecs.ts                # ECS 组件类型定义
   api/
     builder.ts                            # motion() 链式构建器
     animate.ts                            # animate() 便捷 API
@@ -25,7 +25,7 @@ src/
     adjust.ts                             # 时间轴调整
     validation.ts                         # Mark 参数校验与标准化
     gpu-status.ts                         # GPU 指标查询
-    gpu-channel-mapper.ts                 # GPU 轨道映射注册
+    gpu-channels.ts                 # GPU 轨道映射注册
     visual-target.ts                      # 统一 VisualTarget 适配
     timeline-api.ts                       # timeline() 编排 API
 ```

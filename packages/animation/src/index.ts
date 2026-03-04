@@ -10,8 +10,8 @@ import {
   type TargetType,
 } from './api/mark';
 import { isVisualTargetCached } from './api/visual-target';
-import { registerAnimationSystems } from './runtime/animation-system-registry';
-import type { MotionTarget } from './types/animation-target-types';
+import { registerAnimationSystems } from './runtime/system-registry';
+import type { MotionTarget } from './types/targets';
 
 const initializedWorlds = new WeakSet<World>();
 
@@ -168,12 +168,12 @@ export { FrameSampler } from '@g-motion/shared';
 export type { FrameRoundingMode } from '@g-motion/shared';
 export * from './api/adjust';
 export * from './api/animate';
-export * from './api/animation-options';
+export * from './api/options';
 export * from './api/builder';
 export * from './api/control';
 export * from './api/gpu-status';
 export * from './api/mark';
 export * from './api/visual-target';
 export * from './api/timeline-api';
-export * from './types/animation-target-types';
-export { engine } from './config/engine-config';
+export * from './types/targets';
+export { engine } from './config/engine';

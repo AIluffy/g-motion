@@ -1,6 +1,6 @@
 import type { InertiaOptions } from '@g-motion/core';
 import { createDebugger, panic } from '@g-motion/shared';
-import type { StaggerOptions, StaggerValue } from '../types/animation-target-types';
+import type { StaggerOptions, StaggerValue } from '../types/targets';
 
 const warn = createDebugger('Validation', 'warn');
 

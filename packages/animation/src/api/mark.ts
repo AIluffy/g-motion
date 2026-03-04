@@ -9,7 +9,7 @@ import {
   resolveDomElements,
 } from '@g-motion/shared';
 import type { Easing } from '@g-motion/shared';
-import type { AnimatableProps, StaggerValue } from '../types/animation-target-types';
+import type { AnimatableProps, StaggerValue } from '../types/targets';
 
 export interface MarkOptions<T = any> {
   to?: AnimatableProps<T> | ((index: number, entityId: number, target?: T) => AnimatableProps<T>);

@@ -1,5 +1,5 @@
 import type { Easing } from '@g-motion/shared';
-import type { StaggerOptions, StaggerValue } from '../types/animation-target-types';
+import type { StaggerOptions, StaggerValue } from '../types/targets';
 
 function applyNamedEase(name: string, t: number): number {
   const x = Math.min(1, Math.max(0, t));

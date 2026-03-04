@@ -1,10 +1,10 @@
 import { MotionStatus } from '@g-motion/core';
 import { createDebugger } from '@g-motion/shared';
 import type { World } from '@g-motion/core';
-import { BatchCoordinator } from './control/batch-coordinator';
-import { AnimationCoordinator } from './control/completion-handler';
-import { FrameNavigator } from './control/frame-navigator';
-import { PlaybackController } from './control/playback-controller';
+import { BatchCoordinator } from './control/batch';
+import { AnimationCoordinator } from './control/completion';
+import { FrameNavigator } from './control/frame';
+import { PlaybackController } from './control/playback';
 
 const warn = createDebugger('AnimationControl', 'warn');
 
@@ -189,7 +189,6 @@ export class AnimationControl implements PromiseLike<void> {
   getFps(): number {
     return (this.getPlaybackRate() || 1) * 60;
   }
-
 
   getWorldInternal(): World {
     return this.coordinator.getWorld();
