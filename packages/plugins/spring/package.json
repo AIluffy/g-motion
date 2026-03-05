@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@g-motion/core": "workspace:*",
-    "@g-motion/shared": "workspace:*"
+    "@g-motion/shared": "workspace:*",
+    "@g-motion/values": "workspace:*"
   },
   "devDependencies": {
     "@rslib/core": "workspace:*",

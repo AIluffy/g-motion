@@ -27,5 +27,9 @@
     "@types/node": "workspace:*",
     "typescript": "workspace:*",
     "vitest": "workspace:*"
+  },
+  "dependencies": {
+    "@g-motion/core": "workspace:*",
+    "@g-motion/values": "workspace:*"
   }
 }
