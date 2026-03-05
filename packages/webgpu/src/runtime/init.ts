@@ -1,4 +1,4 @@
-import { createDebugger, getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
 import { AsyncReadbackManager } from './async-readback';
 import type { WebGPUEngine } from './engine';
 import { getGPUMetricsProvider } from './metrics';
@@ -63,8 +63,8 @@ const PHYSICS_BIND_GROUP_LAYOUT_ENTRIES = [
 
 const resolveInitDeps = (config?: InitConfig): WebGPUInitializationDeps => ({
   metricsProvider: config?.metricsProvider ?? getGPUMetricsProvider(),
-  getCustomGpuEasings: config?.getCustomGpuEasings ?? getCustomGpuEasings,
-  getCustomEasingVersion: config?.getCustomEasingVersion ?? getCustomEasingVersion,
+  getCustomGpuEasings: config?.getCustomGpuEasings ?? (() => []),
+  getCustomEasingVersion: config?.getCustomEasingVersion ?? (() => 0),
 });
 
 export async function initWebGPUCompute(

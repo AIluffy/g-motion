@@ -1,5 +1,4 @@
 import { GPU_CAPABLE_PROPERTIES } from '@g-motion/shared/transform';
-import { resolveDomElements } from '@g-motion/shared/dom';
 import { TargetType } from './mark';
 
 export type VisualTargetKind = 'dom' | 'object' | 'primitive';
@@ -64,8 +63,8 @@ function resolveDomElement(source: any, root?: Document | Element | null): HTMLE
     const scope = root ?? document;
     if (typeof (scope as any).querySelectorAll === 'function') {
       try {
-        const elements = resolveDomElements(source, scope as Document | Element);
-        const first = elements && elements.length > 0 ? elements[0] : null;
+        const elements = (scope as Document | Element).querySelectorAll(source);
+        const first = elements && elements.length > 0 ? elements.item(0) : null;
         return first as HTMLElement | null;
       } catch {}
     }

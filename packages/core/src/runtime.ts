@@ -1,6 +1,7 @@
 export * from './runtime/app';
 export * from './runtime/context';
 export * from './runtime/engine';
+export * from './runtime/easing-registry';
 export * from './runtime/gpu-registry';
 export * from './runtime/plugin';
 export * from './runtime/target-resolver';

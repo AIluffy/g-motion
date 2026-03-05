@@ -1,5 +1,5 @@
-import { panic, registerGpuEasing } from '@g-motion/shared';
-import { createDebugger } from '@g-motion/shared';
+import { panic, createDebugger } from '@g-motion/shared';
+import { registerGpuEasing } from './easing-registry';
 import { getAppContext } from './context';
 import type { ComponentDef, RendererDef, ShaderDef, SystemDef } from './plugin';
 import { MotionApp, MotionAppConfig } from './plugin';

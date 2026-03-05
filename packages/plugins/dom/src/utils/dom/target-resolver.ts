@@ -20,6 +20,8 @@ export type DomTargetResolver<TType> = (
  */
 export interface DomEnvironment {
   hasDocument(): boolean;
+  hasWindow(): boolean;
+  createElement(tag: string): Element | null;
   querySelectorAll(root: Element | Document, selector: string): NodeListLike | null;
   isElement(input: unknown): input is Element;
   isNodeList(input: unknown): input is NodeListLike;
@@ -43,6 +45,17 @@ const defaultDomEnv: DomEnvironment = {
       typeof document !== 'undefined' &&
       typeof (document as unknown as Record<string, unknown>).querySelectorAll === 'function'
     );
+  },
+
+  hasWindow(): boolean {
+    return typeof window !== 'undefined';
+  },
+
+  createElement(tag: string): Element | null {
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
+      return null;
+    }
+    return document.createElement(tag);
   },
 
   querySelectorAll(root: Element | Document, selector: string): NodeListLike | null {

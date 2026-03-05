@@ -7,6 +7,7 @@ export * from './constants';
 export * from './runtime/context';
 export * from './data';
 export * from './runtime/engine';
+export * from './runtime/easing-registry';
 export * from './runtime/gpu-registry';
 export * from './ecs/entities';
 export * from './runtime/plugin';
