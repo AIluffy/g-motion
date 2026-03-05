@@ -1,20 +1,24 @@
 import { isPluginRegistered } from '@g-motion/core';
-import type { InertiaOptions, TimelineData, SpringOptions } from '@g-motion/core';
+import type { InertiaParams, TimelineData, SpringParams } from '@g-motion/core';
+
+type InertiaRuntimeParams = InertiaParams & {
+  velocitySource?: (track: string, ctx: { target: unknown }) => number;
+};
 
 type InertiaAnalysis = {
   hasInertia: boolean;
-  inertiaConfig: InertiaOptions | undefined;
+  inertiaConfig: InertiaRuntimeParams | undefined;
   inertiaVelocities: Map<string, number>;
 };
 
 type SpringAnalysis = {
   hasSpring: boolean;
-  springConfig: SpringOptions | undefined;
+  springConfig: SpringParams | undefined;
   springVelocities: Map<string, number>;
 };
 
 function resolveInertiaVelocity(
-  inertia: InertiaOptions,
+  inertia: InertiaRuntimeParams,
   trackKey: string,
   target: unknown,
 ): number | undefined {
@@ -32,7 +36,7 @@ function resolveInertiaVelocity(
 
 export function analyzeSpringTracks(tracks: TimelineData): SpringAnalysis {
   let hasSpring = false;
-  let springConfig: SpringOptions | undefined;
+  let springConfig: SpringParams | undefined;
   const springVelocities = new Map<string, number>();
 
   for (const [trackKey, track] of tracks.entries()) {
@@ -55,7 +59,7 @@ export function analyzeSpringTracks(tracks: TimelineData): SpringAnalysis {
 
 export function analyzeInertiaTracks(tracks: TimelineData, target: unknown): InertiaAnalysis {
   let hasInertia = false;
-  let inertiaConfig: InertiaOptions | undefined;
+  let inertiaConfig: InertiaRuntimeParams | undefined;
   const inertiaVelocities = new Map<string, number>();
 
   for (const [trackKey, track] of tracks.entries()) {
@@ -85,10 +89,10 @@ export function analyzeInertiaTracks(tracks: TimelineData, target: unknown): Ine
 }
 
 export function buildInertiaComponent(
-  config: InertiaOptions,
+  config: InertiaParams,
   velocities: Map<string, number>,
 ): Record<string, unknown> {
-  const normalizeTimeConstant = (cfg: InertiaOptions): number => {
+  const normalizeTimeConstant = (cfg: InertiaParams): number => {
     if (typeof cfg.deceleration === 'number' && cfg.deceleration > 0) {
       return 1000 / cfg.deceleration;
     }

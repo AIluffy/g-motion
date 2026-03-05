@@ -1,23 +1,14 @@
+import type {
+  SpringComponentData as ProtocolSpringComponentData,
+  SpringParams,
+} from '@g-motion/protocol';
+
 /**
  * Spring animation options.
  */
-export interface SpringOptions {
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  restSpeed?: number;
-  restDelta?: number;
-  initialVelocity?: number;
-}
+export interface SpringOptions extends SpringParams {}
 
 /**
  * Spring component data.
  */
-export interface SpringComponentData {
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  restSpeed?: number;
-  restDelta?: number;
-  velocities?: Map<string, number>;
-}
+export type SpringComponentData = ProtocolSpringComponentData;

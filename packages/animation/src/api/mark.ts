@@ -1,8 +1,8 @@
 import {
-  InertiaOptions,
-  Keyframe,
-  SpringOptions,
-  TimelineData,
+  type InertiaParams,
+  type Keyframe,
+  type SpringParams,
+  type TimelineData,
   type SelectorCache as CoreSelectorCache,
   type TargetResolveContext as CoreTargetResolveContext,
   type TargetResolver as CoreTargetResolver,
@@ -23,8 +23,8 @@ export interface MarkOptions<T = any> {
   ease?: Easing;
   interp?: 'linear' | 'bezier' | 'hold' | 'autoBezier';
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
-  spring?: SpringOptions;
-  inertia?: InertiaOptions;
+  spring?: SpringParams;
+  inertia?: InertiaParams;
   stagger?: StaggerValue;
 }
 

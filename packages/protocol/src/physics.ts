@@ -1,4 +1,4 @@
-export interface SpringOptions {
+export interface SpringParams {
   stiffness?: number;
   damping?: number;
   mass?: number;
@@ -7,9 +7,8 @@ export interface SpringOptions {
   initialVelocity?: number;
 }
 
-export interface InertiaOptions {
+export interface InertiaParams {
   velocity?: number | 'auto' | (() => number);
-  velocitySource?: (track: string, ctx: { target: unknown }) => number;
   min?: number;
   max?: number;
   bounds?: { min?: number; max?: number };
@@ -30,6 +29,11 @@ export interface SpringComponentData {
   restDelta?: number;
   velocities?: Map<string, number>;
 }
+
+/** @deprecated Use SpringParams instead. */
+export type SpringOptions = SpringParams;
+/** @deprecated Use InertiaParams instead. */
+export type InertiaOptions = InertiaParams;
 
 export interface InertiaComponentData {
   timeConstant?: number;

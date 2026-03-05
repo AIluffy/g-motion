@@ -1,4 +1,4 @@
-import type { InertiaOptions } from '@g-motion/core';
+import type { InertiaParams } from '@g-motion/core';
 import { createDebugger, panic } from '@g-motion/shared';
 import type { StaggerOptions, StaggerValue } from '../types/targets';
 
@@ -17,7 +17,7 @@ export interface MarkValidationOptions {
   ease?: string | ((t: number) => number);
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
   spring?: unknown;
-  inertia?: InertiaOptions;
+  inertia?: InertiaParams;
   stagger?: StaggerValue;
 }
 

@@ -1,4 +1,4 @@
-import type { InertiaOptions, SpringOptions } from './physics';
+import type { InertiaParams, SpringParams } from './physics';
 
 export type Easing = string;
 
@@ -20,8 +20,8 @@ export interface Keyframe {
   interp?: 'linear' | 'bezier' | 'hold' | 'autoBezier' | 'spring' | 'inertia';
   bezier?: { cx1: number; cy1: number; cx2: number; cy2: number };
   easing?: Easing;
-  spring?: SpringOptions;
-  inertia?: InertiaOptions;
+  spring?: SpringParams;
+  inertia?: InertiaParams;
 }
 
 export type Track = Keyframe[];

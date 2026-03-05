@@ -15,14 +15,6 @@
 // ECS 基础类型
 export * from './component';
 
-/** @deprecated Import from '@g-motion/protocol' instead. */
-export type {
-  SpringOptions,
-  InertiaOptions,
-  SpringComponentData,
-  InertiaComponentData,
-} from '@g-motion/protocol';
-
 // 动画核心类型（兼容转发）
 export * from './animation';
 

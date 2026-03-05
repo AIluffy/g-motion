@@ -52,6 +52,8 @@ export type {
 } from './animation';
 export { MotionStatus } from './animation';
 export type {
+  SpringParams,
+  InertiaParams,
   SpringOptions,
   InertiaOptions,
   SpringComponentData,
