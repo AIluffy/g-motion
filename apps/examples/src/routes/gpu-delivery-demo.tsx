@@ -7,13 +7,13 @@ import {
   getGPUBatchStatus,
   getGPUMetrics,
 } from '@g-motion/animation';
+import { WorldProvider } from '@g-motion/core';
 import {
-  WorldProvider,
   createMatrix2DTransformChannelTable,
   createMatrix3DTransformChannelTable,
-  enqueueGPUResults,
   getGPUChannelMappingRegistry,
-} from '@g-motion/core';
+} from '@g-motion/webgpu';
+import { enqueueGPUResults } from '@g-motion/webgpu/internal';
 
 import {
   Card,

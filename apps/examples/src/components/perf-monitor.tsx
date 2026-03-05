@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { getGPUMetrics, getSystemTimings } from '@g-motion/animation';
-import { getGPUChannelMappingRegistry } from '@g-motion/core';
+import { getGPUChannelMappingRegistry } from '@g-motion/webgpu';
 import { useSetAtom } from 'jotai';
 import { activeEntityCountAtom, engineMetricsAtom } from '@/state/engineState';
 import './perf-monitor.css';

@@ -1,7 +1,8 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { motion, engine, AnimationControl } from '@g-motion/animation';
-import { getGPUMetricsProvider, WorldProvider } from '@g-motion/core';
+import { WorldProvider } from '@g-motion/core';
+import { getGPUMetricsProvider } from '@g-motion/webgpu';
 import { useAtom } from 'jotai';
 import {
   engineSpeedAtom,

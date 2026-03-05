@@ -1,7 +1,8 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, type AnimationControl, engine } from '@g-motion/animation';
-import { WorldProvider, getGPUMetricsProvider } from '@g-motion/core';
+import { WorldProvider } from '@g-motion/core';
+import { getGPUMetricsProvider } from '@g-motion/webgpu';
 
 import {
   Card,
