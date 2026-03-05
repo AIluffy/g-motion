@@ -6,15 +6,15 @@
  */
 
 import type { SystemContext, SystemDef } from '../../../runtime/plugin';
-import { drainGPUResultsInto } from '@g-motion/webgpu/internal';
-import type { GPUResultPacket } from '@g-motion/webgpu/internal';
+import { drainGPUResultsInto } from '../../../gpu-bridge';
+import type { GPUResultPacket } from '../../../gpu-bridge/types';
 import {
   getGPUChannelMappingRegistry,
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
   isStandardTransformChannels,
-} from '@g-motion/webgpu/internal';
-import type { ChannelMapping } from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge';
+import type { ChannelMapping } from '../../../gpu-bridge/types';
 import { createDebugger, isDev } from '@g-motion/shared';
 import { getRendererCode } from '../../../render/renderer-code';
 import { applyGPUResultPacket } from './apply-results';

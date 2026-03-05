@@ -14,6 +14,6 @@ export {
   dispatchPhysicsBatch,
   getPipelineForWorkgroup,
   initWebGPUCompute,
-} from '@g-motion/webgpu/internal';
-export { enqueueGPUResults } from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge';
+export { enqueueGPUResults } from '../../gpu-bridge';
 export { WebGPUComputeSystem } from './system';

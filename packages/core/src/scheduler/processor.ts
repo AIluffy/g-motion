@@ -1,5 +1,5 @@
 import { createDebugger, getNowMs, isFatalError } from '@g-motion/shared';
-import { getPersistentGPUBufferManager } from '@g-motion/webgpu/internal';
+import { getPersistentGPUBufferManager } from '../gpu-bridge';
 import type {
   EngineServices,
   NormalizedMotionAppConfig,

@@ -4,8 +4,8 @@
  * Handles asynchronous GPU device creation, validation, and pipeline setup.
  */
 
-import type { InitConfig, WebGPUEngine, WebGPUInitResult } from '@g-motion/webgpu/internal';
-import { initializeWebGPU as initializeWebGPUCore } from '@g-motion/webgpu/internal';
+import type { InitConfig, WebGPUEngine, WebGPUInitResult } from '../../gpu-bridge/types';
+import { initializeWebGPU as initializeWebGPUCore } from '../../gpu-bridge';
 
 export async function initializeWebGPU(
   engine: WebGPUEngine,

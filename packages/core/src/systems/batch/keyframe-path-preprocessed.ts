@@ -16,7 +16,7 @@ import {
   preprocessChannelsToRawAndMap,
   type RawKeyframeGenerationOptions,
   type RawKeyframeValueEvaluator,
-} from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge';
 import { KEYFRAME_FLOATS, MAX_KEYFRAMES_PER_CHANNEL } from './constants';
 import type { PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
 import { getFlatTracks, tryReusePackedCache } from './keyframe-utils';

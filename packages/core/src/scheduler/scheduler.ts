@@ -3,7 +3,7 @@ import {
   getGPUResultQueueLength,
   getPendingReadbackCount,
   setGPUResultWakeup,
-} from '@g-motion/webgpu/internal';
+} from '../gpu-bridge';
 import { WebGPUConstants } from '../constants';
 import type { EngineServices, SystemDef } from '../runtime/plugin';
 import { SchedulerLoop } from './loop';

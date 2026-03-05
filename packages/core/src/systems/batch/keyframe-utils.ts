@@ -14,7 +14,7 @@ import { TimelineTracksMap } from '@g-motion/shared';
 import type {
   RawKeyframeGenerationOptions,
   RawKeyframeValueEvaluator,
-} from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge/types';
 
 // ---------------------------------------------------------------------------
 // Types

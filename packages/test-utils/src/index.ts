@@ -230,3 +230,12 @@ export function createSpy<T extends (...args: unknown[]) => unknown>(impl?: T): 
 
   return spy as unknown as SpyFunction<T>;
 }
+
+export async function __getKeyframeSearchShaderModeForTests(): Promise<boolean | null> {
+  try {
+    const mod = await import('@g-motion/webgpu/testing');
+    return mod.__getKeyframeSearchShaderModeForTests();
+  } catch {
+    return null;
+  }
+}

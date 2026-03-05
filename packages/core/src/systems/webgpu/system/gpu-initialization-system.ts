@@ -1,12 +1,12 @@
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
-import { getOutputFormatBufferPoolStats } from '@g-motion/webgpu/internal';
-import type { GPUMetricsProvider, WebGPUInitResult } from '@g-motion/webgpu/internal';
-import type { WebGPUEngine } from '@g-motion/webgpu/internal';
+import { getOutputFormatBufferPoolStats } from '../../../gpu-bridge';
+import type { GPUMetricsProvider, WebGPUInitResult } from '../../../gpu-bridge/types';
+import type { WebGPUEngine } from '../../../gpu-bridge/types';
 import {
   ensureWebGPUInitialized as ensureWebGPUInitializedCore,
   ensureWebGPUPipelines as ensureWebGPUPipelinesCore,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge';
 
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,
