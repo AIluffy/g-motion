@@ -27,6 +27,7 @@ export type { SystemDef, SystemContext, RendererDef, RendererBatchContext } from
 export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';
 export type {
   GPUBridge,
+  GPUComputeCapability,
   GPUInitResult,
   GPUBatchRequest,
   GPUPhysicsBatchRequest,
@@ -35,3 +36,10 @@ export type {
 } from './gpu-bridge';
 export { registerGPUBridge, getGPUBridge, requireGPUBridge, clearGPUBridge } from './gpu-bridge';
 
+
+export type {
+  SpringOptions,
+  InertiaOptions,
+  SpringComponentData,
+  InertiaComponentData,
+} from './physics';

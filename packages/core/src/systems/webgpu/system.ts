@@ -20,14 +20,7 @@ import type {
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
 } from '../../gpu-bridge/types';
-import {
-  clearPhysicsGPUEntities,
-  createWebGPUFrameEncoder,
-  getWebGPUTestingModule,
-  getWebGPUEngine,
-  resetWebGPUEngine,
-  setPendingReadbackCount,
-} from '../../gpu-bridge';
+import { getGPUModuleSync, getWebGPUTestingModule } from '../../gpu-bridge';
 import type { SystemContext, SystemDef } from '../../runtime/plugin';
 import type { GPUFrameContext } from './frame-context';
 import { createGPUFrameContext } from './frame-context';
@@ -41,11 +34,17 @@ import { processInterpolationArchetype } from './system/output-buffer-processor'
 import { dispatchPhysicsBatchForArchetype } from './system/physics-dispatch-system';
 import { processCompletedReadbacks } from './system/readback-processing-system';
 
-export {
-  disableGPUOutputFormatPass,
-  enableGPUOutputFormatPass,
-  processOutputBuffer,
-} from '../../gpu-bridge';
+
+
+export const disableGPUOutputFormatPass = () => getGPUModuleSync()?.disableGPUOutputFormatPass?.();
+export const enableGPUOutputFormatPass = () => getGPUModuleSync()?.enableGPUOutputFormatPass?.();
+export const processOutputBuffer = (...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['processOutputBuffer']>) => {
+  const gpu = getGPUModuleSync();
+  if (!gpu) {
+    throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
+  }
+  return gpu.processOutputBuffer(...args);
+};
 export type { ProcessOutputBufferInput } from '../../gpu-bridge/types';
 export { debugIO, firstEntityChannelPreview, float32Preview } from './debug';
 export {
@@ -62,7 +61,7 @@ const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
 function getEngineOrNull() {
   try {
-    return getWebGPUEngine();
+    return getGPUModuleSync()?.getWebGPUEngine() ?? null;
   } catch {
     return null;
   }
@@ -77,8 +76,9 @@ export function __resetWebGPUComputeSystemForTests(): void {
     mod?.__resetViewportCullingPassForTests();
     mod?.__resetKeyframePassesForTests();
   });
-  resetWebGPUEngine();
-  setPendingReadbackCount(0);
+  const gpu = getGPUModuleSync();
+  gpu?.resetWebGPUEngine?.();
+  gpu?.setPendingReadbackCount?.(0);
 }
 
 /**
@@ -113,8 +113,9 @@ export const WebGPUComputeSystem: SystemDef = {
     }
 
     if (!initResult.success || !engine.deviceAvailable) {
-      clearPhysicsGPUEntities();
-      setPendingReadbackCount(0);
+      const gpu = getGPUModuleSync();
+      gpu?.clearPhysicsGPUEntities?.();
+      gpu?.setPendingReadbackCount?.(0);
       metricsProvider.updateStatus({
         enabled: true,
         webgpuAvailable: false,
@@ -130,8 +131,9 @@ export const WebGPUComputeSystem: SystemDef = {
 
     const device = engine.getGPUDevice();
     if (!device) {
-      clearPhysicsGPUEntities();
-      setPendingReadbackCount(0);
+      const gpu = getGPUModuleSync();
+      gpu?.clearPhysicsGPUEntities?.();
+      gpu?.setPendingReadbackCount?.(0);
       metricsProvider.updateStatus({
         enabled: true,
         webgpuAvailable: false,
@@ -201,7 +203,7 @@ function resolveComputeDeps(ctx: SystemContext | undefined): {
 async function processArchetypeBatches(
   frameContext: GPUFrameContext,
   archetypeBatches: Map<string, ArchetypeBatchDescriptor>,
-  engine: ReturnType<typeof getWebGPUEngine>,
+  engine: import('../../gpu-bridge/types').WebGPUEngine,
 ): Promise<void> {
   const { device, services, flags, physics } = frameContext;
   const { world, processor, config, metricsProvider } = services;
@@ -222,7 +224,7 @@ async function processArchetypeBatches(
   const { dtMs, dtSec, maxVelocity } = physics;
   const { gpu, queue } = device;
   const frame = batchedSubmitEnabled
-    ? createWebGPUFrameEncoder({
+    ? getGPUModuleSync()?.createWebGPUFrameEncoder({
         device: gpu,
         timestampManager: engine.timestampManager,
         label: `motion-frame-${engine.frameId}`,

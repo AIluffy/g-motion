@@ -1,7 +1,9 @@
-let _webgpuModule: typeof import('@g-motion/webgpu/internal') | null = null;
-let _loadPromise: Promise<typeof import('@g-motion/webgpu/internal') | null> | null = null;
+export type GPUModuleFacade = typeof import('@g-motion/webgpu/internal');
 
-export async function getWebGPUModule(): Promise<typeof import('@g-motion/webgpu/internal') | null> {
+let _webgpuModule: GPUModuleFacade | null = null;
+let _loadPromise: Promise<GPUModuleFacade | null> | null = null;
+
+export async function getWebGPUModule(): Promise<GPUModuleFacade | null> {
   if (_webgpuModule) return _webgpuModule;
   if (_loadPromise) return _loadPromise;
 
@@ -18,7 +20,7 @@ export async function getWebGPUModule(): Promise<typeof import('@g-motion/webgpu
   return _loadPromise;
 }
 
-export function getWebGPUModuleSync(): typeof import('@g-motion/webgpu/internal') | null {
+export function getWebGPUModuleSync(): GPUModuleFacade | null {
   return _webgpuModule;
 }
 

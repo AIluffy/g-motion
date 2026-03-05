@@ -1,5 +1,5 @@
 import { createDebugger, getNowMs, isFatalError } from '@g-motion/shared';
-import { getPersistentGPUBufferManager } from '../gpu-bridge';
+import { getGPUModuleSync } from '../gpu-bridge';
 import type {
   EngineServices,
   NormalizedMotionAppConfig,
@@ -136,7 +136,9 @@ export class SchedulerProcessor {
     } | null = null;
 
     try {
-      const manager = getPersistentGPUBufferManager();
+      const gpu = getGPUModuleSync();
+      if (!gpu) return;
+      const manager = gpu.getPersistentGPUBufferManager();
       const stats = manager.getStats();
       managerStats = {
         bytesSkipped: stats.bytesSkipped ?? 0,

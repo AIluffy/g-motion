@@ -139,4 +139,4 @@ export type {
 } from './runtime/metrics';
 
 export * from './gpu/persistent-buffer-manager';
-export * from './benchmark';
+export * from '@g-motion/benchmark';

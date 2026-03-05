@@ -1,4 +1,4 @@
-import type { TimelineData, InertiaOptions } from '@g-motion/shared/types';
+import type { TimelineData, InertiaOptions } from '@g-motion/protocol';
 
 /**
  * Resolves inertia velocity from options.

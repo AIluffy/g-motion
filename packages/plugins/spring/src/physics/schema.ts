@@ -1,5 +1,5 @@
 import type { ComponentDef } from '@g-motion/protocol';
-import type { SpringOptions } from '@g-motion/shared/types';
+import type { SpringOptions } from '@g-motion/protocol';
 
 /**
  * SpringComponent stores spring physics parameters and per-track velocity state.
@@ -18,7 +18,7 @@ export const SpringComponent: ComponentDef = {
   schema: SpringComponentSchema,
 };
 
-export type { SpringOptions } from '@g-motion/shared/types';
+export type { SpringOptions } from '@g-motion/protocol';
 
 /**
  * Default spring parameters (matching Popmotion defaults)

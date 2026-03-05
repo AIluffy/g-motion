@@ -5,14 +5,7 @@ import type {
   WebGPUEngine,
   WebGPUFrameEncoder,
 } from '../../../gpu-bridge/types';
-import {
-  dispatchGPUBatch,
-  getGPUChannelMappingRegistry,
-  getPersistentGPUBufferManager,
-  processOutputBuffer,
-  runKeyframeInterpPass,
-  runKeyframePreprocessPass,
-} from '../../../gpu-bridge';
+import { getGPUModuleSync } from '../../../gpu-bridge';
 import type { World } from '../../../runtime/world';
 import type { ComputeBatchProcessor } from '../../batch';
 import { debugIO, firstEntityChannelPreview, float32Preview } from '../debug';
@@ -66,9 +59,12 @@ export async function processInterpolationArchetype(params: {
   const sp = engine.stagingPool;
   if (!sp) return;
 
+  const gpu = getGPUModuleSync();
+  if (!gpu) return;
+
   const queue = device.queue;
-  const persistent = getPersistentGPUBufferManager(device);
-  const channelRegistry = getGPUChannelMappingRegistry();
+  const persistent = gpu.getPersistentGPUBufferManager(device);
+  const channelRegistry = gpu.getGPUChannelMappingRegistry();
 
   const table = channelRegistry.getChannels(archetypeId);
   const outputChannels = table?.channels ?? [];
@@ -110,7 +106,7 @@ export async function processInterpolationArchetype(params: {
 
   if (preprocessEnabled && gpuBatch.preprocessedKeyframes && rawStride > 0) {
     const batchWithPreprocessed = gpuBatch as unknown as GPUBatchWithPreprocessedKeyframes;
-    const preprocessResult = await runKeyframePreprocessPass(
+    const preprocessResult = await gpu.runKeyframePreprocessPass(
       device,
       queue,
       batchWithPreprocessed,
@@ -122,7 +118,7 @@ export async function processInterpolationArchetype(params: {
       },
     );
     if (preprocessResult) {
-      const interpOutput = await runKeyframeInterpPass(
+      const interpOutput = await gpu.runKeyframeInterpPass(
         device,
         queue,
         archetypeId,
@@ -152,7 +148,7 @@ export async function processInterpolationArchetype(params: {
   }
 
   if (!outputBuffer) {
-    const result = await dispatchGPUBatch(
+    const result = await gpu.dispatchGPUBatch(
       device,
       queue,
       gpuBatch,
@@ -224,7 +220,7 @@ export async function processInterpolationArchetype(params: {
     });
   }
 
-  await processOutputBuffer(
+  await gpu.processOutputBuffer(
     device,
     queue,
     sp,

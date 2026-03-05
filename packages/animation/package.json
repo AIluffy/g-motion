@@ -16,19 +16,22 @@
   ],
   "dependencies": {
     "@g-motion/core": "workspace:*",
-    "@g-motion/webgpu": "workspace:*",
     "@g-motion/values": "workspace:*",
     "@g-motion/shared": "workspace:*"
   },
   "peerDependencies": {
     "@g-motion/plugin-spring": "workspace:*",
-    "@g-motion/plugin-inertia": "workspace:*"
+    "@g-motion/plugin-inertia": "workspace:*",
+    "@g-motion/webgpu": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@g-motion/plugin-spring": {
       "optional": true
     },
     "@g-motion/plugin-inertia": {
+      "optional": true
+    },
+    "@g-motion/webgpu": {
       "optional": true
     }
   },

@@ -4,7 +4,7 @@
  * Default constants and configuration values for batch processing.
  */
 
-import { WebGPUConstants } from '@g-motion/shared';
+import { WebGPUConstants } from '@g-motion/webgpu';
 
 /**
  * Default maximum batch size per archetype

@@ -1,0 +1,30 @@
+{
+  "name": "@g-motion/benchmark",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "bench": "pnpm run build && node ./scripts/run-bench.mjs"
+  },
+  "dependencies": {
+    "@g-motion/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@rslib/core": "workspace:*",
+    "@types/node": "workspace:*",
+    "typescript": "workspace:*"
+  }
+}

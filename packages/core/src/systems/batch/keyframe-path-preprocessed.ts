@@ -10,13 +10,8 @@
  */
 
 import type { TimelineData, Track } from '@g-motion/shared';
-import {
-  packChannelMaps,
-  packRawKeyframes,
-  preprocessChannelsToRawAndMap,
-  type RawKeyframeGenerationOptions,
-  type RawKeyframeValueEvaluator,
-} from '../../gpu-bridge';
+import { getGPUModuleSync } from '../../gpu-bridge';
+import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '../../gpu-bridge/types';
 import { KEYFRAME_FLOATS, MAX_KEYFRAMES_PER_CHANNEL } from './constants';
 import type { PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
 import { getFlatTracks, tryReusePackedCache } from './keyframe-utils';
@@ -36,6 +31,13 @@ export function serializePreprocessedPath(
   timelineFlatEnabled: boolean,
   packedCacheMap: PackedCacheMap,
 ): SerializedKeyframes {
+  const gpu = getGPUModuleSync();
+  if (!gpu) {
+    throw new Error(
+      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
+    );
+  }
+
   const rawKeyframesByClip: Float32Array[] = [];
   const channelMapByClip: Uint32Array[] = [];
   const clipIndexByEntity = new Uint32Array(entityCount);
@@ -102,15 +104,15 @@ export function serializePreprocessedPath(
       rawKeyframesByClip.push(new Float32Array(0));
       channelMapByClip.push(new Uint32Array(0));
     } else {
-      const { rawKeyframes, channelMaps } = preprocessChannelsToRawAndMap(
+      const { rawKeyframes, channelMaps } = gpu.preprocessChannelsToRawAndMap(
         channelTracks,
         preprocessOptions,
         evaluateRawValue,
       );
       ci = rawKeyframesByClip.length;
       clipIndexByTracks.set(tracks, ci);
-      rawKeyframesByClip.push(packRawKeyframes(rawKeyframes));
-      channelMapByClip.push(packChannelMaps(channelMaps));
+      rawKeyframesByClip.push(gpu.packRawKeyframes(rawKeyframes));
+      channelMapByClip.push(gpu.packChannelMaps(channelMaps));
     }
 
     clipIndexByEntity[eIndex] = ci;
