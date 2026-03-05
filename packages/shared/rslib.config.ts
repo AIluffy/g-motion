@@ -1,15 +1,6 @@
 import { defineConfig } from '@rslib/core';
+import { webPreset } from '../../tools/rslib-preset';
 
 export default defineConfig({
-  lib: [
-    {
-      format: 'esm',
-      syntax: 'es2021',
-      dts: true,
-    },
-    {
-      format: 'cjs',
-      syntax: 'es2021',
-    },
-  ],
+  ...webPreset,
 });

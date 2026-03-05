@@ -1,6 +1,8 @@
 import { defineConfig } from '@rslib/core';
+import { nodePreset } from '../../tools/rslib-preset';
 
 export default defineConfig({
+  ...nodePreset,
   source: {
     tsconfigPath: './tsconfig.json',
     entry: {
@@ -8,11 +10,4 @@ export default defineConfig({
       setup: './src/setup.ts',
     },
   },
-  lib: [
-    {
-      format: 'esm',
-      syntax: 'es2021',
-      dts: true,
-    },
-  ],
 });

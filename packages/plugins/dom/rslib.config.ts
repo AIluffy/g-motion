@@ -1,11 +1,6 @@
 import { defineConfig } from '@rslib/core';
+import { webPreset } from '../../../tools/rslib-preset';
 
 export default defineConfig({
-  lib: [
-    {
-      format: 'esm',
-      syntax: ['node 18'],
-      dts: true,
-    },
-  ],
+  ...webPreset,
 });

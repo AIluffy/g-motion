@@ -1,29 +1,13 @@
 import { defineConfig } from '@rslib/core';
+import { rawAssetRule, webPreset } from '../../../tools/rslib-preset';
 
 export default defineConfig({
+  ...webPreset,
+  ...rawAssetRule,
   source: {
     tsconfigPath: './tsconfig.json',
     entry: {
       index: './src/index.ts',
-    },
-  },
-  lib: [
-    {
-      format: 'esm',
-      syntax: 'es2021',
-      dts: true,
-    },
-  ],
-  tools: {
-    rspack: {
-      module: {
-        rules: [
-          {
-            resourceQuery: /raw$/,
-            type: 'asset/source',
-          },
-        ],
-      },
     },
   },
 });

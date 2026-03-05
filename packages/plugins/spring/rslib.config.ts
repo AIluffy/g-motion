@@ -1,23 +1,7 @@
 import { defineConfig } from '@rslib/core';
+import { rawAssetRule, webPreset } from '../../../tools/rslib-preset';
 
 export default defineConfig({
-  lib: [
-    {
-      format: 'esm',
-      syntax: 'es2021',
-      dts: true,
-    },
-  ],
-  tools: {
-    rspack: {
-      module: {
-        rules: [
-          {
-            resourceQuery: /raw$/,
-            type: 'asset/source',
-          },
-        ],
-      },
-    },
-  },
+  ...webPreset,
+  ...rawAssetRule,
 });
