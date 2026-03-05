@@ -12,6 +12,16 @@
       "types": "./dist/types-entry.d.ts",
       "import": "./dist/types-entry.js",
       "require": "./dist/types-entry.cjs"
+    },
+    "./dom": {
+      "types": "./dist/dom-entry.d.ts",
+      "import": "./dist/dom-entry.js",
+      "require": "./dist/dom-entry.cjs"
+    },
+    "./transform": {
+      "types": "./dist/transform-entry.d.ts",
+      "import": "./dist/transform-entry.js",
+      "require": "./dist/transform-entry.cjs"
     }
   },
   "main": "./dist/index.cjs",

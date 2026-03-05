@@ -1,5 +1,6 @@
 import { TimelineData, Keyframe } from '@g-motion/core';
-import { TRANSFORM_KEYS, createDebugger } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
+import { TRANSFORM_KEYS } from '@g-motion/shared/transform';
 import { ResolvedMarkOptions, TargetType } from './mark';
 import type { VisualTarget } from './visual-target';
 import { defaultRegistry, ValueType } from '@g-motion/values';

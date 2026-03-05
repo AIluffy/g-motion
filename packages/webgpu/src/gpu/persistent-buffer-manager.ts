@@ -1,4 +1,4 @@
-import { crc32 } from '@g-motion/shared';
+import { crc32 } from '../stream/crc32';
 
 /**
  * Persistent GPU Buffer Manager

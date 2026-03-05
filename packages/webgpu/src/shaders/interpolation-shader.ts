@@ -1,4 +1,4 @@
-import { WebGPUConstants } from '@g-motion/shared';
+import { WebGPUConstants } from '../constants/webgpu';
 import interpolationShaderCode from './interpolation.wgsl?raw';
 
 // T031: Built-in WGSL Shader for Interpolation

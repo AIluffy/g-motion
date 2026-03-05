@@ -1,4 +1,3 @@
-/** @deprecated 基础批处理类型请从 @g-motion/shared 使用，GPU 扩展类型请从 @g-motion/webgpu 导入 */
 /**
  * GPU 批处理相关类型定义
  *

@@ -1,5 +1,5 @@
 import { getEngineForWorld, MotionStatus, World, WorldProvider } from '@g-motion/core';
-import { getDomEnvironment } from '@g-motion/shared';
+import { getDomEnvironment } from '@g-motion/shared/dom';
 import { ensureValueParsersRegistered } from '@g-motion/values';
 import { motion as builderMotion } from './api/builder';
 import type { DomAnimationScope } from './api/control';

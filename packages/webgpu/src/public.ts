@@ -135,3 +135,17 @@ export type {
   GPUMemoryStats,
   GPUMetricsProvider,
 } from './runtime/metrics';
+
+
+export { WebGPUConstants } from './constants/webgpu';
+export { crc32 } from './stream/crc32';
+export { encodePackedFrame, PackedStreamDecoder } from './stream/packed-stream';
+export type { PackedFrame, PackedFrameHeader } from './stream/packed-stream';
+export type {
+  PreprocessedKeyframes,
+  BatchDescriptor,
+  LeasedBatchDescriptor,
+  WorkgroupBatchDescriptor,
+  KeyframePreprocessBatchDescriptor,
+  ViewportCullingBatchDescriptor,
+} from './runtime/batch-types';
