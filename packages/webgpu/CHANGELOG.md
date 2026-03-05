@@ -1,4 +1,4 @@
-# @g-motion/utils
+# @g-motion/webgpu
 
 ## 1.0.0
 
@@ -10,7 +10,3 @@
 
 - Updated dependencies
   - @g-motion/shared@1.0.0
-
-## Unreleased
-
-- 添加 createDomTargetResolver 工具，用于统一 DOM TargetResolver 实现。

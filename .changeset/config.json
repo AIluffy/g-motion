@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [
+    [
+      "@g-motion/core",
+      "@g-motion/animation",
+      "@g-motion/shared",
+      "@g-motion/values",
+      "@g-motion/webgpu"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "feat/v2",
+  "updateInternalDependencies": "patch",
+  "ignore": ["@g-motion/test-utils"]
+}

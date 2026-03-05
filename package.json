@@ -18,7 +18,10 @@
     "test:watch": "turbo run test -- --watch",
     "clean": "turbo clean && rm -rf node_modules",
     "prepare": "husky install",
-    "flow": "pnpm build && pnpm test && pnpm dev --filter examples"
+    "flow": "pnpm build && pnpm test && pnpm dev --filter examples",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish"
   },
   "keywords": [],
   "author": "",
@@ -34,6 +37,7 @@
     }
   },
   "devDependencies": {
+    "@changesets/cli": "^2.30.0",
     "@g-motion/test-utils": "workspace:*",
     "@rslib/core": "^0.18.3",
     "@types/node": "^24.10.1",
