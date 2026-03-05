@@ -1,5 +1,5 @@
-import type { MotionPlugin } from '@g-motion/core';
-import { registerPlugin } from '@g-motion/core';
+import type { MotionPlugin } from '@g-motion/protocol';
+import { registerPlugin } from '@g-motion/protocol';
 import { InertiaComponentSchema } from './physics/schema';
 import inertiaShaderCode from './shaders/inertia.wgsl?raw';
 

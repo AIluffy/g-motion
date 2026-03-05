@@ -322,65 +322,10 @@ export interface ShaderDef {
   bindings?: ShaderBindingDef[];
 }
 
-export interface MotionPlugin {
-  name: string;
-  version?: string;
-
-  manifest: PluginManifest;
-}
-
-/**
- * Global plugin registry for auto-discovery
- */
-const PLUGIN_REGISTRY: MotionPlugin[] = [];
-
-/**
- * Registered plugin names for idempotency checking
- */
-const REGISTERED_PLUGIN_NAMES = new Set<string>();
-
-/**
- * Register a plugin in the global registry for auto-discovery
- *
- * @param plugin - The plugin to register
- * @returns true if registered successfully, false if already registered (idempotent)
- */
-export function registerPlugin(plugin: MotionPlugin): boolean {
-  // Idempotent registration - don't register twice
-  if (REGISTERED_PLUGIN_NAMES.has(plugin.name)) {
-    return false;
-  }
-
-  PLUGIN_REGISTRY.push(plugin);
-  REGISTERED_PLUGIN_NAMES.add(plugin.name);
-  return true;
-}
-
-/**
- * Get all registered plugins
- *
- * @returns Array of registered plugins
- */
-export function getRegisteredPlugins(): readonly MotionPlugin[] {
-  return PLUGIN_REGISTRY;
-}
-
-/**
- * Clear the plugin registry (for test isolation)
- *
- * @warning This will remove all registered plugins. Use with caution.
- */
-export function clearPluginRegistry(): void {
-  PLUGIN_REGISTRY.length = 0;
-  REGISTERED_PLUGIN_NAMES.clear();
-}
-
-/**
- * Check if a plugin is already registered
- *
- * @param pluginName - Name of the plugin to check
- * @returns true if the plugin is registered
- */
-export function isPluginRegistered(pluginName: string): boolean {
-  return REGISTERED_PLUGIN_NAMES.has(pluginName);
-}
+export type { MotionPlugin } from '@g-motion/protocol';
+export {
+  clearPluginRegistry,
+  getRegisteredPlugins,
+  isPluginRegistered,
+  registerPlugin,
+} from '@g-motion/protocol';

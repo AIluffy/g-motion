@@ -16,7 +16,8 @@
   ],
   "dependencies": {
     "@g-motion/shared": "workspace:*",
-    "@g-motion/webgpu": "workspace:*"
+    "@g-motion/webgpu": "workspace:*",
+    "@g-motion/protocol": "workspace:*"
   },
   "scripts": {
     "build": "rslib build",
