@@ -1,20 +1,80 @@
-import {
-  GPUBatchMetric,
-  GPUBatchStatus as CoreGPUBatchStatus,
-  SystemTimingStat,
-  getGPUMetricsProvider,
-} from '@g-motion/webgpu';
-
 /**
  * GPU Batch Processing Status Query API
  *
  * Provides public methods to query the status and metrics of GPU batch processing.
  */
 
-export type GPUBatchStatus = CoreGPUBatchStatus;
-export type GPUBatchMetrics = GPUBatchMetric;
+export interface GPUBatchStatus {
+  enabled: boolean;
+  webgpuAvailable: boolean;
+  gpuInitialized: boolean;
+  frameTimeMs: number;
+  outputFormatPoolStats?: unknown;
+  [key: string]: unknown;
+}
+
+export interface GPUBatchMetrics {
+  [key: string]: unknown;
+}
+
+export interface SystemTimingStat {
+  [key: string]: unknown;
+}
 
 export type SystemTimings = Record<string, SystemTimingStat>;
+
+type GPUMetricsProviderLike = {
+  getStatus(): GPUBatchStatus;
+  getMetrics(): GPUBatchMetrics[];
+  clear(): void;
+  getSystemTimings?(): SystemTimings;
+};
+
+type WebGPUStatusModule = {
+  getGPUMetricsProvider: () => GPUMetricsProviderLike;
+};
+
+const defaultStatus: GPUBatchStatus = {
+  enabled: false,
+  webgpuAvailable: false,
+  gpuInitialized: false,
+  frameTimeMs: 0,
+};
+
+const fallbackMetricsProvider: GPUMetricsProviderLike = {
+  getStatus: () => ({ ...defaultStatus }),
+  getMetrics: () => [],
+  clear: () => {},
+  getSystemTimings: () => ({}),
+};
+
+let webgpuStatusModule: WebGPUStatusModule | null = null;
+let webgpuStatusModuleLoadPromise: Promise<WebGPUStatusModule | null> | null = null;
+
+async function getWebGPUStatusModule(): Promise<WebGPUStatusModule | null> {
+  if (webgpuStatusModule) return webgpuStatusModule;
+  if (webgpuStatusModuleLoadPromise) return webgpuStatusModuleLoadPromise;
+
+  webgpuStatusModuleLoadPromise = import('@g-motion/webgpu')
+    .then((mod) => {
+      webgpuStatusModule = mod;
+      return mod;
+    })
+    .catch(() => null)
+    .finally(() => {
+      webgpuStatusModuleLoadPromise = null;
+    });
+
+  return webgpuStatusModuleLoadPromise;
+}
+
+function getGPUMetricsProviderSafe(): GPUMetricsProviderLike {
+  const provider = webgpuStatusModule?.getGPUMetricsProvider();
+  if (provider) return provider;
+
+  void getWebGPUStatusModule();
+  return fallbackMetricsProvider;
+}
 
 /**
  * Check if WebGPU is available in the current browser.
@@ -30,7 +90,7 @@ export function isGPUAvailable(): boolean {
  * @returns GPU batch status information
  */
 export function getGPUBatchStatus(): GPUBatchStatus {
-  const provider = getGPUMetricsProvider();
+  const provider = getGPUMetricsProviderSafe();
   const status = provider.getStatus();
   const webgpuAvailable = status.webgpuAvailable || isGPUAvailable();
 
@@ -42,7 +102,7 @@ export function getGPUBatchStatus(): GPUBatchStatus {
  * @returns Array of GPU batch metrics, newest first
  */
 export function getGPUMetrics(): GPUBatchMetrics[] {
-  return getGPUMetricsProvider().getMetrics();
+  return getGPUMetricsProviderSafe().getMetrics();
 }
 
 /**
@@ -51,7 +111,7 @@ export function getGPUMetrics(): GPUBatchMetrics[] {
  */
 export function getLatestGPUMetric(): GPUBatchMetrics | null {
   const metrics = getGPUMetrics();
-  return metrics.length > 0 ? metrics[0] : null;
+  return metrics.length > 0 ? metrics[0] ?? null : null;
 }
 
 /**
@@ -59,10 +119,10 @@ export function getLatestGPUMetric(): GPUBatchMetrics | null {
  * Useful for benchmarking to avoid old data.
  */
 export function clearGPUMetrics(): void {
-  getGPUMetricsProvider().clear();
+  getGPUMetricsProviderSafe().clear();
 }
 
 export function getSystemTimings(): SystemTimings {
-  const provider = getGPUMetricsProvider() as any;
-  return (provider.getSystemTimings?.() as SystemTimings | undefined) ?? {};
+  const provider = getGPUMetricsProviderSafe();
+  return provider.getSystemTimings?.() ?? {};
 }
