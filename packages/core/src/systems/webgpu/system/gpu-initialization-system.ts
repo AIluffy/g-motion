@@ -4,7 +4,6 @@ import { getGPUModuleSync } from '../../../gpu-bridge';
 import type { GPUMetricsProvider, WebGPUInitResult } from '../../../gpu-bridge/types';
 import type { WebGPUEngine } from '../../../gpu-bridge/types';
 
-
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,
   getCustomGpuEasings,
@@ -19,9 +18,7 @@ export async function ensureWebGPUInitialized(params: {
   const deps = buildInitDeps(metricsProvider);
   const gpu = getGPUModuleSync();
   if (!gpu) {
-    throw new Error(
-      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
-    );
+    throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
   }
   return gpu.ensureWebGPUInitialized({ engine, deps });
 }
@@ -35,9 +32,7 @@ export async function ensureWebGPUPipelines(params: {
   const deps = buildInitDeps(metricsProvider);
   const gpu = getGPUModuleSync();
   if (!gpu) {
-    throw new Error(
-      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
-    );
+    throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
   }
   await gpu.ensureWebGPUPipelines({ engine, device, deps });
 }
@@ -58,6 +53,7 @@ export function maybeSampleOutputFormatPoolStats(params: {
   if (!shouldSample) return;
 
   metricsProvider.updateStatus({
-    outputFormatPoolStats: getGPUModuleSync()?.getOutputFormatBufferPoolStats?.(device) ?? null,
+    outputFormatPoolStats:
+      getGPUModuleSync()?.getOutputFormatBufferPoolStats?.(device) ?? undefined,
   });
 }

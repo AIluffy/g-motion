@@ -8,18 +8,13 @@ export interface GPUBatchStatus {
   enabled: boolean;
   webgpuAvailable: boolean;
   gpuInitialized: boolean;
-  frameTimeMs: number;
+  frameTimeMs?: number;
   outputFormatPoolStats?: unknown;
-  [key: string]: unknown;
 }
 
-export interface GPUBatchMetrics {
-  [key: string]: unknown;
-}
+export type GPUBatchMetrics = object;
 
-export interface SystemTimingStat {
-  [key: string]: unknown;
-}
+export type SystemTimingStat = object;
 
 export type SystemTimings = Record<string, SystemTimingStat>;
 
@@ -111,7 +106,7 @@ export function getGPUMetrics(): GPUBatchMetrics[] {
  */
 export function getLatestGPUMetric(): GPUBatchMetrics | null {
   const metrics = getGPUMetrics();
-  return metrics.length > 0 ? metrics[0] ?? null : null;
+  return metrics.length > 0 ? (metrics[0] ?? null) : null;
 }
 
 /**

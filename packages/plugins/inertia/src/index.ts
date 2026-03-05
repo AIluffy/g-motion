@@ -1,4 +1,4 @@
-import type { MotionPlugin } from '@g-motion/protocol';
+import type { MotionPlugin } from '@g-motion/core';
 import { InertiaComponentSchema } from './physics/schema';
 import inertiaShaderCode from './shaders/inertia.wgsl?raw';
 
@@ -34,7 +34,6 @@ export const inertiaPlugin: MotionPlugin = {
     },
   },
 };
-
 
 // Re-export all exports from sub-modules
 export { InertiaComponentSchema } from './physics/schema';

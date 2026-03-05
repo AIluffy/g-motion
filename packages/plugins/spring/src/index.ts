@@ -1,4 +1,4 @@
-import type { MotionPlugin } from '@g-motion/protocol';
+import type { MotionPlugin } from '@g-motion/core';
 import { SpringComponentSchema } from './physics/schema';
 import springShaderCode from './shaders/spring.wgsl?raw';
 
@@ -34,7 +34,6 @@ export const springPlugin: MotionPlugin = {
     },
   },
 };
-
 
 // Re-export all exports from sub-modules
 export { SpringComponentSchema } from './physics/schema';

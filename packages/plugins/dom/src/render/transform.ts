@@ -1,5 +1,5 @@
 import { EXCLUDED_STYLE_KEYS } from '@g-motion/shared/transform';
-import type { TransformTypedBuffers } from '@g-motion/shared';
+import type { TransformTypedBuffers } from '@g-motion/shared/transform';
 
 export type { TransformTypedBuffers };
 

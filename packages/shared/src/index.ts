@@ -19,5 +19,6 @@ export { NonNegativeRollingAverage } from './math/rolling-average';
 
 export * from './types';
 export * from './constants';
+export type { TransformProperties, TransformOrigin, Rotate3D, Quaternion } from './transform/types';
 
 export { TimelineTracksMap } from './timeline';

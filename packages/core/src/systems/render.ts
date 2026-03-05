@@ -121,13 +121,17 @@ function processGroupBatch(
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
 ): void {
   try {
+    const rendererTransformTypedBuffers: RendererBatchContext['transformTypedBuffers'] = {};
+    for (const [key, value] of Object.entries(transformTypedBuffers)) {
+      rendererTransformTypedBuffers[key] = value instanceof Int32Array ? undefined : value;
+    }
     const ctxBatch: RendererBatchContext = {
       world,
       archetypeId,
       entityIds: Array.from(activeData.entityIds),
       targets: activeData.targets,
       componentBuffers: componentBufferMap,
-      transformTypedBuffers,
+      transformTypedBuffers: rendererTransformTypedBuffers,
     };
     renderer.preFrame?.();
     renderer.updateBatch!.call(renderer, ctxBatch);

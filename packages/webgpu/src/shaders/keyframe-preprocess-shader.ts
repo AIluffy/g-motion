@@ -6,6 +6,7 @@
  */
 
 import { getEasingId } from '@g-motion/shared';
+import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '../runtime/types';
 import keyframeEntryExpandShaderCode from './keyframe-entry-expand.wgsl?raw';
 import keyframeInterpFromSearchShaderCode from './keyframe-interp-from-search.wgsl?raw';
 import keyframePreprocessShaderCode from './keyframe-preprocess.wgsl?raw';
@@ -143,22 +144,6 @@ export function easingStringToType(easing: string | undefined): number {
   if (easing === 'hold') return EASING_TYPE.HOLD;
   return getEasingId(easing);
 }
-
-export interface RawKeyframeGenerationOptions {
-  timeInterval: number;
-  maxSubdivisionsPerSegment?: number;
-}
-
-export type RawKeyframeValueEvaluator = (
-  keyframe: {
-    startTime: number;
-    time: number;
-    startValue: number;
-    endValue: number;
-    easing: unknown;
-  },
-  t: number,
-) => number;
 
 export function generateRawKeyframesForTrack(
   track: Array<{

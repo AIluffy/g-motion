@@ -103,6 +103,22 @@ export interface PhysicsBatchDescriptor extends WorkgroupBatchDescriptor {
   bindGroup?: GPUBindGroup;
 }
 
+export interface RawKeyframeGenerationOptions {
+  timeInterval: number;
+  maxSubdivisionsPerSegment?: number;
+}
+
+export type RawKeyframeValueEvaluator = (
+  keyframe: {
+    startTime: number;
+    time: number;
+    startValue: number;
+    endValue: number;
+    easing: unknown;
+  },
+  t: number,
+) => number;
+
 /**
  * 原型批处理描述符联合类型
  */

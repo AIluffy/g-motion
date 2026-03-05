@@ -8,7 +8,7 @@ import {
   TRANSFORM_TYPED_KEYS,
   buildTransformTypedBuffers,
   type TransformTypedBuffers,
-} from '@g-motion/shared';
+} from '@g-motion/shared/transform';
 import { Archetype } from '../ecs/archetype';
 
 /**
@@ -33,7 +33,7 @@ export const TRANSFORM_FIELDS = TRANSFORM_TYPED_KEYS;
  */
 export function extractTransformTypedBuffers(archetype: Archetype): TransformTypedBuffers {
   return buildTransformTypedBuffers(
-    (component, field) => archetype.getTypedBuffer(component, field),
+    (component: string, field: string) => archetype.getTypedBuffer(component, field),
     TRANSFORM_FIELDS,
   );
 }

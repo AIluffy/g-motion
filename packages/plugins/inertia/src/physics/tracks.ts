@@ -1,4 +1,4 @@
-import type { TimelineData } from '@g-motion/protocol';
+import type { TimelineData } from '@g-motion/shared';
 import type { InertiaOptions } from '../types';
 
 /**

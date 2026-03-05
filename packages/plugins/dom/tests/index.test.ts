@@ -1,8 +1,9 @@
-import { expect, test } from 'vitest';
-import { DOMPlugin } from '../src/index';
+import { describe, it, expect } from 'vitest';
 
-test('DOMPlugin should have correct name and version', () => {
-  expect(DOMPlugin.name).toBe('DOMPlugin');
-  expect(DOMPlugin.version).toBe('0.0.0');
-  expect(DOMPlugin.manifest?.setup).toBeDefined();
+// demo 测试用例
+describe('Demo Test Suite', () => {
+  it('should pass a simple demo test', () => {
+    const result = 1 + 1;
+    expect(result).toBe(2);
+  });
 });

@@ -1,5 +1,5 @@
 import type { RendererDef } from '@g-motion/protocol';
-import { TRANSFORM_TYPED_KEYS, createDebugger, resolveDomElements } from '@g-motion/shared';
+import { TRANSFORM_TYPED_KEYS, createDebugger } from '@g-motion/shared';
 import { DomStyleBatcher, initializeElementForGPU } from './style-batcher';
 import {
   buildTransformString,
@@ -7,6 +7,7 @@ import {
   resolveTransformValues,
   TransformTyped,
 } from './transform';
+import { resolveDomElements } from '../utils/dom/target-resolver';
 
 const debug = createDebugger('DOMRenderer');
 

@@ -1,12 +1,8 @@
 import type {
-  ComponentDef,
-  ComponentType,
-  ComponentValue,
-  RendererBatchContext,
-  RendererDef,
   MotionApp as MotionAppBase,
+  RendererDef,
   ShaderBindingDef,
-  ShaderDef,
+  MotionPlugin as ProtocolMotionPlugin,
   SystemContext as ProtocolSystemContext,
   SystemDef,
 } from '@g-motion/protocol';
@@ -26,7 +22,7 @@ export type {
 /**
  * Configuration options for Motion animation engine.
  */
-export interface MotionAppConfig {
+export interface MotionAppConfig extends Record<string, unknown> {
   globalSpeed?: number;
   targetFps?: number;
   frameDuration?: number;
@@ -224,7 +220,7 @@ export interface EngineServices {
   app: MotionApp;
   config: NormalizedMotionAppConfig;
   batchProcessor: import('../systems/batch').ComputeBatchProcessor;
-  metrics: { clear: () => void };
+  metrics: import('../gpu-bridge/types').GPUMetricsProvider;
   appContext: import('./context').AppContext;
 }
 
@@ -283,9 +279,9 @@ export interface PluginManifest {
   setup?(app: MotionApp, services?: EngineServices): void;
 }
 
-export type { ShaderBindingDef, ShaderDef } from '@g-motion/protocol';
-
-export type { MotionPlugin } from '@g-motion/protocol';
+export type MotionPlugin = Omit<ProtocolMotionPlugin, 'manifest'> & {
+  manifest: PluginManifest;
+};
 export {
   clearPluginRegistry,
   getRegisteredPlugins,

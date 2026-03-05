@@ -1,4 +1,4 @@
-import type { TimelineData, Keyframe } from '@g-motion/protocol';
+import type { TimelineData } from '@g-motion/shared';
 import type { SpringOptions } from '../types';
 
 /**

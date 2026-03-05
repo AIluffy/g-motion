@@ -1,4 +1,4 @@
-import type { MotionPlugin } from '@g-motion/protocol';
+import type { MotionPlugin } from './plugin';
 
 const pluginRegistry: MotionPlugin[] = [];
 const pluginNames = new Set<string>();

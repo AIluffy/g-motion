@@ -1,8 +1,12 @@
 import { getEasingId } from '@g-motion/shared';
-import { EASING_MODE } from '../../gpu-bridge';
-import { MIN_GPU_KEYFRAME_DURATION } from './constants';
+import {
+  EASING_MODE_BEZIER,
+  EASING_MODE_HOLD,
+  EASING_MODE_STANDARD,
+  MIN_GPU_KEYFRAME_DURATION,
+} from './constants';
 
-type EasingMode = (typeof EASING_MODE)[keyof typeof EASING_MODE];
+type EasingMode = typeof EASING_MODE_STANDARD | typeof EASING_MODE_BEZIER | typeof EASING_MODE_HOLD;
 
 export type KeyframeBezier = {
   cx1: number;
@@ -24,9 +28,9 @@ export interface KeyframeLike {
 export function packSingleKeyframe(kf: KeyframeLike, buffer: Float32Array, offset: number): void {
   const easingName = kf.easing ? (kf.easing as string) : 'linear';
   const easingId = getEasingId(easingName);
-  let easingMode: EasingMode = EASING_MODE.STANDARD;
-  if (kf.interp === 'hold') easingMode = EASING_MODE.HOLD;
-  else if (kf.bezier || kf.interp === 'bezier') easingMode = EASING_MODE.BEZIER;
+  let easingMode: EasingMode = EASING_MODE_STANDARD;
+  if (kf.interp === 'hold') easingMode = EASING_MODE_HOLD;
+  else if (kf.bezier || kf.interp === 'bezier') easingMode = EASING_MODE_BEZIER;
 
   const startTime = kf.startTime ?? 0;
   const duration = (kf.time ?? 0) - startTime;

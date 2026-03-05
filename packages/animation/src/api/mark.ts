@@ -11,15 +11,7 @@ import {
   registerTargetResolverWithScope as registerTargetResolverWithScopeCore,
   resolveWithRegisteredTargetResolvers,
 } from '@g-motion/core';
-import {
-  createDebugger,
-  isArrayLike,
-  isDev,
-  isDomElement,
-  isNodeList,
-  panic,
-  resolveDomElements,
-} from '@g-motion/shared';
+import { createDebugger, isDev, panic } from '@g-motion/shared';
 import type { Easing } from '@g-motion/shared';
 import type { AnimatableProps, StaggerValue } from '../types/targets';
 
@@ -49,6 +41,25 @@ export enum TargetType {
 
 const debugResolveTargets = createDebugger('Animation:resolveTargets');
 const warnTargets = createDebugger('Targets', 'warn');
+
+function isDomElement(value: unknown): value is Element {
+  return typeof Element !== 'undefined' && value instanceof Element;
+}
+
+function isNodeList(value: unknown): value is NodeListOf<Node> {
+  return typeof NodeList !== 'undefined' && value instanceof NodeList;
+}
+
+function isArrayLike(value: unknown): value is ArrayLike<unknown> {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return true;
+  if (typeof (value as { length?: unknown }).length !== 'number') return false;
+  return !isNodeList(value);
+}
+
+function resolveDomElements(selector: string, rootNode: Element | Document): Element[] {
+  return Array.from(rootNode.querySelectorAll(selector));
+}
 
 export function resolveTimeValue(
   opts: MarkOptions,

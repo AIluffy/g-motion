@@ -30,7 +30,6 @@
     "@g-motion/webgpu": "workspace:*"
   },
   "dependencies": {
-    "@g-motion/core": "workspace:*",
     "@g-motion/values": "workspace:*"
   }
 }

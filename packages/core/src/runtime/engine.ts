@@ -5,6 +5,7 @@ import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
 import type { SystemScheduler } from '../scheduler/scheduler';
+import type { GPUMetricsProvider } from '../gpu-bridge/types';
 import { preloadWebGPUModule } from '../gpu-bridge';
 import { World } from './world';
 import { WorldProvider } from './world-provider';
@@ -12,17 +13,56 @@ import { WorldProvider } from './world-provider';
 const warn = createDebugger('MotionEngine', 'warn');
 
 async function tryImportWebGPUInternal(): Promise<null | {
-  getGPUMetricsProvider: () => { clear: () => void };
+  getGPUMetricsProvider: () => GPUMetricsProvider;
   resetWebGPUEngine: () => void;
 }> {
   try {
     return (await import('@g-motion/webgpu/internal')) as {
-      getGPUMetricsProvider: () => { clear: () => void };
+      getGPUMetricsProvider: () => GPUMetricsProvider;
       resetWebGPUEngine: () => void;
     };
   } catch {
     return null;
   }
+}
+
+function createNoopGPUMetricsProvider(): GPUMetricsProvider {
+  let status: ReturnType<GPUMetricsProvider['getStatus']> = {
+    enabled: false,
+    activeEntityCount: 0,
+    threshold: 1000,
+    webgpuAvailable: false,
+    gpuInitialized: false,
+  };
+  return {
+    getStatus: () => status,
+    updateStatus: (update) => {
+      status = { ...status, ...update };
+      return status;
+    },
+    recordMetric: () => {},
+    getMetrics: () => [],
+    clear: () => {
+      status = {
+        enabled: false,
+        activeEntityCount: 0,
+        threshold: 1000,
+        webgpuAvailable: false,
+        gpuInitialized: false,
+      };
+    },
+    seedFromLegacy: (input) => {
+      if (input.gpuInitialized != null || input.webgpuAvailable != null) {
+        status = {
+          ...status,
+          gpuInitialized: input.gpuInitialized ?? status.gpuInitialized,
+          webgpuAvailable: input.webgpuAvailable ?? status.webgpuAvailable,
+        };
+      }
+    },
+    getArchetypeTimings: () => new Map(),
+    calculateDynamicThreshold: (baseThreshold = 1000) => baseThreshold,
+  };
 }
 
 async function tryClearPipelineCache(): Promise<void> {
@@ -35,7 +75,6 @@ async function tryClearPipelineCache(): Promise<void> {
     // Ignore when WebGPU systems are unavailable.
   }
 }
-
 
 export interface MotionEngine {
   readonly services: EngineServices;
@@ -75,7 +114,7 @@ class MotionEngineImpl implements MotionEngine {
 
     const appContext = getAppContext();
     const batchProcessor = appContext.getBatchProcessor();
-    const metrics = { clear: () => void 0 } as EngineServices['metrics'];
+    const metrics = createNoopGPUMetricsProvider();
 
     this.services = {
       world: this.world,
@@ -89,6 +128,11 @@ class MotionEngineImpl implements MotionEngine {
 
     this.scheduler.setServices(this.services);
     void preloadWebGPUModule();
+    void tryImportWebGPUInternal().then((mod) => {
+      if (mod?.getGPUMetricsProvider) {
+        this.services.metrics = mod.getGPUMetricsProvider();
+      }
+    });
   }
 
   get disposed(): boolean {
@@ -131,7 +175,6 @@ class MotionEngineImpl implements MotionEngine {
 
     manifest.setup?.(this.app, this.services);
   }
-
 
   setComputeProvider(provider: ComputeProvider): void {
     this.computeProvider = provider;

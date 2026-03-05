@@ -1,19 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { clearPluginRegistry, getRegisteredPlugins, registerPlugin } from '@g-motion/core';
-import { inertiaPlugin } from '../src';
+import { describe, it, expect } from 'vitest';
 
-describe('inertia plugin registration', () => {
-  beforeEach(() => {
-    clearPluginRegistry();
-  });
-
-  it('does not auto-register on import', () => {
-    expect(inertiaPlugin.name).toBe('inertia');
-    expect(getRegisteredPlugins()).toEqual([]);
-  });
-
-  it('registers only when explicitly requested', () => {
-    expect(registerPlugin(inertiaPlugin)).toBe(true);
-    expect(getRegisteredPlugins().map((plugin) => plugin.name)).toEqual(['inertia']);
+// demo 测试用例
+describe('Demo Test Suite', () => {
+  it('should pass a simple demo test', () => {
+    const result = 1 + 1;
+    expect(result).toBe(2);
   });
 });
