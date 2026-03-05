@@ -26,7 +26,8 @@
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
     "typescript": "workspace:*",
-    "vitest": "workspace:*"
+    "vitest": "workspace:*",
+    "@g-motion/webgpu": "workspace:*"
   },
   "dependencies": {
     "@g-motion/core": "workspace:*",
