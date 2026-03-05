@@ -29,12 +29,21 @@ export type {
   GPUChannelCapability,
   GPUBufferCapability,
   GPUComputeCapability,
-  GPUInitResult,
   GPUBatchRequest,
   GPUPhysicsBatchRequest,
   GPUResultEntry,
   GPUMetrics,
 } from './gpu-bridge';
+export type {
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+  GPUBatchDescriptor,
+  PhysicsBatchDescriptor,
+  ArchetypeBatchDescriptor,
+  GPUMetricsProvider,
+  GPUInitResult,
+  GPUResultPacket,
+} from './gpu-orchestration';
 
 export type { PlatformCapabilities, PlatformProvider } from './platform';
 export type { ShaderBindingDef, ShaderDef } from './shader';

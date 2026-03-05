@@ -1,13 +1,5 @@
-// --- GPU result delivery queue (Phase 1: primitive channel) ---
-export type GPUResultPacket = {
-  archetypeId: string;
-  entityIds: ArrayLike<number>;
-  values: Float32Array; // one value per entity (primitive)
-  // Phase 4: Multi-channel support
-  stride?: number; // values per entity (default 1)
-  channels?: Array<{ index: number; property: string }>; // channel mapping (optional)
-  finished?: Uint32Array; // optional per-slot finished flags (1 finished, 0 active)
-};
+import type { GPUResultPacket } from '@g-motion/protocol';
+export type { GPUResultPacket } from '@g-motion/protocol';
 
 export class GPUSyncManager {
   private resultQueue: GPUResultPacket[] = [];

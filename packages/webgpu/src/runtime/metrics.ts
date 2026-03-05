@@ -1,4 +1,5 @@
 import { createDebugger, isDev } from '@g-motion/shared';
+import type { GPUMetricsProvider as ProtocolGPUMetricsProvider } from '@g-motion/protocol';
 import type { OutputFormatPoolStats } from '../output-format';
 
 const debug = createDebugger('GPUMetrics');
@@ -63,7 +64,7 @@ export interface GPUMemoryStats {
   timestamp: number;
 }
 
-export interface GPUMetricsProvider {
+export interface GPUMetricsProvider extends ProtocolGPUMetricsProvider {
   getStatus(): GPUBatchStatus;
   updateStatus(update: Partial<GPUBatchStatus>): GPUBatchStatus;
   recordMetric(metric: GPUBatchMetric): void;

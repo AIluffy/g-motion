@@ -1,20 +1,36 @@
 import type { GPUModuleFacade } from './lazy-loader';
-import type * as WebGPUInternal from '../internal';
+import type {
+  ArchetypeBatchDescriptor,
+  GPUBatchDescriptor,
+  PhysicsBatchDescriptor,
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+  GPUResultPacket,
+} from '@g-motion/protocol';
+import type { ChannelMapping } from '../runtime/channels';
+import type { GPUBatchWithPreprocessedKeyframes } from '../runtime/types';
+import type { GPUMetricsProvider } from '../runtime/metrics';
+import type { InitConfig, WebGPUInitResult } from '../runtime/init';
+import type { PendingReadback } from '../runtime/async-readback';
+import type { ProcessOutputBufferInput } from '../output-format/output-buffer-processing';
+import type { WebGPUEngine } from '../runtime/engine';
+import type { WebGPUFrameEncoder } from '../runtime/encoder';
 
 export type { GPUModuleFacade };
-
-export type ArchetypeBatchDescriptor = WebGPUInternal.ArchetypeBatchDescriptor;
-export type ChannelMapping = WebGPUInternal.ChannelMapping;
-export type GPUBatchDescriptor = WebGPUInternal.GPUBatchDescriptor;
-export type GPUBatchWithPreprocessedKeyframes = WebGPUInternal.GPUBatchWithPreprocessedKeyframes;
-export type GPUMetricsProvider = WebGPUInternal.GPUMetricsProvider;
-export type GPUResultPacket = WebGPUInternal.GPUResultPacket;
-export type InitConfig = WebGPUInternal.InitConfig;
-export type PendingReadback = WebGPUInternal.PendingReadback;
-export type PhysicsBatchDescriptor = WebGPUInternal.PhysicsBatchDescriptor;
-export type ProcessOutputBufferInput = WebGPUInternal.ProcessOutputBufferInput;
-export type RawKeyframeGenerationOptions = WebGPUInternal.RawKeyframeGenerationOptions;
-export type RawKeyframeValueEvaluator = WebGPUInternal.RawKeyframeValueEvaluator;
-export type WebGPUEngine = WebGPUInternal.WebGPUEngine;
-export type WebGPUFrameEncoder = WebGPUInternal.WebGPUFrameEncoder;
-export type WebGPUInitResult = WebGPUInternal.WebGPUInitResult;
+export type {
+  ArchetypeBatchDescriptor,
+  ChannelMapping,
+  GPUBatchDescriptor,
+  GPUBatchWithPreprocessedKeyframes,
+  GPUMetricsProvider,
+  GPUResultPacket,
+  InitConfig,
+  PendingReadback,
+  PhysicsBatchDescriptor,
+  ProcessOutputBufferInput,
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+  WebGPUEngine,
+  WebGPUFrameEncoder,
+  WebGPUInitResult,
+};

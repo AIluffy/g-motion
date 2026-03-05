@@ -8,8 +8,11 @@
 import type {
   PreprocessedKeyframes,
   LeasedBatchDescriptor,
-  WorkgroupBatchDescriptor,
-} from '@g-motion/shared';
+  ArchetypeBatchDescriptor as ProtocolArchetypeBatchDescriptor,
+  GPUBatchDescriptor as ProtocolGPUBatchDescriptor,
+  PhysicsBatchDescriptor as ProtocolPhysicsBatchDescriptor,
+} from '@g-motion/protocol';
+export type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '@g-motion/protocol';
 
 /**
  * GPU Buffer 集合
@@ -28,101 +31,29 @@ export interface GPUBatchBuffers {
  * GPU 批处理描述符
  * 用于标准动画插值计算
  */
-export interface GPUBatchDescriptor extends WorkgroupBatchDescriptor {
-  kind?: 'interpolation';
-  /** 原型 ID */
-  archetypeId: string;
-  /** 实体 ID 列表 */
-  entityIds: ArrayLike<number>;
-  /** 实体数量 */
-  entityCount: number;
-  /** 实体 ID 缓冲区租赁 ID */
-  entityIdsLeaseId?: number;
-  /** 动画状态数据 */
-  statesData: Float32Array;
-  /** 关键帧数据 */
-  keyframesData: Float32Array;
-  /** 状态数据版本号 */
-  statesVersion?: number;
-  /** 关键帧数据版本号 */
-  keyframesVersion?: number;
-  /** 实体签名 */
-  entitySig?: number;
-  /** 预处理后关键帧数据 */
-  preprocessedKeyframes?: PreprocessedKeyframes;
+export interface GPUBatchDescriptor extends ProtocolGPUBatchDescriptor {
   /** GPU 缓冲区集合 */
   gpuBuffers?: GPUBatchBuffers;
   /** WebGPU 绑定组 */
   bindGroup?: GPUBindGroup;
-  /** 创建时间戳 */
-  createdAt: number;
 }
 
 /**
  * 物理批处理描述符
  * 用于物理动画（弹簧、惯性）计算
  */
-export interface PhysicsBatchDescriptor extends WorkgroupBatchDescriptor {
-  kind: 'physics';
-  /** 原型 ID */
-  archetypeId: string;
-  /** 实体 ID 列表 */
-  entityIds: ArrayLike<number>;
-  /** 实体数量 */
-  entityCount: number;
-  /** 实体 ID 缓冲区租赁 ID */
-  entityIdsLeaseId?: number;
-  /** 物理配置 */
-  physics: {
-    /** 基础原型 ID */
-    baseArchetypeId: string;
-    /** 状态数据步长 */
-    stride: number;
-    /** 通道配置 */
-    channels: Array<{ index: number; property: string }>;
-    /** 槽位数量 */
-    slotCount: number;
-    /** 状态数据 */
-    stateData?: Float32Array;
-    /** 状态数据版本 */
-    stateVersion?: number;
-  };
-  /** 创建时间戳 */
-  createdAt: number;
-  /** 可选状态数据（与 physics.stateData 冗余，保留以兼容旧代码） */
-  statesData?: Float32Array;
-  /** 可选关键帧数据 */
-  keyframesData?: Float32Array;
-  /** 关键帧数据版本 */
-  keyframesVersion?: number;
-  /** 预处理后关键帧数据 */
-  preprocessedKeyframes?: PreprocessedKeyframes;
+export interface PhysicsBatchDescriptor extends ProtocolPhysicsBatchDescriptor {
   /** GPU 缓冲区集合 */
   gpuBuffers?: GPUBatchBuffers;
   /** WebGPU 绑定组 */
   bindGroup?: GPUBindGroup;
 }
 
-export interface RawKeyframeGenerationOptions {
-  timeInterval: number;
-  maxSubdivisionsPerSegment?: number;
-}
-
-export type RawKeyframeValueEvaluator = (
-  keyframe: {
-    startTime: number;
-    time: number;
-    startValue: number;
-    endValue: number;
-    easing: unknown;
-  },
-  t: number,
-) => number;
-
 /**
  * 原型批处理描述符联合类型
  */
-export type ArchetypeBatchDescriptor = GPUBatchDescriptor | PhysicsBatchDescriptor;
+export type ArchetypeBatchDescriptor = ProtocolArchetypeBatchDescriptor &
+  (GPUBatchDescriptor | PhysicsBatchDescriptor);
 
 /**
  * 关键帧预处理批处理描述符
