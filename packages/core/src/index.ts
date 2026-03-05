@@ -27,11 +27,3 @@ export * from './utils';
 export * from './runtime/world';
 export * from './runtime/world-provider';
 
-export {
-  type Plugin,
-  type PluginContext,
-  definePlugin,
-  type Disposable,
-  type FrameCallback,
-  type Priority,
-} from '@g-motion/protocol';

@@ -13,6 +13,7 @@
 - Favor small, focused changes; avoid per-frame allocations in core systems (Archetype, scheduler, batch/webgpu).
 - Performance-critical changes should include benchmark tests (packages/*/benchmarks/) to verify improvements.
 - Use centralized types from @g-motion/core/types; avoid duplicate type definitions.
+- 协议层符号（如 `definePlugin`、`FrameCallback`、`Priority`、`Plugin`、`PluginContext`、`Disposable`）统一从 `@g-motion/protocol` 导入，避免从 `@g-motion/core` 间接导入。
 - Access shared resources via AppContext singleton (avoid globalThis).
 
 ## ECS Module Split Rules (Hard Requirements)
