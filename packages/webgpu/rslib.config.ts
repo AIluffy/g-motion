@@ -15,6 +15,7 @@ export default defineConfig({
       buffer: './src/buffer.ts',
       wgsl: './src/wgsl.ts',
       engine: './src/engine.ts',
+      shaders: './src/shaders.ts',
     },
   },
 });

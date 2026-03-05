@@ -37,6 +37,11 @@
       "types": "./dist/engine.d.ts",
       "import": "./dist/engine.js",
       "require": "./dist/engine.cjs"
+    },
+    "./shaders": {
+      "types": "./dist/shaders.d.ts",
+      "import": "./dist/shaders.js",
+      "require": "./dist/shaders.cjs"
     }
   },
   "main": "./dist/index.cjs",
