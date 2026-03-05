@@ -41,6 +41,14 @@ type TrackMarkOptions = Pick<
   'duration' | 'ease' | 'interp' | 'bezier' | 'spring' | 'inertia'
 >;
 
+/**
+ * Create a MotionBuilder for target(s).
+ *
+ * Physics plugins are opt-in: call `registerPlugin(springPlugin | inertiaPlugin)`
+ * before using `spring` / `inertia` marks, or import
+ * `@g-motion/plugin-spring/auto-register` and/or
+ * `@g-motion/plugin-inertia/auto-register`.
+ */
 export function motion<T extends MotionTarget>(
   target: T,
   opts?: { world?: World; scope?: DomAnimationScope },

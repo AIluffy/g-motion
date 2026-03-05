@@ -1,9 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { clearPluginRegistry, getRegisteredPlugins, registerPlugin } from '@g-motion/core';
+import { springPlugin } from '../src';
 
-// demo 测试用例
-describe('Demo Test Suite', () => {
-  it('should pass a simple demo test', () => {
-    const result = 1 + 1;
-    expect(result).toBe(2);
+describe('spring plugin registration', () => {
+  beforeEach(() => {
+    clearPluginRegistry();
+  });
+
+  it('does not auto-register on import', () => {
+    expect(springPlugin.name).toBe('spring');
+    expect(getRegisteredPlugins()).toEqual([]);
+  });
+
+  it('registers only when explicitly requested', () => {
+    expect(registerPlugin(springPlugin)).toBe(true);
+    expect(getRegisteredPlugins().map((plugin) => plugin.name)).toEqual(['spring']);
   });
 });
