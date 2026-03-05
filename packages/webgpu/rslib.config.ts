@@ -11,6 +11,10 @@ export default defineConfig({
       public: './src/public.ts',
       internal: './src/internal.ts',
       testing: './src/testing.ts',
+      compute: './src/compute.ts',
+      buffer: './src/buffer.ts',
+      wgsl: './src/wgsl.ts',
+      engine: './src/engine.ts',
     },
   },
 });
