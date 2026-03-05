@@ -1,7 +1,7 @@
 import type { MotionApp, MotionPlugin, TargetResolver } from '@g-motion/protocol';
-import { registerTargetResolver } from '@g-motion/core';
+import { registerPlatformProvider, registerTargetResolver } from '@g-motion/core';
 import { createDebugger } from '@g-motion/shared';
-import { createDomTargetResolver } from '@g-motion/shared/dom';
+import { createDomTargetResolver, getDomEnvironment } from '@g-motion/shared/dom';
 import { TransformComponent } from './components/transform';
 import { createDOMRenderer, DOMRendererConfig } from './render/renderer';
 
@@ -48,6 +48,17 @@ export const createDOMPlugin = (options: DOMPluginOptions = {}): MotionPlugin =>
       if (typeof registerTargetResolver === 'function') {
         registerTargetResolver(domTargetResolver);
       }
+
+      registerPlatformProvider({
+        getCapabilities: () => {
+          const env = getDomEnvironment();
+          return {
+            hasDocument: () => env.hasDocument(),
+            hasWindow: () => env.hasWindow(),
+            createElement: (tag: string) => env.createElement(tag),
+          };
+        },
+      });
     },
   },
 });

@@ -4,6 +4,7 @@ export * from './runtime/engine';
 export * from './runtime/gpu-registry';
 export * from './runtime/plugin';
 export * from './runtime/target-resolver';
+export * from './runtime/platform-registry';
 export * from './runtime/world';
 export * from './runtime/world-provider';
 export * from './runtime/status';

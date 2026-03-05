@@ -24,3 +24,5 @@ export type {
   GPUMetrics,
 } from './gpu-bridge';
 
+
+export type { PlatformCapabilities, PlatformProvider } from './platform';

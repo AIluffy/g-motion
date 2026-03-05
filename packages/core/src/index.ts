@@ -11,6 +11,7 @@ export * from './runtime/gpu-registry';
 export * from './ecs/entities';
 export * from './runtime/plugin';
 export * from './runtime/target-resolver';
+export * from './runtime/platform-registry';
 export * from './ecs/registry';
 export * from './render/renderer-code';
 export * from './scheduler/scheduler';
