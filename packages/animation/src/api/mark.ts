@@ -1,4 +1,16 @@
-import { InertiaOptions, Keyframe, SpringOptions, TimelineData } from '@g-motion/core';
+import {
+  InertiaOptions,
+  Keyframe,
+  SpringOptions,
+  TimelineData,
+  type SelectorCache as CoreSelectorCache,
+  type TargetResolveContext as CoreTargetResolveContext,
+  type TargetResolver as CoreTargetResolver,
+  type TargetScopeRoot as CoreTargetScopeRoot,
+  registerTargetResolver as registerTargetResolverCore,
+  registerTargetResolverWithScope as registerTargetResolverWithScopeCore,
+  resolveWithRegisteredTargetResolvers,
+} from '@g-motion/core';
 import {
   createDebugger,
   isArrayLike,
@@ -101,9 +113,8 @@ export function getTargetType(target: unknown): TargetType {
   return TargetType.Object;
 }
 
-export type TargetScopeRoot = Element | Document | null | undefined;
-
-export type SelectorCache = Record<string, Element[]>;
+export type TargetScopeRoot = CoreTargetScopeRoot;
+export type SelectorCache = CoreSelectorCache;
 
 export type TargetResolutionOptions = {
   root?: TargetScopeRoot;
@@ -117,59 +128,23 @@ export type ResolvedTarget = {
   type: TargetType;
 };
 
-export type TargetResolveContext = {
-  root: TargetScopeRoot;
-  selectorCache: SelectorCache;
-  strictTargets: boolean;
-};
-
+export type TargetResolveContext = CoreTargetResolveContext;
 export type TargetResolveResult = ResolvedTarget[];
-
-export type TargetResolver = (
-  input: unknown,
-  ctx: TargetResolveContext,
-) => TargetResolveResult | null | undefined;
-
-const targetResolvers: TargetResolver[] = [];
-
-type ResolverNamespace = {
-  name: string;
-  resolvers: TargetResolver[];
-};
-
-const resolverNamespaces: ResolverNamespace[] = [
-  {
-    name: 'default',
-    resolvers: targetResolvers,
-  },
-];
+export type TargetResolver = CoreTargetResolver;
 
 export function registerTargetResolver(resolver: TargetResolver): void {
-  targetResolvers.push(resolver);
+  registerTargetResolverCore(resolver);
 }
 
-export function registerTargetResolverWithScope(
-  _scopeName: string,
-  resolver: TargetResolver,
-): void {
-  targetResolvers.push(resolver);
+export function registerTargetResolverWithScope(scopeName: string, resolver: TargetResolver): void {
+  registerTargetResolverWithScopeCore(scopeName, resolver);
 }
 
 function resolveWithRegisteredResolvers(
   input: unknown,
   ctx: TargetResolveContext,
 ): TargetResolveResult | null {
-  if (targetResolvers.length === 0) {
-    return null;
-  }
-  const activeResolvers = resolverNamespaces[0]?.resolvers ?? targetResolvers;
-  for (const resolver of activeResolvers) {
-    const resolved = resolver(input, ctx);
-    if (resolved && resolved.length > 0) {
-      return resolved;
-    }
-  }
-  return null;
+  return resolveWithRegisteredTargetResolvers(input, ctx) as unknown as TargetResolveResult | null;
 }
 
 function getRootDiagnostics(root: TargetScopeRoot): {

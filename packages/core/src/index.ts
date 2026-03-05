@@ -9,6 +9,7 @@ export * from './data';
 export * from './runtime/engine';
 export * from './ecs/entities';
 export * from './runtime/plugin';
+export * from './runtime/target-resolver';
 export * from './ecs/registry';
 export * from './render/renderer-code';
 export * from './scheduler/scheduler';

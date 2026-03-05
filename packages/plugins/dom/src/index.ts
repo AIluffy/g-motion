@@ -1,6 +1,6 @@
 import type { MotionApp, MotionPlugin } from '@g-motion/core';
+import { registerTargetResolver, type TargetResolver } from '@g-motion/core';
 import { createDebugger, createDomTargetResolver } from '@g-motion/shared';
-import { registerTargetResolver, TargetResolver, TargetType } from '@g-motion/animation';
 import { TransformComponent } from './components/transform';
 import { createDOMRenderer, DOMRendererConfig } from './render/renderer';
 
@@ -13,7 +13,7 @@ export interface DOMPluginOptions {
   rendererConfig?: DOMRendererConfig;
 }
 
-const domTargetResolver: TargetResolver = createDomTargetResolver(TargetType.DOM);
+const domTargetResolver: TargetResolver = createDomTargetResolver('dom');
 
 export const createDOMPlugin = (options: DOMPluginOptions = {}): MotionPlugin => ({
   name: 'DOMPlugin',

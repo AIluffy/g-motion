@@ -18,11 +18,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@g-motion/animation": "workspace:*",
     "@g-motion/core": "workspace:*",
     "@g-motion/shared": "workspace:*"
   },
   "devDependencies": {
+    "@g-motion/animation": "workspace:*",
     "@rslib/core": "^0.18.3",
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3",

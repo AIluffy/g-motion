@@ -207,9 +207,6 @@ importers:
 
   packages/plugins/dom:
     dependencies:
-      '@g-motion/animation':
-        specifier: workspace:*
-        version: link:../../animation
       '@g-motion/core':
         specifier: workspace:*
         version: link:../../core
@@ -217,6 +214,9 @@ importers:
         specifier: workspace:*
         version: link:../../shared
     devDependencies:
+      '@g-motion/animation':
+        specifier: workspace:*
+        version: link:../../animation
       '@rslib/core':
         specifier: ^0.18.3
         version: 0.18.3(typescript@5.9.3)
