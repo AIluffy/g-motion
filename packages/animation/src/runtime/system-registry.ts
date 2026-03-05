@@ -1,7 +1,6 @@
 import {
   ActiveEntityMonitorSystem,
   BatchSamplingSystem,
-  GPUResultApplySystem,
   MotionStateComponent,
   RenderComponent,
   RenderSystem,
@@ -9,9 +8,9 @@ import {
   TimelineComponent,
   TimelineSystem,
   TimeSystem,
-  WebGPUComputeSystem,
   World,
 } from '@g-motion/core';
+import { GPUResultApplySystem, WebGPUComputeSystem } from '@g-motion/webgpu/orchestration';
 import { createDebugger } from '@g-motion/shared';
 
 const debug = createDebugger('Animation');

@@ -22,9 +22,7 @@ export * from './systems/render';
 export * from './systems/roving-resolver';
 export * from './systems/time';
 export * from './systems/timeline';
-export * from './systems/webgpu';
-export * from './systems/webgpu/delivery';
+export * from './webgpu-systems';
 export * from './utils';
 export * from './runtime/world';
 export * from './runtime/world-provider';
-

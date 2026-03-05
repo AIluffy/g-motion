@@ -19,9 +19,9 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '../../gpu-bridge/types';
-import { getGPUModuleSync, getWebGPUTestingModule } from '../../gpu-bridge';
-import type { SystemContext, SystemDef } from '../../runtime/plugin';
+} from '../bridge/types';
+import { getGPUModuleSync, getWebGPUTestingModule } from '../bridge';
+import type { SystemContext, SystemDef } from '@g-motion/core/runtime';
 import type { GPUFrameContext } from './frame-context';
 import { createGPUFrameContext } from './frame-context';
 
@@ -34,18 +34,18 @@ import { processInterpolationArchetype } from './system/output-buffer-processor'
 import { dispatchPhysicsBatchForArchetype } from './system/physics-dispatch-system';
 import { processCompletedReadbacks } from './system/readback-processing-system';
 
-
-
 export const disableGPUOutputFormatPass = () => getGPUModuleSync()?.disableGPUOutputFormatPass?.();
 export const enableGPUOutputFormatPass = () => getGPUModuleSync()?.enableGPUOutputFormatPass?.();
-export const processOutputBuffer = (...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['processOutputBuffer']>) => {
+export const processOutputBuffer = (
+  ...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['processOutputBuffer']>
+) => {
   const gpu = getGPUModuleSync();
   if (!gpu) {
     throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
   }
   return gpu.processOutputBuffer(...args);
 };
-export type { ProcessOutputBufferInput } from '../../gpu-bridge/types';
+export type { ProcessOutputBufferInput } from '../bridge/types';
 export { debugIO, firstEntityChannelPreview, float32Preview } from './debug';
 export {
   clearPhysicsValidationShadow,
@@ -203,7 +203,7 @@ function resolveComputeDeps(ctx: SystemContext | undefined): {
 async function processArchetypeBatches(
   frameContext: GPUFrameContext,
   archetypeBatches: Map<string, ArchetypeBatchDescriptor>,
-  engine: import('../../gpu-bridge/types').WebGPUEngine,
+  engine: import('../bridge/types').WebGPUEngine,
 ): Promise<void> {
   const { device, services, flags, physics } = frameContext;
   const { world, processor, config, metricsProvider } = services;

@@ -3,8 +3,8 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '../../gpu-bridge/types';
-import { getGPUModuleSync } from '../../gpu-bridge';
+} from '../../runtime/gpu-types';
+import { getGPUModuleSync } from '../../runtime/gpu-access';
 import type { BatchStatistics } from './batch-statistics';
 import type { EntityIdLeasePool } from './entity-id-lease-pool';
 

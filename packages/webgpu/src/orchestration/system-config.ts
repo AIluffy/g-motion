@@ -1,4 +1,4 @@
-import type { NormalizedMotionAppConfig } from '../../runtime/plugin';
+import type { NormalizedMotionAppConfig } from '@g-motion/core/runtime';
 
 export type WebGPUReadbackMode = 'full' | 'visible';
 

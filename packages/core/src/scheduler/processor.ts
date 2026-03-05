@@ -1,5 +1,5 @@
 import { createDebugger, getNowMs, isFatalError } from '@g-motion/shared';
-import { getGPUModuleSync } from '../gpu-bridge';
+import { getGPUModuleSync } from '../runtime/gpu-access';
 import type {
   EngineServices,
   NormalizedMotionAppConfig,

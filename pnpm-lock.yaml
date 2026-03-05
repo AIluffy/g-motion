@@ -69,13 +69,13 @@ importers:
       '@g-motion/values':
         specifier: workspace:*
         version: link:../values
-      '@g-motion/webgpu':
-        specifier: workspace:*
-        version: link:../webgpu
     devDependencies:
       '@g-motion/test-utils':
         specifier: workspace:*
         version: link:../test-utils
+      '@g-motion/webgpu':
+        specifier: workspace:*
+        version: link:../webgpu
       '@rslib/core':
         specifier: ^0.18.3
         version: 0.18.3(typescript@5.9.3)
@@ -113,13 +113,7 @@ importers:
       '@g-motion/shared':
         specifier: workspace:*
         version: link:../shared
-      '@g-motion/webgpu':
-        specifier: workspace:*
-        version: link:../webgpu
     devDependencies:
-      '@g-motion/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       '@rslib/core':
         specifier: ^0.18.3
         version: 0.18.3(typescript@5.9.3)
@@ -306,6 +300,12 @@ importers:
 
   packages/webgpu:
     dependencies:
+      '@g-motion/core':
+        specifier: workspace:*
+        version: link:../core
+      '@g-motion/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@g-motion/shared':
         specifier: workspace:*
         version: link:../shared

@@ -1,5 +1,5 @@
 import { getNowMs } from '@g-motion/shared';
-import { getGPUModuleSync } from '../gpu-bridge';
+import { getGPUModuleSync } from '../runtime/gpu-access';
 import { WebGPUConstants } from '../constants';
 import type { EngineServices, SystemDef } from '../runtime/plugin';
 import { SchedulerLoop } from './loop';

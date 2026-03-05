@@ -13,9 +13,12 @@
  */
 
 import { getNowMs } from '@g-motion/shared';
-import { getGPUModuleSync } from '../../gpu-bridge';
-import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '../../gpu-bridge/types';
-import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '../../gpu-bridge/types';
+import { getGPUModuleSync } from '../../runtime/gpu-access';
+import type {
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+} from '../../runtime/gpu-types';
+import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '../../runtime/gpu-types';
 import { SchedulingConstants } from '../../constants';
 import type { SystemContext, SystemDef } from '../../runtime/plugin';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';
@@ -51,7 +54,9 @@ export const BatchSamplingSystem: SystemDef = {
     const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
     const config = world.config;
     const forcedWorkgroupSize = config.webgpu?.forceWorkgroupSize;
-    gpu.setForcedWorkgroupSize?.(typeof forcedWorkgroupSize === 'number' ? forcedWorkgroupSize : null);
+    gpu.setForcedWorkgroupSize?.(
+      typeof forcedWorkgroupSize === 'number' ? forcedWorkgroupSize : null,
+    );
     const timelineFlatEnabled = config.keyframe?.timelineFlat === true;
     const staticReuseEnabled = config.batchSamplingStaticReuse === true;
     const seekInvalidation = consumeBatchSamplingSeekInvalidation();

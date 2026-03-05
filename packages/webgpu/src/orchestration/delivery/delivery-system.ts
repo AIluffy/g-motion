@@ -5,12 +5,12 @@
  * Handles primitive values, transform matrices, and channel-specific formats.
  */
 
-import type { SystemContext, SystemDef } from '../../../runtime/plugin';
-import type { GPUResultPacket } from '../../../gpu-bridge/types';
-import { getGPUModuleSync } from '../../../gpu-bridge';
-import type { ChannelMapping } from '../../../gpu-bridge/types';
+import type { SystemContext, SystemDef } from '@g-motion/core/runtime';
+import type { GPUResultPacket } from '../../bridge/types';
+import { getGPUModuleSync } from '../../bridge';
+import type { ChannelMapping } from '../../bridge/types';
 import { createDebugger, isDev } from '@g-motion/shared';
-import { getRendererCode } from '../../../render/renderer-code';
+import { getRendererCode } from '@g-motion/core';
 import { applyGPUResultPacket } from './apply-results';
 
 const s_gpuResultPacketsScratch: GPUResultPacket[] = [];

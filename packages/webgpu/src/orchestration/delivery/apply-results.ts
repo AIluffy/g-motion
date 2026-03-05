@@ -1,7 +1,7 @@
-import type { ChannelMapping, GPUResultPacket } from '../../../gpu-bridge/types';
-import { getGPUModuleSync } from '../../../gpu-bridge';
-import { MotionStatus } from '../../../components/state';
-import type { World } from '../../../runtime/world';
+import type { ChannelMapping, GPUResultPacket } from '../../bridge/types';
+import { getGPUModuleSync } from '../../bridge';
+import { MotionStatus } from '@g-motion/core/components';
+import type { World } from '@g-motion/core/runtime';
 import {
   applyMatrixTransform,
   applyPrimitiveValue,

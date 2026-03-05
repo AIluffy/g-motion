@@ -1,5 +1,5 @@
 import type { GPUModuleFacade } from './lazy-loader';
-import type * as WebGPUInternal from '@g-motion/webgpu/internal';
+import type * as WebGPUInternal from '../internal';
 
 export type { GPUModuleFacade };
 

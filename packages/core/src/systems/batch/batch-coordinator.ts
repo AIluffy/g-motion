@@ -2,7 +2,7 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '../../gpu-bridge/types';
+} from '../../runtime/gpu-types';
 import type {
   BatchEntity,
   BatchKeyframe,

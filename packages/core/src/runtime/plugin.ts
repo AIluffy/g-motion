@@ -220,7 +220,7 @@ export interface EngineServices {
   app: MotionApp;
   config: NormalizedMotionAppConfig;
   batchProcessor: import('../systems/batch').ComputeBatchProcessor;
-  metrics: import('../gpu-bridge/types').GPUMetricsProvider;
+  metrics: import('./gpu-types').GPUMetricsProvider;
   appContext: import('./context').AppContext;
 }
 

@@ -4,7 +4,7 @@
  * Builds CSS transform strings from GPU-computed values.
  */
 
-import { getGPUModuleSync, OUTPUT_FORMAT } from '../../../gpu-bridge';
+import { getGPUModuleSync, OUTPUT_FORMAT } from '../../bridge';
 
 export function buildMatrix2DTransformString(
   values: Float32Array,
@@ -68,22 +68,22 @@ export function buildMatrix3DTransformString(
   return `matrix3d(${parts.join(',')})`;
 }
 
-const packedRGBAToCSS = (...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['packedRGBAToCSS']>) => {
+const packedRGBAToCSS = (
+  ...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['packedRGBAToCSS']>
+) => {
   const gpu = getGPUModuleSync();
   if (!gpu) {
-    throw new Error(
-      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
-    );
+    throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
   }
   return gpu.packedRGBAToCSS(...args);
 };
 
-const unpackHalf2 = (...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['unpackHalf2']>) => {
+const unpackHalf2 = (
+  ...args: Parameters<NonNullable<ReturnType<typeof getGPUModuleSync>>['unpackHalf2']>
+) => {
   const gpu = getGPUModuleSync();
   if (!gpu) {
-    throw new Error(
-      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
-    );
+    throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
   }
   return gpu.unpackHalf2(...args);
 };

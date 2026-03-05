@@ -4,8 +4,8 @@
  * Handles asynchronous GPU device creation, validation, and pipeline setup.
  */
 
-import type { InitConfig, WebGPUEngine, WebGPUInitResult } from '../../gpu-bridge/types';
-import { getGPUModuleSync } from '../../gpu-bridge';
+import type { InitConfig, WebGPUEngine, WebGPUInitResult } from '../bridge/types';
+import { getGPUModuleSync } from '../bridge';
 
 export async function initializeWebGPU(
   engine: WebGPUEngine,

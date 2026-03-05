@@ -1,4 +1,4 @@
-import type { SystemContext } from '../../runtime/plugin';
+import type { SystemContext } from '@g-motion/core/runtime';
 import {
   isKeyframeEntryExpandOnGPUEnabled,
   isKeyframeSearchIndexedEnabled,

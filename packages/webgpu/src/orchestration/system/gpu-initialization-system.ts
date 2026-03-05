@@ -1,8 +1,8 @@
-import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
-import { getCustomEasingVersion, getCustomGpuEasings } from '../../../runtime/easing-registry';
-import { getGPUModuleSync } from '../../../gpu-bridge';
-import type { GPUMetricsProvider, WebGPUInitResult } from '../../../gpu-bridge/types';
-import type { WebGPUEngine } from '../../../gpu-bridge/types';
+import type { NormalizedMotionAppConfig } from '@g-motion/core/runtime';
+import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/core/runtime';
+import { getGPUModuleSync } from '../../bridge';
+import type { GPUMetricsProvider, WebGPUInitResult } from '../../bridge/types';
+import type { WebGPUEngine } from '../../bridge/types';
 
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,

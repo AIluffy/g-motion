@@ -42,6 +42,11 @@
       "types": "./dist/shaders.d.ts",
       "import": "./dist/shaders.js",
       "require": "./dist/shaders.cjs"
+    },
+    "./orchestration": {
+      "types": "./dist/orchestration.d.ts",
+      "import": "./dist/orchestration.js",
+      "require": "./dist/orchestration.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -64,7 +69,11 @@
     "bench": "pnpm --filter @g-motion/benchmark bench"
   },
   "dependencies": {
+    "@g-motion/protocol": "workspace:*",
     "@g-motion/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "@g-motion/core": "workspace:*"
   },
   "devDependencies": {
     "@g-motion/benchmark": "workspace:*",

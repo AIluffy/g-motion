@@ -44,6 +44,7 @@
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
     "@g-motion/test-utils": "workspace:*",
+    "@g-motion/webgpu": "workspace:*",
     "typescript": "workspace:*",
     "vitest": "workspace:*"
   }

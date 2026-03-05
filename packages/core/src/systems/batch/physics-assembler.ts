@@ -21,7 +21,7 @@ import type {
   Track,
 } from '@g-motion/shared';
 import { MotionStatus } from '../../components/state';
-import { PHYSICS_STATE_STRIDE } from '../../gpu-bridge';
+import { PHYSICS_STATE_STRIDE } from '../../runtime/gpu-access';
 import type { ArchetypeTypedBuffer } from '../../ecs/archetype';
 import { writeEmptySlot, writeInertiaSlot, writeSpringSlot } from './physics-slots';
 

@@ -1,4 +1,4 @@
-export type GPUModuleFacade = typeof import('@g-motion/webgpu/internal');
+export type GPUModuleFacade = typeof import('../internal');
 
 let _webgpuModule: GPUModuleFacade | null = null;
 let _loadPromise: Promise<GPUModuleFacade | null> | null = null;
@@ -7,7 +7,7 @@ export async function getWebGPUModule(): Promise<GPUModuleFacade | null> {
   if (_webgpuModule) return _webgpuModule;
   if (_loadPromise) return _loadPromise;
 
-  _loadPromise = import('@g-motion/webgpu/internal')
+  _loadPromise = import('../internal')
     .then((mod) => {
       _webgpuModule = mod;
       return mod;

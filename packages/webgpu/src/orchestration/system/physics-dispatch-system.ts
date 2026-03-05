@@ -3,10 +3,10 @@ import type {
   PhysicsBatchDescriptor,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '../../../gpu-bridge/types';
-import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../../gpu-bridge';
-import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
-import type { ComputeBatchProcessor } from '../../batch';
+} from '../../bridge/types';
+import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../bridge';
+import type { NormalizedMotionAppConfig } from '@g-motion/core/runtime';
+import type { ComputeBatchProcessor } from '@g-motion/core/batch';
 import { physicsValidationShadow } from '../physics-validation';
 
 export type PhysicsReadbackTag = {

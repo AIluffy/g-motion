@@ -5,7 +5,7 @@
  * Used when config.physicsValidation === true.
  */
 
-import { PHYSICS_STATE_STRIDE } from '../../gpu-bridge';
+import { PHYSICS_STATE_STRIDE } from '../bridge';
 
 export interface PhysicsValidationShadow {
   slotCount: number;

@@ -3,10 +3,10 @@ import type {
   PendingReadback,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '../../../gpu-bridge/types';
-import { getGPUModuleSync } from '../../../gpu-bridge';
-import type { World } from '../../../runtime/world';
-import type { ComputeBatchProcessor } from '../../batch';
+} from '../../bridge/types';
+import { getGPUModuleSync } from '../../bridge';
+import type { World } from '@g-motion/core/runtime';
+import type { ComputeBatchProcessor } from '@g-motion/core/batch';
 
 export type CullingReadbackTag = {
   kind: 'culling';
@@ -55,7 +55,7 @@ export async function maybeRunViewportCulling(params: {
   const gpu = getGPUModuleSync();
   if (!gpu) {
     return {
-      kind: "continue",
+      kind: 'continue',
       outputBuffer: params.outputBuffer,
       entityCount: params.entityCount,
       entityIdsForReadback: params.entityIdsForReadback,

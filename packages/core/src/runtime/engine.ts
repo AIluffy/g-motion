@@ -5,25 +5,21 @@ import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
 import type { SystemScheduler } from '../scheduler/scheduler';
-import type { GPUMetricsProvider } from '../gpu-bridge/types';
-import { preloadWebGPUModule } from '../gpu-bridge';
+import { getGPUBridge } from './gpu-registry';
+import type { GPUMetricsProvider } from './gpu-types';
 import { World } from './world';
 import { WorldProvider } from './world-provider';
 
 const warn = createDebugger('MotionEngine', 'warn');
 
-async function tryImportWebGPUInternal(): Promise<null | {
-  getGPUMetricsProvider: () => GPUMetricsProvider;
-  resetWebGPUEngine: () => void;
-}> {
-  try {
-    return (await import('@g-motion/webgpu/internal')) as {
-      getGPUMetricsProvider: () => GPUMetricsProvider;
-      resetWebGPUEngine: () => void;
-    };
-  } catch {
-    return null;
-  }
+type OptionalGPUBridgeHooks = {
+  getGPUMetricsProvider?: () => GPUMetricsProvider;
+  resetWebGPUEngine?: () => void;
+  clearPipelineCache?: () => void;
+};
+
+function getGPUBridgeHooks(): OptionalGPUBridgeHooks | null {
+  return (getGPUBridge() as OptionalGPUBridgeHooks | null) ?? null;
 }
 
 function createNoopGPUMetricsProvider(): GPUMetricsProvider {
@@ -63,17 +59,6 @@ function createNoopGPUMetricsProvider(): GPUMetricsProvider {
     getArchetypeTimings: () => new Map(),
     calculateDynamicThreshold: (baseThreshold = 1000) => baseThreshold,
   };
-}
-
-async function tryClearPipelineCache(): Promise<void> {
-  try {
-    const mod = await import('../systems/webgpu');
-    if (typeof mod.clearPipelineCache === 'function') {
-      mod.clearPipelineCache();
-    }
-  } catch {
-    // Ignore when WebGPU systems are unavailable.
-  }
 }
 
 export interface MotionEngine {
@@ -127,12 +112,10 @@ class MotionEngineImpl implements MotionEngine {
     };
 
     this.scheduler.setServices(this.services);
-    void preloadWebGPUModule();
-    void tryImportWebGPUInternal().then((mod) => {
-      if (mod?.getGPUMetricsProvider) {
-        this.services.metrics = mod.getGPUMetricsProvider();
-      }
-    });
+    const hooks = getGPUBridgeHooks();
+    if (hooks?.getGPUMetricsProvider) {
+      this.services.metrics = hooks.getGPUMetricsProvider();
+    }
   }
 
   get disposed(): boolean {
@@ -207,23 +190,24 @@ class MotionEngineImpl implements MotionEngine {
       warn('Batch processor cleanup failed:', e);
     }
 
-    void tryImportWebGPUInternal().then((mod) => {
-      try {
-        mod?.resetWebGPUEngine();
-      } catch (e) {
-        warn('WebGPU engine cleanup failed:', e);
-      }
+    const hooks = getGPUBridgeHooks();
+    try {
+      hooks?.resetWebGPUEngine?.();
+    } catch (e) {
+      warn('WebGPU engine cleanup failed:', e);
+    }
 
-      try {
-        mod?.getGPUMetricsProvider().clear();
-      } catch (e) {
-        warn('GPU metrics provider cleanup failed:', e);
-      }
-    });
+    try {
+      hooks?.getGPUMetricsProvider?.().clear();
+    } catch (e) {
+      warn('GPU metrics provider cleanup failed:', e);
+    }
 
-    void tryClearPipelineCache().catch((e) => {
+    try {
+      hooks?.clearPipelineCache?.();
+    } catch (e) {
       warn('Pipeline cache cleanup failed:', e);
-    });
+    }
 
     try {
       this.services.appContext.dispose();
@@ -257,17 +241,18 @@ class MotionEngineImpl implements MotionEngine {
       this.services.batchProcessor.clear();
     } catch {}
 
-    void tryImportWebGPUInternal().then((mod) => {
-      try {
-        mod?.resetWebGPUEngine();
-      } catch {}
+    const hooks = getGPUBridgeHooks();
+    try {
+      hooks?.resetWebGPUEngine?.();
+    } catch {}
 
-      try {
-        mod?.getGPUMetricsProvider().clear();
-      } catch {}
-    });
+    try {
+      hooks?.getGPUMetricsProvider?.().clear();
+    } catch {}
 
-    void tryClearPipelineCache().catch(() => {});
+    try {
+      hooks?.clearPipelineCache?.();
+    } catch {}
 
     try {
       this.services.appContext.dispose();

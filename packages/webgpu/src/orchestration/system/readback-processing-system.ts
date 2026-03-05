@@ -1,8 +1,8 @@
 import { createDebugger, getNowMs, GPU_DEFAULTS } from '@g-motion/shared';
-import type { GPUMetricsProvider, WebGPUEngine } from '../../../gpu-bridge/types';
-import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../../gpu-bridge';
-import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
-import type { ComputeBatchProcessor } from '../../batch';
+import type { GPUMetricsProvider, WebGPUEngine } from '../../bridge/types';
+import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../bridge';
+import type { NormalizedMotionAppConfig } from '@g-motion/core/runtime';
+import type { ComputeBatchProcessor } from '@g-motion/core/batch';
 import { physicsValidationShadow, stepPhysicsShadow } from '../physics-validation';
 import { maybeDebugReadbackOutput } from './output-buffer-processor';
 import type { PhysicsReadbackTag } from './physics-dispatch-system';

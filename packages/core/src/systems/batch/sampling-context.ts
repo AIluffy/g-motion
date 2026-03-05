@@ -12,7 +12,7 @@
 import type {
   RawKeyframeGenerationOptions,
   RawKeyframeValueEvaluator,
-} from '../../gpu-bridge/types';
+} from '../../runtime/gpu-types';
 import type { Archetype } from '../../ecs/archetype';
 import { SchedulingConstants } from '../../constants';
 import type { SystemContext } from '../../runtime/plugin';

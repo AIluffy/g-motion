@@ -16,6 +16,7 @@ export default defineConfig({
       wgsl: './src/wgsl.ts',
       engine: './src/engine.ts',
       shaders: './src/shaders.ts',
+      orchestration: './src/orchestration.ts',
     },
   },
 });

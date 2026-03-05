@@ -10,8 +10,11 @@
  */
 
 import type { TimelineData, Track } from '@g-motion/shared';
-import { getGPUModuleSync } from '../../gpu-bridge';
-import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '../../gpu-bridge/types';
+import { getGPUModuleSync } from '../../runtime/gpu-access';
+import type {
+  RawKeyframeGenerationOptions,
+  RawKeyframeValueEvaluator,
+} from '../../runtime/gpu-types';
 import { KEYFRAME_FLOATS, MAX_KEYFRAMES_PER_CHANNEL } from './constants';
 import type { PackedCacheMap, SerializedKeyframes } from './keyframe-utils';
 import { getFlatTracks, tryReusePackedCache } from './keyframe-utils';
@@ -33,9 +36,7 @@ export function serializePreprocessedPath(
 ): SerializedKeyframes {
   const gpu = getGPUModuleSync();
   if (!gpu) {
-    throw new Error(
-      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
-    );
+    throw new Error('WebGPU module not loaded. Call preloadWebGPUModule() during initialization.');
   }
 
   const rawKeyframesByClip: Float32Array[] = [];

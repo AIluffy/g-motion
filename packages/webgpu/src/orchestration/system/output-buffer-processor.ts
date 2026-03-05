@@ -4,10 +4,10 @@ import type {
   GPUBatchWithPreprocessedKeyframes,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '../../../gpu-bridge/types';
-import { getGPUModuleSync } from '../../../gpu-bridge';
-import type { World } from '../../../runtime/world';
-import type { ComputeBatchProcessor } from '../../batch';
+} from '../../bridge/types';
+import { getGPUModuleSync } from '../../bridge';
+import type { World } from '@g-motion/core/runtime';
+import type { ComputeBatchProcessor } from '@g-motion/core/batch';
 import { debugIO, firstEntityChannelPreview, float32Preview } from '../debug';
 import { maybeRunViewportCulling } from './viewport-culling-system';
 
