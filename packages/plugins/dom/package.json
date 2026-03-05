@@ -5,9 +5,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
+  "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
@@ -23,9 +25,9 @@
   },
   "devDependencies": {
     "@g-motion/animation": "workspace:*",
-    "@rslib/core": "^0.18.3",
-    "@types/node": "^24.10.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.14"
+    "@rslib/core": "workspace:*",
+    "@types/node": "workspace:*",
+    "typescript": "workspace:*",
+    "vitest": "workspace:*"
   }
 }
