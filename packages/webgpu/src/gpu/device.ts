@@ -1,5 +1,6 @@
 import { createDebugger } from '@g-motion/shared';
 import type { WebGPUEngineConfig } from '../runtime/engine';
+import { noopMetricsCollector } from '../types/metrics-collector';
 import type { DeviceInitResult } from '../runtime/types';
 
 const warn = createDebugger('DeviceManager', 'warn');
@@ -15,6 +16,7 @@ export class DeviceManager {
     this.config = {
       powerPreference: cfg.powerPreference ?? 'high-performance',
       timestampQuery: cfg.timestampQuery ?? true,
+      metricsCollector: cfg.metricsCollector ?? noopMetricsCollector,
     };
   }
 
@@ -22,6 +24,7 @@ export class DeviceManager {
     this.config = {
       powerPreference: cfg.powerPreference ?? 'high-performance',
       timestampQuery: cfg.timestampQuery ?? true,
+      metricsCollector: cfg.metricsCollector ?? noopMetricsCollector,
     };
   }
 
