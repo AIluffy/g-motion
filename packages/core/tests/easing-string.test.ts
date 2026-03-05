@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EasingRegistry } from '../../shared/src/easing/registry';
+import { EasingRegistry } from '@g-motion/shared';
 
 describe('GPU-Only Easing Registry', () => {
   let registry: EasingRegistry;

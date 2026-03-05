@@ -17,6 +17,26 @@
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js",
       "require": "./dist/testing.cjs"
+    },
+    "./compute": {
+      "types": "./dist/compute.d.ts",
+      "import": "./dist/compute.js",
+      "require": "./dist/compute.cjs"
+    },
+    "./buffer": {
+      "types": "./dist/buffer.d.ts",
+      "import": "./dist/buffer.js",
+      "require": "./dist/buffer.cjs"
+    },
+    "./wgsl": {
+      "types": "./dist/wgsl.d.ts",
+      "import": "./dist/wgsl.js",
+      "require": "./dist/wgsl.cjs"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js",
+      "require": "./dist/engine.cjs"
     }
   },
   "main": "./dist/index.cjs",

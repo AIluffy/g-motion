@@ -21,7 +21,8 @@
     "flow": "pnpm build && pnpm test && pnpm dev --filter examples",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "check:deps": "pnpm dlx syncpack list-mismatches && pnpm dlx depcheck --ignores='@rslib/*'"
   },
   "keywords": [],
   "author": "",

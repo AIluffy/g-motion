@@ -1,15 +1,40 @@
 import { createDebugger } from '@g-motion/shared';
-import { getGPUMetricsProvider, resetWebGPUEngine } from '@g-motion/webgpu/internal';
+import type { ComputeProvider } from '@g-motion/shared';
 import { App, appWorld, app as globalApp, registerBuiltInRenderers } from './app';
 import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
 import type { SystemScheduler } from '../scheduler/scheduler';
-import { clearPipelineCache } from '../systems/webgpu';
 import { World } from './world';
 import { WorldProvider } from './world-provider';
 
 const warn = createDebugger('MotionEngine', 'warn');
+
+async function tryImportWebGPUInternal(): Promise<null | {
+  getGPUMetricsProvider: () => { clear: () => void };
+  resetWebGPUEngine: () => void;
+}> {
+  try {
+    return (await import('@g-motion/webgpu/internal')) as {
+      getGPUMetricsProvider: () => { clear: () => void };
+      resetWebGPUEngine: () => void;
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function tryClearPipelineCache(): Promise<void> {
+  try {
+    const mod = await import('../systems/webgpu');
+    if (typeof mod.clearPipelineCache === 'function') {
+      mod.clearPipelineCache();
+    }
+  } catch {
+    // Ignore when WebGPU systems are unavailable.
+  }
+}
+
 
 export interface MotionEngine {
   readonly services: EngineServices;
@@ -19,6 +44,9 @@ export interface MotionEngine {
   readonly disposed: boolean;
 
   use(plugin: MotionPlugin): void;
+  setComputeProvider(provider: ComputeProvider): void;
+  getComputeProvider(): ComputeProvider | null;
+  requireComputeProvider(): ComputeProvider;
   dispose(): void;
   reset(options?: EngineResetOptions): void;
 }
@@ -34,6 +62,7 @@ class MotionEngineImpl implements MotionEngine {
   readonly app: MotionApp;
   readonly services: EngineServices;
   private _disposed = false;
+  private computeProvider: ComputeProvider | null = null;
 
   constructor(world: World, appOverride?: MotionApp) {
     this.world = world;
@@ -45,7 +74,7 @@ class MotionEngineImpl implements MotionEngine {
 
     const appContext = getAppContext();
     const batchProcessor = appContext.getBatchProcessor();
-    const metrics = getGPUMetricsProvider();
+    const metrics = { clear: () => void 0 } as EngineServices['metrics'];
 
     this.services = {
       world: this.world,
@@ -101,6 +130,24 @@ class MotionEngineImpl implements MotionEngine {
     manifest.setup?.(this.app, this.services);
   }
 
+
+  setComputeProvider(provider: ComputeProvider): void {
+    this.computeProvider = provider;
+  }
+
+  getComputeProvider(): ComputeProvider | null {
+    return this.computeProvider;
+  }
+
+  requireComputeProvider(): ComputeProvider {
+    if (!this.computeProvider) {
+      throw new Error(
+        'ComputeProvider not available. Install @g-motion/webgpu and call world.use(webgpuPlugin).',
+      );
+    }
+    return this.computeProvider;
+  }
+
   dispose(): void {
     if (this._disposed) {
       return;
@@ -115,23 +162,23 @@ class MotionEngineImpl implements MotionEngine {
       warn('Batch processor cleanup failed:', e);
     }
 
-    try {
-      resetWebGPUEngine();
-    } catch (e) {
-      warn('WebGPU engine cleanup failed:', e);
-    }
+    void tryImportWebGPUInternal().then((mod) => {
+      try {
+        mod?.resetWebGPUEngine();
+      } catch (e) {
+        warn('WebGPU engine cleanup failed:', e);
+      }
 
-    try {
-      getGPUMetricsProvider().clear();
-    } catch (e) {
-      warn('GPU metrics provider cleanup failed:', e);
-    }
+      try {
+        mod?.getGPUMetricsProvider().clear();
+      } catch (e) {
+        warn('GPU metrics provider cleanup failed:', e);
+      }
+    });
 
-    try {
-      clearPipelineCache();
-    } catch (e) {
+    void tryClearPipelineCache().catch((e) => {
       warn('Pipeline cache cleanup failed:', e);
-    }
+    });
 
     try {
       this.services.appContext.dispose();
@@ -165,17 +212,17 @@ class MotionEngineImpl implements MotionEngine {
       this.services.batchProcessor.clear();
     } catch {}
 
-    try {
-      resetWebGPUEngine();
-    } catch {}
+    void tryImportWebGPUInternal().then((mod) => {
+      try {
+        mod?.resetWebGPUEngine();
+      } catch {}
 
-    try {
-      getGPUMetricsProvider().clear();
-    } catch {}
+      try {
+        mod?.getGPUMetricsProvider().clear();
+      } catch {}
+    });
 
-    try {
-      clearPipelineCache();
-    } catch {}
+    void tryClearPipelineCache().catch(() => {});
 
     try {
       this.services.appContext.dispose();

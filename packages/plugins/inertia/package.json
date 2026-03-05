@@ -20,14 +20,16 @@
     "test": "vitest run --pool=threads --maxWorkers=1"
   },
   "dependencies": {
-    "@g-motion/core": "workspace:*",
-    "@g-motion/shared": "workspace:*"
+    "@g-motion/shared": "workspace:*",
+    "@g-motion/values": "workspace:*",
+    "@g-motion/protocol": "workspace:*"
   },
   "devDependencies": {
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
     "jsdom": "^27.2.0",
     "typescript": "workspace:*",
-    "vitest": "workspace:*"
+    "vitest": "workspace:*",
+    "@g-motion/core": "workspace:*"
   }
 }

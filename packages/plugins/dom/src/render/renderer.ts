@@ -1,4 +1,4 @@
-import { SystemDef, SystemContext, RendererDef } from '@g-motion/core';
+import type { SystemDef, SystemContext, RendererDef } from '@g-motion/core';
 import {
   TRANSFORM_TYPED_KEYS,
   buildTransformTypedBuffers,
