@@ -8,6 +8,9 @@ import type { DomAnimationScope } from './control';
 import type { AnimationOptions } from './options';
 import type { AnimatableProps, MotionTarget, MotionTargetValue } from '../types/targets';
 import { addKeyframesForTarget } from './keyframes';
+import type { Interpolator } from './interpolator';
+import { KeyframeInterpolator } from './keyframe-interpolator';
+import { TweenInterpolator } from './tween-interpolator';
 import {
   computeMaxTime,
   getTargetType,
@@ -60,6 +63,8 @@ export class MotionBuilder<T extends MotionTarget> {
   private cachedTargetType?: TargetType;
   private scope?: DomAnimationScope;
   private injectedWorld?: World;
+  private interpolator: Interpolator;
+
 
   constructor(target: T, opts?: { world?: World; scope?: DomAnimationScope }) {
     if (Array.isArray(target)) {
@@ -71,6 +76,7 @@ export class MotionBuilder<T extends MotionTarget> {
     }
     this.injectedWorld = opts?.world;
     this.scope = opts?.scope;
+    this.interpolator = new TweenInterpolator(0, 1);
   }
 
   private get target(): MotionTargetValue<T> {
@@ -84,6 +90,25 @@ export class MotionBuilder<T extends MotionTarget> {
     const vt = getOrCreateVisualTarget(this.target, type);
     this.visualTarget = vt;
     return vt;
+  }
+
+  setInterpolator(interpolator: Interpolator): this {
+    this.interpolator = interpolator;
+    return this;
+  }
+
+  useTweenInterpolator(from: number, to: number, easing?: (t: number) => number): this {
+    this.interpolator = new TweenInterpolator(from, to, easing);
+    return this;
+  }
+
+  useKeyframeInterpolator(keyframes: number[], easing?: (t: number) => number): this {
+    this.interpolator = new KeyframeInterpolator(keyframes, easing);
+    return this;
+  }
+
+  evaluate(progress: number): number {
+    return this.interpolator.evaluate(progress);
   }
 
   track(_prop: string): this {
