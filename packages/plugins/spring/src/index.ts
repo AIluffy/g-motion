@@ -1,5 +1,5 @@
 import type { MotionPlugin } from '@g-motion/protocol';
-import { registerPlugin } from '@g-motion/protocol';
+import { registerPlugin } from '@g-motion/core';
 import { SpringComponentSchema } from './physics/schema';
 import springShaderCode from './shaders/spring.wgsl?raw';
 

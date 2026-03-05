@@ -307,4 +307,4 @@ export {
   getRegisteredPlugins,
   isPluginRegistered,
   registerPlugin,
-} from '@g-motion/protocol';
+} from './plugin-registry';

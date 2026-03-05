@@ -1,3 +1,5 @@
+type GPUDevice = unknown;
+
 export interface GPUBridge {
   readonly isAvailable: boolean;
   initialize(config?: Record<string, unknown>): Promise<GPUInitResult>;
@@ -72,27 +74,4 @@ export interface GPUResultEntry {
 export interface GPUMetrics {
   clear(): void;
   [key: string]: unknown;
-}
-
-let _gpuBridge: GPUBridge | null = null;
-
-export function registerGPUBridge(bridge: GPUBridge): void {
-  _gpuBridge = bridge;
-}
-
-export function getGPUBridge(): GPUBridge | null {
-  return _gpuBridge;
-}
-
-export function requireGPUBridge(): GPUBridge {
-  if (!_gpuBridge) {
-    throw new Error(
-      'GPUBridge not registered. Install @g-motion/webgpu and call registerGPUBridge().',
-    );
-  }
-  return _gpuBridge;
-}
-
-export function clearGPUBridge(): void {
-  _gpuBridge = null;
 }

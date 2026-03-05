@@ -10,4 +10,4 @@ export {
   registerTargetResolver,
   registerTargetResolverWithScope,
   resolveWithRegisteredTargetResolvers,
-} from '@g-motion/protocol';
+} from './target-resolver-registry';
