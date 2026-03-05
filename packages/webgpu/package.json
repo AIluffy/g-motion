@@ -60,10 +60,12 @@
   "scripts": {
     "build": "rslib build",
     "dev": "rslib build --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "pnpm --filter @g-motion/benchmark bench"
   },
   "dependencies": {
-    "@g-motion/shared": "workspace:*"
+    "@g-motion/shared": "workspace:*",
+    "@g-motion/benchmark": "workspace:*"
   },
   "devDependencies": {
     "@rslib/core": "workspace:*",

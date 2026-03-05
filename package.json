@@ -22,7 +22,8 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
-    "check:deps": "pnpm dlx syncpack list-mismatches && pnpm dlx depcheck --ignores='@rslib/*'"
+    "check:deps": "pnpm dlx syncpack list-mismatches && pnpm dlx depcheck --ignores='@rslib/*'",
+    "bench": "turbo run bench"
   },
   "keywords": [],
   "author": "",
