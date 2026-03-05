@@ -43,7 +43,7 @@ registerPlugin(inertiaPlugin);
 export { InertiaComponentSchema } from './physics/schema';
 export { VelocityTracker } from './physics/velocity';
 export { analyzeInertiaTracks, buildInertiaComponent } from './physics/tracks';
-export type { InertiaOptions } from '@g-motion/protocol';
+export type { InertiaOptions, InertiaComponentData } from './types';
 
 // Re-export shader code for external use
 export { default as INERTIA_GPU_SHADER } from './shaders/inertia.wgsl?raw';

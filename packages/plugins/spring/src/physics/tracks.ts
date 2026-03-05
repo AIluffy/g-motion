@@ -1,4 +1,5 @@
-import type { TimelineData, Keyframe, SpringOptions } from '@g-motion/protocol';
+import type { TimelineData, Keyframe } from '@g-motion/protocol';
+import type { SpringOptions } from '../types';
 
 /**
  * Analyzes timeline tracks for spring configuration.

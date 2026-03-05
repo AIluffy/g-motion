@@ -24,9 +24,3 @@ export type {
   GPUMetrics,
 } from './gpu-bridge';
 
-export type {
-  SpringOptions,
-  InertiaOptions,
-  SpringComponentData,
-  InertiaComponentData,
-} from './physics';
