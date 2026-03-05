@@ -15,7 +15,7 @@ import {
   KEYFRAME_SEARCH_SHADER,
   KEYFRAME_SEARCH_SHADER_OPT,
   KEYFRAME_SEARCH_WINDOW_SHADER,
-} from '../../keyframe-preprocess-shader';
+} from '../../shaders/keyframe-preprocess-shader';
 import { __resetKeyframePreprocessCPUCacheForTests } from './caches';
 
 type KeyframePipelineState = {

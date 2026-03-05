@@ -7,8 +7,8 @@
  */
 
 import type { WebGPUFrameEncoder } from '../../runtime/encoder';
-import { CHANNEL_MAP_STRIDE, RAW_KEYFRAME_STRIDE } from '../../keyframe-preprocess-shader';
-import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
+import { CHANNEL_MAP_STRIDE, RAW_KEYFRAME_STRIDE } from '../../shaders/keyframe-preprocess-shader';
+import { getPersistentGPUBufferManager } from '../../gpu/persistent-buffer-manager';
 import { tryRunKeyframeInterpPassWithGpuEntryExpand } from './interp-pass-gpu-expand';
 import type { KeyframePreprocessResult } from './types';
 

@@ -11,9 +11,9 @@ import {
   CHANNEL_MAP_STRIDE,
   PACKED_KEYFRAME_STRIDE,
   RAW_KEYFRAME_STRIDE,
-} from '../../keyframe-preprocess-shader';
+} from '../../shaders/keyframe-preprocess-shader';
 import { getGPUMetricsProvider } from '../../runtime/metrics';
-import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
+import { getPersistentGPUBufferManager } from '../../gpu/persistent-buffer-manager';
 import { s_keyframePreprocessCPUCache } from './caches';
 import { getKeyframePreprocessPipeline } from './pipelines';
 import type { KeyframePreprocessResult } from './types';

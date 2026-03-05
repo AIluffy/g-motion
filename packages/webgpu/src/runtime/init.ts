@@ -1,13 +1,13 @@
 import { createDebugger, getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
-import { AsyncReadbackManager } from '../async-readback';
+import { AsyncReadbackManager } from './async-readback';
 import type { WebGPUEngine } from './engine';
 import { getGPUMetricsProvider } from './metrics';
 import type { GPUMetricsProvider } from './metrics';
-import { getPersistentGPUBufferManager } from '../persistent-buffer-manager';
-import { PHYSICS_COMBINED_SHADER } from '../physics-shader';
+import { getPersistentGPUBufferManager } from '../gpu/persistent-buffer-manager';
+import { PHYSICS_COMBINED_SHADER } from '../shaders/physics-shader';
 import { clearPipelineCache, precompileWorkgroupPipelines } from '../gpu/workgroup';
-import { buildInterpolationShader } from '../shader';
-import { StagingBufferPool } from '../staging-pool';
+import { buildInterpolationShader } from '../shaders/interpolation-shader';
+import { StagingBufferPool } from '../gpu/staging-pool';
 import { GPUTimestampQueryManager } from '../gpu/timestamp';
 import type { DeviceInitResult } from './types';
 

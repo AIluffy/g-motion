@@ -36,7 +36,7 @@ export {
   unmarkPhysicsGPUEntity,
 } from './runtime/sync';
 export type { GPUResultPacket, GPUSyncManager } from './runtime/sync';
-export { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
+export { tryReleasePooledOutputBufferFromTag } from './gpu/output-buffer-pool';
 export { runKeyframeInterpPass, runKeyframePreprocessPass } from './passes/keyframe';
 export type { KeyframePreprocessResult, KeyframeSearchResultGPU } from './passes/keyframe';
 export {
@@ -50,6 +50,6 @@ export {
   FRUSTUM_PLANES_FLOATS,
   RENDER_STATE_EX_STRIDE,
 } from './passes/viewport/culling-types';
-export * from './keyframe-preprocess-shader';
-export * from './persistent-buffer-manager';
+export * from './shaders/keyframe-preprocess-shader';
+export * from './gpu/persistent-buffer-manager';
 export * from './benchmark';

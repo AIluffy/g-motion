@@ -1,4 +1,4 @@
-import { nextPow2 } from './output-format/types';
+import { nextPow2 } from '../output-format/types';
 
 export type OutputBufferReadbackTag = {
   kind: 'output-buffer';

@@ -5,9 +5,9 @@
  * efficient GPU-to-CPU data transfer.
  */
 
-import outputFormatShaderCode from './shaders/output-format.wgsl?raw';
-import batchOutputShaderCode from './shaders/batch-output.wgsl?raw';
-import soaOutputShaderCode from './shaders/soa-output.wgsl?raw';
+import outputFormatShaderCode from './output-format.wgsl?raw';
+import batchOutputShaderCode from './batch-output.wgsl?raw';
+import soaOutputShaderCode from './soa-output.wgsl?raw';
 import { clamp01 } from '@g-motion/shared';
 
 // WGSL shader for output format conversion

@@ -5,8 +5,8 @@
  * animation rendering. Supports translate, scale, rotate operations.
  */
 
-import transform2DShaderCode from './shaders/transform-2d.wgsl?raw';
-import transform3DShaderCode from './shaders/transform-3d.wgsl?raw';
+import transform2DShaderCode from './transform-2d.wgsl?raw';
+import transform3DShaderCode from './transform-3d.wgsl?raw';
 
 // WGSL shader for 2D transform matrix computation
 export const TRANSFORM_2D_SHADER = transform2DShaderCode;

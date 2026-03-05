@@ -20,20 +20,20 @@ export {
   runOutputFormatPass,
 } from './output-format';
 export type { OutputFormatPoolStats } from './output-format';
-export { processOutputBuffer } from './output-buffer-processing';
+export { processOutputBuffer } from './output-format/output-buffer-processing';
 export type {
   OutputBufferLeaseManager,
   ProcessOutputBufferInput,
-} from './output-buffer-processing';
-export { acquirePooledOutputBuffer, releasePooledOutputBuffer } from './output-buffer-pool';
-export type { OutputBufferReadbackTag } from './output-buffer-pool';
+} from './output-format/output-buffer-processing';
+export { acquirePooledOutputBuffer, releasePooledOutputBuffer } from './gpu/output-buffer-pool';
+export type { OutputBufferReadbackTag } from './gpu/output-buffer-pool';
 export {
   buildInterpolationShader,
   EASING_MODE,
   INTERPOLATION_SHADER,
   KEYFRAME_STRIDE,
   packKeyframeForGPU,
-} from './shader';
+} from './shaders/interpolation-shader';
 export {
   MATRIX_3X3_STRIDE,
   MATRIX_4X4_STRIDE,
@@ -46,8 +46,8 @@ export {
   TRANSFORM_COMBINED_SHADER,
   unpackMatrix3x3,
   unpackMatrix4x4,
-} from './transform-shader';
-export type { Transform2DData, Transform3DData } from './transform-shader';
+} from './shaders/transform-shader';
+export type { Transform2DData, Transform3DData } from './shaders/transform-shader';
 export {
   ADVANCED_CULLING_OUTPUT_COMPACT_SHADER,
   ADVANCED_CULLING_SHADER,
@@ -60,8 +60,8 @@ export {
   packRenderStates,
   RENDER_STATE_STRIDE,
   unpackCullResults,
-} from './culling-shader';
-export type { CullResultData, RenderStateData, RenderStateExData } from './culling-shader';
+} from './shaders/culling-shader';
+export type { CullResultData, RenderStateData, RenderStateExData } from './shaders/culling-shader';
 export {
   INERTIA_STATE_STRIDE,
   packInertiaStates,
@@ -71,8 +71,8 @@ export {
   PHYSICS_STATE_STRIDE,
   SPRING_STATE_STRIDE,
   unpackSpringStates,
-} from './physics-shader';
-export type { InertiaStateData, PhysicsSimParams, SpringStateData } from './physics-shader';
+} from './shaders/physics-shader';
+export type { InertiaStateData, PhysicsSimParams, SpringStateData } from './shaders/physics-shader';
 export {
   BATCH_OUTPUT_SHADER,
   createStandardChannelMapping,
@@ -85,13 +85,13 @@ export {
   SOA_OUTPUT_SHADER,
   unpackHalf2,
   unpackInterleavedOutputs,
-} from './output-format-shader';
-export type { InterleavedOutputData, OutputChannelDesc } from './output-format-shader';
+} from './shaders/output-format-shader';
+export type { InterleavedOutputData, OutputChannelDesc } from './shaders/output-format-shader';
 export { NonNegativeRollingAverage, TimingHelper } from './gpu/timing';
-export { StagingBufferPool } from './staging-pool';
-export type { StagingBufferEntry } from './staging-pool';
-export { AsyncReadbackManager } from './async-readback';
-export type { PendingReadback } from './async-readback';
+export { StagingBufferPool } from './gpu/staging-pool';
+export type { StagingBufferEntry } from './gpu/staging-pool';
+export { AsyncReadbackManager } from './runtime/async-readback';
+export type { PendingReadback } from './runtime/async-readback';
 export {
   createBatchChannelTable,
   createChannelMapping,

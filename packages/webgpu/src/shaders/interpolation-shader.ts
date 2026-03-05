@@ -1,5 +1,5 @@
 import { WebGPUConstants } from '@g-motion/shared';
-import interpolationShaderCode from './shaders/interpolation.wgsl?raw';
+import interpolationShaderCode from './interpolation.wgsl?raw';
 
 // T031: Built-in WGSL Shader for Interpolation
 // Extended with Bezier curve support (Phase 1.1)

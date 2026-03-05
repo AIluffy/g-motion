@@ -1,5 +1,5 @@
 import { STANDARD_GPU_CHANNEL_PROPERTIES, panic } from '@g-motion/shared';
-import { OUTPUT_FORMAT } from '../output-format-shader';
+import { OUTPUT_FORMAT } from '../shaders/output-format-shader';
 
 const STANDARD_TRANSFORM_PROPERTIES = STANDARD_GPU_CHANNEL_PROPERTIES;
 const MATRIX2D_SENTINEL_PREFIX = '__matrix2d';

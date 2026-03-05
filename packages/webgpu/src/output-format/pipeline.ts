@@ -2,7 +2,7 @@
  * Output Format Pipeline
  */
 
-import { OUTPUT_FORMAT_SHADER } from '../output-format-shader';
+import { OUTPUT_FORMAT_SHADER } from '../shaders/output-format-shader';
 
 type OutputFormatPipelineState = {
   pipeline: GPUComputePipeline;

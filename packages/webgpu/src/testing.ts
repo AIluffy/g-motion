@@ -5,7 +5,7 @@ export {
 export {
   __getOutputBufferPoolStatsForTests,
   __resetOutputBufferPoolForTests,
-} from './output-buffer-pool';
+} from './gpu/output-buffer-pool';
 export { __resetGPUMetricsProviderForTests } from './runtime/metrics';
 export { createTestGPUContext, resetGPUContext } from './runtime/context';
 export {

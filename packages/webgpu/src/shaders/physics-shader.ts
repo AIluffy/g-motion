@@ -9,7 +9,7 @@
  */
 
 import { WebGPUConstants } from '@g-motion/shared';
-import physicsCombinedShaderCode from './shaders/physics-combined.wgsl?raw';
+import physicsCombinedShaderCode from './physics-combined.wgsl?raw';
 
 // Combined physics shader with both spring and inertia (core infrastructure)
 export const PHYSICS_COMBINED_SHADER = physicsCombinedShaderCode;

@@ -4,13 +4,13 @@
  * Handles GPU→CPU data transfer, formatting, and staging buffer management.
  */
 
-import { runOutputFormatPass, releaseOutputFormatBuffer } from './output-format';
-import { StagingBufferPool } from './staging-pool';
-import { AsyncReadbackManager } from './async-readback';
-import { setPendingReadbackCount } from './runtime/sync';
-import { tryReleasePooledOutputBufferFromTag } from './output-buffer-pool';
-import type { WebGPUFrameEncoder } from './runtime/encoder';
-import type { GPUMetricsProvider } from './runtime/metrics';
+import { runOutputFormatPass, releaseOutputFormatBuffer } from '.';
+import { StagingBufferPool } from '../gpu/staging-pool';
+import { AsyncReadbackManager } from '../runtime/async-readback';
+import { setPendingReadbackCount } from '../runtime/sync';
+import { tryReleasePooledOutputBufferFromTag } from '../gpu/output-buffer-pool';
+import type { WebGPUFrameEncoder } from '../runtime/encoder';
+import type { GPUMetricsProvider } from '../runtime/metrics';
 
 export interface ProcessOutputBufferInput {
   archetypeId: string;

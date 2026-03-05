@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AdaptiveWorkgroupSelector, PipelineManager } from '../src/pipeline-manager';
-import { DirtyRegionTracker, PersistentGPUBufferManager } from '../src/persistent-buffer-manager';
+import { AdaptiveWorkgroupSelector, PipelineManager } from '../src/gpu/pipelines';
+import {
+  DirtyRegionTracker,
+  PersistentGPUBufferManager,
+} from '../src/gpu/persistent-buffer-manager';
 import { WebGPUConstants } from '@g-motion/shared';
 import {
   clearViewportCullingPipelineCache,

@@ -1,5 +1,5 @@
 import { createDebugger } from '@g-motion/shared';
-import type { BufferAllocation, ComputeMetrics } from './runtime/engine';
+import type { BufferAllocation, ComputeMetrics } from '../runtime/engine';
 import {
   getPersistentGPUBufferManager,
   resetPersistentGPUBufferManager,

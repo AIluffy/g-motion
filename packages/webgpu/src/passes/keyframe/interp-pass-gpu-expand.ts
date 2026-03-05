@@ -1,6 +1,6 @@
 import type { WebGPUFrameEncoder } from '../../runtime/encoder';
-import { acquirePooledOutputBuffer, releasePooledOutputBuffer } from '../../output-buffer-pool';
-import { getPersistentGPUBufferManager } from '../../persistent-buffer-manager';
+import { acquirePooledOutputBuffer, releasePooledOutputBuffer } from '../../gpu/output-buffer-pool';
+import { getPersistentGPUBufferManager } from '../../gpu/persistent-buffer-manager';
 import {
   getKeyframeEntryExpandPipeline,
   getKeyframeInterpPipeline,

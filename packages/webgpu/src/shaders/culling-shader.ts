@@ -5,10 +5,10 @@
  * Determines which entities need rendering based on version changes and status.
  */
 
-import cullingShaderCode from './shaders/culling.wgsl?raw';
-import advancedCullingShaderCode from './shaders/culling-advanced.wgsl?raw';
-import advancedCullingOutputCompactShaderCode from './shaders/culling-advanced-output-compact.wgsl?raw';
-import compactionShaderCode from './shaders/culling-compaction.wgsl?raw';
+import cullingShaderCode from './culling.wgsl?raw';
+import advancedCullingShaderCode from './culling-advanced.wgsl?raw';
+import advancedCullingOutputCompactShaderCode from './culling-advanced-output-compact.wgsl?raw';
+import compactionShaderCode from './culling-compaction.wgsl?raw';
 
 // WGSL shader for entity culling
 export const CULLING_SHADER = cullingShaderCode;

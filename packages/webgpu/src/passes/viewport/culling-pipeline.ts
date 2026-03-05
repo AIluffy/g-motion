@@ -2,7 +2,7 @@
  * Viewport Culling Pipeline
  */
 
-import { ADVANCED_CULLING_OUTPUT_COMPACT_SHADER } from '../../culling-shader';
+import { ADVANCED_CULLING_OUTPUT_COMPACT_SHADER } from '../../shaders/culling-shader';
 
 type CullingPipelineState = {
   pipeline: GPUComputePipeline;

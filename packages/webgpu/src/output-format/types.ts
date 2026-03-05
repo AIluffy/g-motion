@@ -2,7 +2,7 @@
  * Output Format Types
  */
 
-import { OUTPUT_FORMAT, packOutputChannels } from '../output-format-shader';
+import { OUTPUT_FORMAT, packOutputChannels } from '../shaders/output-format-shader';
 
 export { OUTPUT_FORMAT, packOutputChannels };
 

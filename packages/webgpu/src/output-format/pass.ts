@@ -11,7 +11,7 @@ import {
   createStandardChannelMapping,
   OUTPUT_FORMAT,
   packOutputChannels,
-} from '../output-format-shader';
+} from '../shaders/output-format-shader';
 import { outputFormatBufferPool, trackBuffer } from './buffer-pool';
 import { getOutputFormatPipeline } from './pipeline';
 import { resetOutputFormatPassState } from './pipeline';

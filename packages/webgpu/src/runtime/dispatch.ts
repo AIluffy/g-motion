@@ -1,9 +1,9 @@
 import type { GPUBatchDescriptor } from './types';
 import type { WebGPUFrameEncoder } from './encoder';
 import { getGPUMetricsProvider } from './metrics';
-import type { OutputBufferReadbackTag } from '../output-buffer-pool';
-import { acquirePooledOutputBuffer } from '../output-buffer-pool';
-import { getPersistentGPUBufferManager } from '../persistent-buffer-manager';
+import type { OutputBufferReadbackTag } from '../gpu/output-buffer-pool';
+import { acquirePooledOutputBuffer } from '../gpu/output-buffer-pool';
+import { getPersistentGPUBufferManager } from '../gpu/persistent-buffer-manager';
 import {
   getPipelineForWorkgroup,
   recordWorkgroupTiming,

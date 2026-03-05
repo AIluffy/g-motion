@@ -1,9 +1,9 @@
-import type { AsyncReadbackManager } from '../async-readback';
-import { BufferManager } from '../buffer-manager';
+import type { AsyncReadbackManager } from './async-readback';
+import { BufferManager } from '../gpu/buffer-manager';
 import type { DeviceManager } from '../gpu/device';
-import { ReadbackManager } from '../readback-manager';
-import type { PersistentGPUBufferManager } from '../persistent-buffer-manager';
-import type { StagingBufferPool } from '../staging-pool';
+import { ReadbackManager } from './readback-manager';
+import type { PersistentGPUBufferManager } from '../gpu/persistent-buffer-manager';
+import type { StagingBufferPool } from '../gpu/staging-pool';
 import type { GPUTimestampQueryManager } from '../gpu/timestamp';
 import type { DeviceInitResult } from './types';
 import type { PipelineManager, WorkgroupSize } from '../gpu/pipelines';
