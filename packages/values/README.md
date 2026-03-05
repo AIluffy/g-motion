@@ -1,6 +1,6 @@
-# @g-motion/utils
+# @g-motion/values
 
-通用工具库，供 Motion 各包共享使用。
+值类型检测、解析、缓存与插值库。
 
 ## 安装与构建
 
