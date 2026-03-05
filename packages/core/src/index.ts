@@ -23,4 +23,3 @@ export * from './systems/webgpu/delivery';
 export * from './utils';
 export * from './runtime/world';
 export * from './runtime/world-provider';
-export * from '@g-motion/webgpu';

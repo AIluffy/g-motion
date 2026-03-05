@@ -3,7 +3,7 @@ import {
   GPUBatchStatus as CoreGPUBatchStatus,
   SystemTimingStat,
   getGPUMetricsProvider,
-} from '@g-motion/core';
+} from '@g-motion/webgpu';
 
 /**
  * GPU Batch Processing Status Query API

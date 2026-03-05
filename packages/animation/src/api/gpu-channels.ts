@@ -1,4 +1,4 @@
-import { registerGPUChannelMappingForTracks } from '@g-motion/core';
+import { registerGPUChannelMappingForTracks } from '@g-motion/webgpu';
 import type { TimelineData } from '@g-motion/core';
 import type { VisualTarget } from './visual-target';
 import { TargetType } from './mark';

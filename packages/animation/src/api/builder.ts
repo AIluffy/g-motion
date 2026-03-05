@@ -18,9 +18,13 @@ import {
   TargetType,
 } from './mark';
 export type { MarkOptions, ResolvedMarkOptions } from './mark';
-import { analyzeInertiaTracks, buildInertiaComponent } from '@g-motion/plugin-inertia';
-import { analyzeSpringTracks } from '@g-motion/plugin-spring';
 import { ComponentRegistrar } from '../runtime/system-registry';
+import {
+  analyzeInertiaTracks,
+  analyzeSpringTracks,
+  assertPhysicsPluginInstalled,
+  buildInertiaComponent,
+} from '../runtime/physics-bridge';
 import { AnimationValidator } from './validator';
 import { GPUChannelMapper } from './gpu-channels';
 import { buildRenderComponent } from './render';
@@ -193,6 +197,7 @@ export class MotionBuilder<T extends MotionTarget> {
     };
 
     if (hasSpring && springConfig) {
+      assertPhysicsPluginInstalled('spring', 'spring');
       components.Spring = {
         stiffness: springConfig.stiffness ?? 100,
         damping: springConfig.damping ?? 10,
@@ -204,6 +209,7 @@ export class MotionBuilder<T extends MotionTarget> {
     }
 
     if (hasInertia && inertiaConfig) {
+      assertPhysicsPluginInstalled('inertia', 'inertia');
       components.Inertia = buildInertiaComponent(inertiaConfig, inertiaVelocities);
     }
 
