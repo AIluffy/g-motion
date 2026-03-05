@@ -12,34 +12,40 @@ export interface GPUBridge {
   reset(): void;
 }
 
-export interface GPUComputeCapability {
+export interface GPUResultQueueCapability {
   getGPUResultQueueLength?(): number;
   getPendingReadbackCount?(): number;
   setGPUResultWakeup?(wakeup?: () => void): void;
-  getPersistentGPUBufferManager(device?: GPUDevice): {
-    getStats(): {
-      bytesSkipped?: number;
-      totalBytesProcessed?: number;
-      currentMemoryUsage?: number;
-      peakMemoryUsage?: number;
-      totalMemoryBytes?: number;
-    };
-  };
+}
+
+export interface GPUWorkgroupCapability {
   selectWorkgroupSize?(archetypeId: string, entityCount: number): number;
   setForcedWorkgroupSize?(size: number | null): void;
   consumeForcedGPUStateSyncEntityIdsSet?(): Set<number>;
+}
+
+export interface GPUPhysicsCapability {
   isPhysicsGPUEntity?(entityId: number): boolean;
+}
+
+export interface GPUChannelCapability {
   getGPUChannelMappingRegistry(): {
-    getChannels(archetypeId: string):
-      | {
-          stride: number;
-          rawStride?: number;
-          channels: Array<{ index: number; property: string }>;
-          rawChannels?: Array<{ index: number; property: string }>;
-        }
-      | undefined;
+    getChannels(archetypeId: string): unknown;
   };
 }
+
+export interface GPUBufferCapability {
+  getPersistentGPUBufferManager(device?: GPUDevice): {
+    getStats(): unknown;
+  };
+}
+
+export type GPUComputeCapability =
+  GPUResultQueueCapability &
+  GPUWorkgroupCapability &
+  GPUPhysicsCapability &
+  GPUChannelCapability &
+  GPUBufferCapability;
 
 export interface GPUInitResult {
   success: boolean;

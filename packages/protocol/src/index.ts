@@ -16,6 +16,11 @@ export type { SystemDef, SystemContext, RendererDef, RendererBatchContext } from
 export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';
 export type {
   GPUBridge,
+  GPUResultQueueCapability,
+  GPUWorkgroupCapability,
+  GPUPhysicsCapability,
+  GPUChannelCapability,
+  GPUBufferCapability,
   GPUComputeCapability,
   GPUInitResult,
   GPUBatchRequest,
