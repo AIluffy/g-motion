@@ -175,7 +175,6 @@ export function createScopedMotion(root: Element): ScopedMotionFn {
 export { FrameSampler } from '@g-motion/shared';
 export type { FrameRoundingMode } from '@g-motion/shared';
 export * from './api/adjust';
-export * from './api/animate';
 export * from './api/options';
 export * from './api/builder';
 export type { Interpolator } from './api/interpolator';
