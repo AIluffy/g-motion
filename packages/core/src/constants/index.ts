@@ -4,7 +4,7 @@
  * Centralizes magic numbers to improve code readability and maintainability
  */
 
-import { WebGPUConstants } from '@g-motion/webgpu';
+import { GPU_DEFAULTS } from '@g-motion/shared';
 
 export const SchedulingConstants = {
   MAX_FRAME_TIME_MS: 100,
@@ -24,7 +24,7 @@ export const ARCHETYPE_DEFAULTS = {
   GROWTH_FACTOR: 2,
 } as const;
 
-export { WebGPUConstants };
+export const WebGPUConstants = GPU_DEFAULTS;
 
 /**
  * WebGPU workgroup size hints for optimal GPU utilization

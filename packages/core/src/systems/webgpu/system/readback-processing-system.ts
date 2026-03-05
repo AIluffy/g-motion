@@ -1,5 +1,4 @@
-import { WebGPUConstants } from '@g-motion/webgpu';
-import { createDebugger, getNowMs } from '@g-motion/shared';
+import { createDebugger, getNowMs, GPU_DEFAULTS } from '@g-motion/shared';
 import type { GPUMetricsProvider, WebGPUEngine } from '../../../gpu-bridge/types';
 import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../../gpu-bridge';
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
@@ -165,7 +164,7 @@ export function processCompletedReadbacks(params: {
               shadow.state,
               Number(physicsTag.dtMs ?? 0),
               Number(physicsTag.dtSec ?? 0),
-              Number(physicsTag.maxVelocity ?? WebGPUConstants.GPU.PHYSICS_MAX_VELOCITY_DEFAULT),
+              Number(physicsTag.maxVelocity ?? GPU_DEFAULTS.GPU.PHYSICS_MAX_VELOCITY_DEFAULT),
             );
             const limit = Math.min(slotCount, 2048);
             let maxAbs = 0;
@@ -175,7 +174,7 @@ export function processCompletedReadbacks(params: {
               const abs = Math.abs(got - expected);
               if (abs > maxAbs) maxAbs = abs;
             }
-            const threshold = WebGPUConstants.GPU.PHYSICS_SETTLE_THRESHOLD_DEFAULT;
+            const threshold = GPU_DEFAULTS.GPU.PHYSICS_SETTLE_THRESHOLD_DEFAULT;
             if (maxAbs > threshold) {
               if (engine.frameId - shadow.lastWarnFrame >= 60) {
                 shadow.lastWarnFrame = engine.frameId;
