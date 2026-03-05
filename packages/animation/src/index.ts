@@ -1,5 +1,10 @@
-import { getEngineForWorld, MotionStatus, World, WorldProvider } from '@g-motion/core';
-import { getDomEnvironment } from '@g-motion/shared/dom';
+import {
+  getEngineForWorld,
+  getPlatformCapabilities,
+  MotionStatus,
+  World,
+  WorldProvider,
+} from '@g-motion/core';
 import { ensureValueParsersRegistered } from '@g-motion/values';
 import { motion as builderMotion } from './api/builder';
 import type { DomAnimationScope } from './api/control';
@@ -109,11 +114,11 @@ export function inspectTargets(
   input: unknown,
   options?: InspectTargetsOptions,
 ): InspectTargetsResult {
-  const root = options?.root ?? (typeof document !== 'undefined' ? document : null);
-  const hasDocument = typeof document !== 'undefined';
-  const hasWindow = typeof window !== 'undefined';
-  const domEnv = getDomEnvironment();
-  const hasDOM = domEnv.hasDocument();
+  const platform = getPlatformCapabilities();
+  const hasDocument = platform.hasDocument();
+  const hasWindow = platform.hasWindow();
+  const root = options?.root ?? (hasDocument ? (globalThis.document as Document) : null);
+  const hasDOM = hasDocument;
   const selectorCache: SelectorCache = {};
   const resolved = resolveTargets(input, {
     root: root ?? undefined,
@@ -140,7 +145,8 @@ export function inspectTargets(
 export const motion = <T extends MotionTarget>(target: T, options?: MotionOptions) => {
   const world = WorldProvider.useWorld();
   initEngine(world);
-  const root = typeof document !== 'undefined' ? document : null;
+  const platform = getPlatformCapabilities();
+  const root = platform.hasDocument() ? (globalThis.document as Document) : null;
   const builderTarget = normalizeTargets(target, root, options);
   return builderMotion<T>(builderTarget as T);
 };

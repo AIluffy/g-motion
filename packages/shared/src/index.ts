@@ -1,11 +1,4 @@
-export {
-  EasingRegistry,
-  getCustomEasingVersion,
-  getCustomGpuEasings,
-  getEasingId,
-  globalEasingRegistry,
-  registerGpuEasing,
-} from './easing';
+export { EasingRegistry, getEasingId } from './easing';
 export type { EasingEntry } from './easing';
 
 export { Registry, RegistryWithDefaults } from './collections';

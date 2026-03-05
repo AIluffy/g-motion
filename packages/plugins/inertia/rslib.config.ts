@@ -8,6 +8,7 @@ export default defineConfig({
     tsconfigPath: './tsconfig.json',
     entry: {
       index: './src/index.ts',
+      'auto-register': './src/auto-register.ts',
     },
   },
 });

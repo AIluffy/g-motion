@@ -1,5 +1,6 @@
 import type { ComponentDef } from './component';
 import type { RendererDef, SystemDef } from './system';
+import type { ShaderDef } from './shader';
 import type { FrameCallback, Priority } from './types';
 
 export interface EngineLike {
@@ -31,8 +32,8 @@ export interface MotionApp {
   registerSystem(system: SystemDef): void;
   registerRenderer(name: string, renderer: RendererDef): void;
   registerGpuEasing(wgslFn: string): string;
-  registerShader(shader: unknown): void;
-  getConfig(): unknown;
+  registerShader(shader: ShaderDef): void;
+  getConfig(): Record<string, unknown>;
   getRenderer(name: string): unknown;
 }
 
@@ -46,29 +47,4 @@ export interface MotionPlugin {
     config?: Record<string, unknown>;
     setup?(app: MotionApp, services?: unknown): void;
   };
-}
-
-const pluginRegistry: MotionPlugin[] = [];
-const pluginNames = new Set<string>();
-
-export function registerPlugin(plugin: MotionPlugin): boolean {
-  if (pluginNames.has(plugin.name)) {
-    return false;
-  }
-  pluginRegistry.push(plugin);
-  pluginNames.add(plugin.name);
-  return true;
-}
-
-export function getRegisteredPlugins(): readonly MotionPlugin[] {
-  return pluginRegistry;
-}
-
-export function clearPluginRegistry(): void {
-  pluginRegistry.length = 0;
-  pluginNames.clear();
-}
-
-export function isPluginRegistered(pluginName: string): boolean {
-  return pluginNames.has(pluginName);
 }

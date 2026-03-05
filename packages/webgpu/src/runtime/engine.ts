@@ -14,6 +14,8 @@ import { GPUDeviceLifecycle } from '../gpu/lifecycle';
 import { GPUFrameCoordinator } from '../gpu/frame';
 import { GPUPipelineRegistry } from '../gpu/registry';
 import { GPURuntimeState } from '../gpu/state';
+import type { MetricsCollector } from '../types/metrics-collector';
+import { noopMetricsCollector } from '../types/metrics-collector';
 
 export interface ComputeMetrics {
   dispatchCount: number;
@@ -35,6 +37,7 @@ export interface BufferAllocation {
 export interface WebGPUEngineConfig {
   powerPreference?: GPUPowerPreference;
   timestampQuery?: boolean;
+  metricsCollector?: MetricsCollector | null;
 }
 
 export class WebGPUEngine {
@@ -42,12 +45,15 @@ export class WebGPUEngine {
   private pipelineRegistry: GPUPipelineRegistry;
   private frameCoordinator: GPUFrameCoordinator;
   private deviceLifecycle: GPUDeviceLifecycle;
-  private readonly config: Required<WebGPUEngineConfig>;
+  private readonly config: Omit<Required<WebGPUEngineConfig>, 'metricsCollector'> & {
+    metricsCollector: MetricsCollector;
+  };
 
   constructor(cfg: WebGPUEngineConfig = {}) {
     this.config = {
       powerPreference: cfg.powerPreference ?? 'high-performance',
       timestampQuery: cfg.timestampQuery ?? true,
+      metricsCollector: cfg.metricsCollector ?? noopMetricsCollector,
     };
     this.runtimeState = new GPURuntimeState();
     this.pipelineRegistry = new GPUPipelineRegistry();
@@ -63,7 +69,15 @@ export class WebGPUEngine {
   }
 
   async initialize(): Promise<DeviceInitResult> {
-    return this.deviceLifecycle.initialize();
+    this.config.metricsCollector.mark('webgpu-engine:initialize:start');
+    const start = performance.now();
+    const result = await this.deviceLifecycle.initialize();
+    this.config.metricsCollector.measure(
+      'webgpu-engine:initialize',
+      performance.now() - start,
+      { ok: result.ok },
+    );
+    return result;
   }
   createBuffer(size: number, usage: GPUBufferUsageFlags, label?: string): GPUBuffer | null {
     return this.frameCoordinator.createBuffer(size, usage, label);
@@ -92,12 +106,21 @@ export class WebGPUEngine {
     workgroupCountY = 1,
     workgroupCountZ = 1,
   ): Promise<boolean> {
-    return this.pipelineRegistry.executeCompute(
+    const start = performance.now();
+    const executed = await this.pipelineRegistry.executeCompute(
       buffers,
       workgroupCountX,
       workgroupCountY,
       workgroupCountZ,
     );
+    this.config.metricsCollector.measure('webgpu-engine:execute-compute', performance.now() - start, {
+      executed,
+      buffers: buffers.length,
+      workgroupCountX,
+      workgroupCountY,
+      workgroupCountZ,
+    });
+    return executed;
   }
   cachePipeline(
     device: GPUDevice,
@@ -137,6 +160,9 @@ export class WebGPUEngine {
   }
   get frameId() {
     return this.runtimeState.frameId;
+  }
+  get metricsCollector() {
+    return this.config.metricsCollector;
   }
   get outputFormatStatsCounter() {
     return this.runtimeState.outputFormatStatsCounter;

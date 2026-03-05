@@ -1,20 +1,4 @@
 /**
- * Shared physics animation contract types.
- */
-
-/**
- * Spring animation options.
- */
-export interface SpringOptions {
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  restSpeed?: number;
-  restDelta?: number;
-  initialVelocity?: number;
-}
-
-/**
  * Inertia animation options.
  */
 export interface InertiaOptions {
@@ -32,18 +16,6 @@ export interface InertiaOptions {
   bounce?: false | { stiffness?: number; damping?: number; mass?: number };
   restSpeed?: number;
   restDelta?: number;
-}
-
-/**
- * Spring component data.
- */
-export interface SpringComponentData {
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  restSpeed?: number;
-  restDelta?: number;
-  velocities?: Map<string, number>;
 }
 
 /**

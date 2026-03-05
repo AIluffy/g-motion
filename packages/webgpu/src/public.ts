@@ -23,3 +23,6 @@ export { WebGPUConstants } from './constants/webgpu';
 
 // Common public types
 export type { GPUBatchDescriptor, PhysicsBatchDescriptor } from './runtime/types';
+
+export type { MetricsCollector } from './types/metrics-collector';
+export { noopMetricsCollector } from './types/metrics-collector';

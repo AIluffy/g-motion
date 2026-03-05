@@ -1,5 +1,4 @@
 import type { MotionPlugin } from '@g-motion/protocol';
-import { registerPlugin } from '@g-motion/protocol';
 import { SpringComponentSchema } from './physics/schema';
 import springShaderCode from './shaders/spring.wgsl?raw';
 
@@ -36,13 +35,11 @@ export const springPlugin: MotionPlugin = {
   },
 };
 
-// Auto-register plugin for auto-discovery
-registerPlugin(springPlugin);
 
 // Re-export all exports from sub-modules
 export { SpringComponentSchema } from './physics/schema';
 export { analyzeSpringTracks, buildSpringComponent } from './physics/tracks';
-export type { SpringOptions } from '@g-motion/protocol';
+export type { SpringOptions, SpringComponentData } from './types';
 
 // Re-export shader code for external use
 export { default as SPRING_GPU_SHADER } from './shaders/spring.wgsl?raw';

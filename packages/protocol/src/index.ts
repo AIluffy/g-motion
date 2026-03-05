@@ -1,11 +1,5 @@
 export type { Plugin, PluginContext, WorldLike, EngineLike } from './plugin';
-export {
-  definePlugin,
-  registerPlugin,
-  getRegisteredPlugins,
-  clearPluginRegistry,
-  isPluginRegistered,
-} from './plugin';
+export { definePlugin } from './plugin';
 export type { MotionApp, MotionPlugin } from './plugin';
 
 export type {
@@ -15,11 +9,6 @@ export type {
   TargetResolveResult,
   TargetResolver,
 } from './target-resolver';
-export {
-  registerTargetResolver,
-  registerTargetResolverWithScope,
-  resolveWithRegisteredTargetResolvers,
-} from './target-resolver';
 
 export type { Disposable, FrameCallback, Priority } from './types';
 
@@ -27,6 +16,11 @@ export type { SystemDef, SystemContext, RendererDef, RendererBatchContext } from
 export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';
 export type {
   GPUBridge,
+  GPUResultQueueCapability,
+  GPUWorkgroupCapability,
+  GPUPhysicsCapability,
+  GPUChannelCapability,
+  GPUBufferCapability,
   GPUComputeCapability,
   GPUInitResult,
   GPUBatchRequest,
@@ -34,12 +28,7 @@ export type {
   GPUResultEntry,
   GPUMetrics,
 } from './gpu-bridge';
-export { registerGPUBridge, getGPUBridge, requireGPUBridge, clearGPUBridge } from './gpu-bridge';
 
 
-export type {
-  SpringOptions,
-  InertiaOptions,
-  SpringComponentData,
-  InertiaComponentData,
-} from './physics';
+export type { PlatformCapabilities, PlatformProvider } from './platform';
+export type { ShaderBindingDef, ShaderDef } from './shader';

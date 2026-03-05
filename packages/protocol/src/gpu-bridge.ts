@@ -1,3 +1,5 @@
+type GPUDevice = unknown;
+
 export interface GPUBridge {
   readonly isAvailable: boolean;
   initialize(config?: Record<string, unknown>): Promise<GPUInitResult>;
@@ -10,34 +12,40 @@ export interface GPUBridge {
   reset(): void;
 }
 
-export interface GPUComputeCapability {
+export interface GPUResultQueueCapability {
   getGPUResultQueueLength?(): number;
   getPendingReadbackCount?(): number;
   setGPUResultWakeup?(wakeup?: () => void): void;
-  getPersistentGPUBufferManager(device?: GPUDevice): {
-    getStats(): {
-      bytesSkipped?: number;
-      totalBytesProcessed?: number;
-      currentMemoryUsage?: number;
-      peakMemoryUsage?: number;
-      totalMemoryBytes?: number;
-    };
-  };
+}
+
+export interface GPUWorkgroupCapability {
   selectWorkgroupSize?(archetypeId: string, entityCount: number): number;
   setForcedWorkgroupSize?(size: number | null): void;
   consumeForcedGPUStateSyncEntityIdsSet?(): Set<number>;
+}
+
+export interface GPUPhysicsCapability {
   isPhysicsGPUEntity?(entityId: number): boolean;
+}
+
+export interface GPUChannelCapability {
   getGPUChannelMappingRegistry(): {
-    getChannels(archetypeId: string):
-      | {
-          stride: number;
-          rawStride?: number;
-          channels: Array<{ index: number; property: string }>;
-          rawChannels?: Array<{ index: number; property: string }>;
-        }
-      | undefined;
+    getChannels(archetypeId: string): unknown;
   };
 }
+
+export interface GPUBufferCapability {
+  getPersistentGPUBufferManager(device?: GPUDevice): {
+    getStats(): unknown;
+  };
+}
+
+export type GPUComputeCapability =
+  GPUResultQueueCapability &
+  GPUWorkgroupCapability &
+  GPUPhysicsCapability &
+  GPUChannelCapability &
+  GPUBufferCapability;
 
 export interface GPUInitResult {
   success: boolean;
@@ -72,27 +80,4 @@ export interface GPUResultEntry {
 export interface GPUMetrics {
   clear(): void;
   [key: string]: unknown;
-}
-
-let _gpuBridge: GPUBridge | null = null;
-
-export function registerGPUBridge(bridge: GPUBridge): void {
-  _gpuBridge = bridge;
-}
-
-export function getGPUBridge(): GPUBridge | null {
-  return _gpuBridge;
-}
-
-export function requireGPUBridge(): GPUBridge {
-  if (!_gpuBridge) {
-    throw new Error(
-      'GPUBridge not registered. Install @g-motion/webgpu and call registerGPUBridge().',
-    );
-  }
-  return _gpuBridge;
-}
-
-export function clearGPUBridge(): void {
-  _gpuBridge = null;
 }

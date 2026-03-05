@@ -64,10 +64,10 @@
     "bench": "pnpm --filter @g-motion/benchmark bench"
   },
   "dependencies": {
-    "@g-motion/shared": "workspace:*",
-    "@g-motion/benchmark": "workspace:*"
+    "@g-motion/shared": "workspace:*"
   },
   "devDependencies": {
+    "@g-motion/benchmark": "workspace:*",
     "@rslib/core": "workspace:*",
     "@types/node": "workspace:*",
     "typescript": "workspace:*",

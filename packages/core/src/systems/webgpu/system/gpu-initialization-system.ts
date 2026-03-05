@@ -1,5 +1,5 @@
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
-import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
+import { getCustomEasingVersion, getCustomGpuEasings } from '../../../runtime/easing-registry';
 import { getGPUModuleSync } from '../../../gpu-bridge';
 import type { GPUMetricsProvider, WebGPUInitResult } from '../../../gpu-bridge/types';
 import type { WebGPUEngine } from '../../../gpu-bridge/types';

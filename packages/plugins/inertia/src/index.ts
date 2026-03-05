@@ -1,5 +1,4 @@
 import type { MotionPlugin } from '@g-motion/protocol';
-import { registerPlugin } from '@g-motion/protocol';
 import { InertiaComponentSchema } from './physics/schema';
 import inertiaShaderCode from './shaders/inertia.wgsl?raw';
 
@@ -36,14 +35,12 @@ export const inertiaPlugin: MotionPlugin = {
   },
 };
 
-// Auto-register plugin for auto-discovery
-registerPlugin(inertiaPlugin);
 
 // Re-export all exports from sub-modules
 export { InertiaComponentSchema } from './physics/schema';
 export { VelocityTracker } from './physics/velocity';
 export { analyzeInertiaTracks, buildInertiaComponent } from './physics/tracks';
-export type { InertiaOptions } from '@g-motion/protocol';
+export type { InertiaOptions, InertiaComponentData } from './types';
 
 // Re-export shader code for external use
 export { default as INERTIA_GPU_SHADER } from './shaders/inertia.wgsl?raw';

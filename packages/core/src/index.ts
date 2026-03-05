@@ -7,9 +7,12 @@ export * from './constants';
 export * from './runtime/context';
 export * from './data';
 export * from './runtime/engine';
+export * from './runtime/easing-registry';
+export * from './runtime/gpu-registry';
 export * from './ecs/entities';
 export * from './runtime/plugin';
 export * from './runtime/target-resolver';
+export * from './runtime/platform-registry';
 export * from './ecs/registry';
 export * from './render/renderer-code';
 export * from './scheduler/scheduler';
@@ -25,11 +28,3 @@ export * from './utils';
 export * from './runtime/world';
 export * from './runtime/world-provider';
 
-export {
-  type Plugin,
-  type PluginContext,
-  definePlugin,
-  type Disposable,
-  type FrameCallback,
-  type Priority,
-} from '@g-motion/protocol';

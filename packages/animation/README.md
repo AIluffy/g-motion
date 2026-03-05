@@ -104,6 +104,10 @@ scopedMotion('.box').mark({ to: { x: 120 }, duration: 200 }).play();
 
 ### motion() 与 MotionBuilder
 
+> 物理插件注册说明：`@g-motion/plugin-spring` 与 `@g-motion/plugin-inertia` 默认**不会**自动注册。
+> 你需要手动执行 `registerPlugin(springPlugin/inertiaPlugin)`，或显式导入
+> `@g-motion/plugin-spring/auto-register`、`@g-motion/plugin-inertia/auto-register`。
+
 ```ts
 motion(target, options?)
   .track(prop)
