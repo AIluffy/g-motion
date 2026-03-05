@@ -26,4 +26,4 @@ export const InertiaComponent: ComponentDef = {
   schema: InertiaComponentSchema,
 };
 
-export type { InertiaOptions } from '@g-motion/shared/types';
+export type { InertiaOptions } from '@g-motion/protocol';

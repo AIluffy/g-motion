@@ -36,3 +36,10 @@ export type {
 } from './gpu-bridge';
 export { registerGPUBridge, getGPUBridge, requireGPUBridge, clearGPUBridge } from './gpu-bridge';
 
+
+export type {
+  SpringOptions,
+  InertiaOptions,
+  SpringComponentData,
+  InertiaComponentData,
+} from './physics';
