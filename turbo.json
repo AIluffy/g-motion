@@ -3,6 +3,7 @@
   "tasks": {
     "build": {
       "outputs": ["dist/**", "build/**"],
+      "inputs": ["src/**", "rslib.config.ts", "tsconfig.json", "package.json"],
       "cache": true,
       "dependsOn": ["^build"]
     },
@@ -17,7 +18,13 @@
       "cache": true
     },
     "type-check": {
-      "cache": true
+      "cache": true,
+      "dependsOn": ["^build"]
+    },
+    "bench": {
+      "outputs": [],
+      "cache": false,
+      "dependsOn": ["build"]
     },
     "dev": {
       "cache": false,
