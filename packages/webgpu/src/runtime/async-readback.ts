@@ -1,6 +1,5 @@
-import { createDebugger } from '@g-motion/shared';
-import { WebGPUConstants } from '@g-motion/shared';
-import { getNowMs } from '@g-motion/shared';
+import { createDebugger, getNowMs } from '@g-motion/shared';
+import { WebGPUConstants } from '../constants/webgpu';
 
 export interface PendingReadback {
   archetypeId: string;

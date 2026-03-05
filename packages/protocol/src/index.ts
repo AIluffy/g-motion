@@ -22,3 +22,16 @@ export {
 } from './target-resolver';
 
 export type { Disposable, FrameCallback, Priority } from './types';
+
+export type { SystemDef, SystemContext, RendererDef, RendererBatchContext } from './system';
+export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';
+export type {
+  GPUBridge,
+  GPUInitResult,
+  GPUBatchRequest,
+  GPUPhysicsBatchRequest,
+  GPUResultEntry,
+  GPUMetrics,
+} from './gpu-bridge';
+export { registerGPUBridge, getGPUBridge, requireGPUBridge, clearGPUBridge } from './gpu-bridge';
+

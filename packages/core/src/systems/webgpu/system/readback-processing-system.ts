@@ -1,13 +1,13 @@
 import { WebGPUConstants } from '@g-motion/shared';
 import { createDebugger, getNowMs } from '@g-motion/shared';
-import type { GPUMetricsProvider, WebGPUEngine } from '@g-motion/webgpu/internal';
+import type { GPUMetricsProvider, WebGPUEngine } from '../../../gpu-bridge/types';
 import {
   enqueueGPUResults,
   PHYSICS_STATE_STRIDE,
   processOutputBuffer,
   setPendingReadbackCount,
   tryReleasePooledOutputBufferFromTag,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge';
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow, stepPhysicsShadow } from '../physics-validation';

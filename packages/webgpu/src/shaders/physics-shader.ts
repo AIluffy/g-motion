@@ -8,7 +8,7 @@
  * This file contains the combined physics shader and general utility functions.
  */
 
-import { WebGPUConstants } from '@g-motion/shared';
+import { WebGPUConstants } from '../constants/webgpu';
 import physicsCombinedShaderCode from './physics-combined.wgsl?raw';
 
 // Combined physics shader with both spring and inertia (core infrastructure)

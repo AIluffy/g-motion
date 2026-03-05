@@ -4,7 +4,7 @@ import {
   DirtyRegionTracker,
   PersistentGPUBufferManager,
 } from '../src/gpu/persistent-buffer-manager';
-import { WebGPUConstants } from '@g-motion/shared';
+import { WebGPUConstants } from '../src/constants/webgpu';
 import {
   clearViewportCullingPipelineCache,
   getCullingCompactPipeline,

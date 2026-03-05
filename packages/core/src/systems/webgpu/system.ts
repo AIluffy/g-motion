@@ -19,19 +19,15 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge/types';
 import {
   clearPhysicsGPUEntities,
   createWebGPUFrameEncoder,
+  getWebGPUTestingModule,
   getWebGPUEngine,
   resetWebGPUEngine,
   setPendingReadbackCount,
-} from '@g-motion/webgpu/internal';
-import {
-  __resetKeyframePassesForTests,
-  __resetOutputFormatPassForTests,
-  __resetViewportCullingPassForTests,
-} from '@g-motion/webgpu/testing';
+} from '../../gpu-bridge';
 import type { SystemContext, SystemDef } from '../../runtime/plugin';
 import type { GPUFrameContext } from './frame-context';
 import { createGPUFrameContext } from './frame-context';
@@ -49,9 +45,8 @@ export {
   disableGPUOutputFormatPass,
   enableGPUOutputFormatPass,
   processOutputBuffer,
-} from '@g-motion/webgpu/internal';
-export type { ProcessOutputBufferInput } from '@g-motion/webgpu/internal';
-export { __getKeyframeSearchShaderModeForTests } from '@g-motion/webgpu/testing';
+} from '../../gpu-bridge';
+export type { ProcessOutputBufferInput } from '../../gpu-bridge/types';
 export { debugIO, firstEntityChannelPreview, float32Preview } from './debug';
 export {
   clearPhysicsValidationShadow,
@@ -63,14 +58,25 @@ export {
 } from './physics-validation';
 export { __resolveKeyframeSearchOptimizedFlagForTests } from './system-config';
 
-const engine = getWebGPUEngine();
 const warn = createDebugger('WebGPUComputeSystem', 'warn');
 
+function getEngineOrNull() {
+  try {
+    return getWebGPUEngine();
+  } catch {
+    return null;
+  }
+}
+
 export function __resetWebGPUComputeSystemForTests(): void {
+  const engine = getEngineOrNull();
+  if (!engine) return;
   engine.resetForTests();
-  __resetOutputFormatPassForTests();
-  __resetViewportCullingPassForTests();
-  __resetKeyframePassesForTests();
+  void getWebGPUTestingModule().then((mod) => {
+    mod?.__resetOutputFormatPassForTests();
+    mod?.__resetViewportCullingPassForTests();
+    mod?.__resetKeyframePassesForTests();
+  });
   resetWebGPUEngine();
   setPendingReadbackCount(0);
 }
@@ -95,6 +101,8 @@ export const WebGPUComputeSystem: SystemDef = {
   async update(_dt: number, ctx?: SystemContext) {
     const deps = resolveComputeDeps(ctx);
     if (!deps) return;
+    const engine = getEngineOrNull();
+    if (!engine) return;
 
     const { world, metricsProvider, processor, config } = deps;
 
@@ -169,7 +177,7 @@ export const WebGPUComputeSystem: SystemDef = {
 
     engine.beginFrame();
 
-    await processArchetypeBatches(frameContext, archetypeBatches);
+    await processArchetypeBatches(frameContext, archetypeBatches, engine);
 
     sp.nextFrame();
     engine.endFrame();
@@ -193,6 +201,7 @@ function resolveComputeDeps(ctx: SystemContext | undefined): {
 async function processArchetypeBatches(
   frameContext: GPUFrameContext,
   archetypeBatches: Map<string, ArchetypeBatchDescriptor>,
+  engine: ReturnType<typeof getWebGPUEngine>,
 ): Promise<void> {
   const { device, services, flags, physics } = frameContext;
   const { world, processor, config, metricsProvider } = services;

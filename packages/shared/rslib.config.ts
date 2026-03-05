@@ -7,6 +7,8 @@ export default defineConfig({
     entry: {
       index: './src/index.ts',
       'types-entry': './src/types-entry.ts',
+      'dom-entry': './src/dom-entry.ts',
+      'transform-entry': './src/transform-entry.ts',
     },
   },
 });

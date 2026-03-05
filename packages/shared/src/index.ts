@@ -24,6 +24,14 @@ export { getNowMs } from './time/now';
 export { clamp, clamp01, lerp } from './math/interpolation';
 export { NonNegativeRollingAverage } from './math/rolling-average';
 
+export * from './types';
+export * from './constants';
+
+export { TimelineTracksMap } from './timeline';
+
+/**
+ * @deprecated 使用 @g-motion/shared/dom
+ */
 export {
   createDomTargetResolver,
   getDomEnvironment,
@@ -31,6 +39,7 @@ export {
   resolveDomElements,
   setDomEnvironment,
 } from './dom/target-resolver';
+/** @deprecated 使用 @g-motion/shared/dom */
 export type {
   DomEnvironment,
   DomResolvedTarget,
@@ -38,16 +47,10 @@ export type {
   DomTargetResolverContext,
   NodeListLike,
 } from './dom/target-resolver';
+/** @deprecated 使用 @g-motion/shared/dom */
 export { isArrayLike, isDomElement, isNodeList } from './dom/type-guards';
 
-export { crc32 } from './stream/crc32';
-export { encodePackedFrame, PackedStreamDecoder } from './stream/packed-stream';
-export type { PackedFrame, PackedFrameHeader } from './stream/packed-stream';
-
-export * from './types';
-
-export * from './constants';
-
+/** @deprecated 使用 @g-motion/shared/transform */
 export {
   DEFAULT_HALF_FLOAT_COMPONENTS,
   EXCLUDED_STYLE_KEYS,
@@ -56,8 +59,16 @@ export {
   TRANSFORM_KEYS,
   TRANSFORM_TYPED_KEYS,
 } from './transform/constants';
+/** @deprecated 使用 @g-motion/shared/transform */
 export { buildTransformTypedBuffers } from './transform/typed-buffers';
+/** @deprecated 使用 @g-motion/shared/transform */
 export type { TransformTypedBuffers } from './transform/typed-buffers';
+/** @deprecated 使用 @g-motion/shared/transform */
 export type { Quaternion, Rotate3D, TransformOrigin, TransformProperties } from './transform/types';
 
-export { TimelineTracksMap } from './timeline';
+/** @deprecated 使用 @g-motion/webgpu */
+export { crc32 } from './stream/crc32';
+/** @deprecated 使用 @g-motion/webgpu */
+export { encodePackedFrame, PackedStreamDecoder } from './stream/packed-stream';
+/** @deprecated 使用 @g-motion/webgpu */
+export type { PackedFrame, PackedFrameHeader } from './stream/packed-stream';

@@ -3,14 +3,14 @@ import type {
   PhysicsBatchDescriptor,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge/types';
 import {
   dispatchPhysicsBatch,
   getPersistentGPUBufferManager,
   markPhysicsGPUEntity,
   PHYSICS_STATE_STRIDE,
   setPendingReadbackCount,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge';
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';

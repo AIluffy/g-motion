@@ -5,6 +5,7 @@ import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';
 import { getRegisteredPlugins } from './plugin';
 import type { SystemScheduler } from '../scheduler/scheduler';
+import { preloadWebGPUModule } from '../gpu-bridge';
 import { World } from './world';
 import { WorldProvider } from './world-provider';
 
@@ -87,6 +88,7 @@ class MotionEngineImpl implements MotionEngine {
     };
 
     this.scheduler.setServices(this.services);
+    void preloadWebGPUModule();
   }
 
   get disposed(): boolean {

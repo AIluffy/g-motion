@@ -19,7 +19,8 @@
  * ```
  */
 
-import { DEFAULT_HALF_FLOAT_COMPONENTS, createDebugger } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
+import { DEFAULT_HALF_FLOAT_COMPONENTS } from '@g-motion/shared/transform';
 
 const debug = createDebugger('HalfFloat');
 

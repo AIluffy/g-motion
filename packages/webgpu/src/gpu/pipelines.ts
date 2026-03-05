@@ -1,4 +1,5 @@
-import { createDebugger, panic, WebGPUConstants } from '@g-motion/shared';
+import { createDebugger, panic } from '@g-motion/shared';
+import { WebGPUConstants } from '../constants/webgpu';
 import type { GPUMetricsProvider } from '../runtime/metrics';
 import { getGPUMetricsProvider } from '../runtime/metrics';
 

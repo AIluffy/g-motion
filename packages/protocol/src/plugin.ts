@@ -1,3 +1,5 @@
+import type { ComponentDef } from './component';
+import type { RendererDef, SystemDef } from './system';
 import type { FrameCallback, Priority } from './types';
 
 export interface EngineLike {
@@ -25,9 +27,9 @@ export function definePlugin(name: string, install: Plugin['install']): Plugin {
 }
 
 export interface MotionApp {
-  registerComponent(name: string, def: unknown): void;
-  registerSystem(system: unknown): void;
-  registerRenderer(name: string, renderer: unknown): void;
+  registerComponent(name: string, def: ComponentDef): void;
+  registerSystem(system: SystemDef): void;
+  registerRenderer(name: string, renderer: RendererDef): void;
   registerGpuEasing(wgslFn: string): string;
   registerShader(shader: unknown): void;
   getConfig(): unknown;
@@ -38,8 +40,8 @@ export interface MotionPlugin {
   name: string;
   version?: string;
   manifest: {
-    components?: Record<string, unknown>;
-    systems?: unknown[];
+    components?: Record<string, ComponentDef>;
+    systems?: SystemDef[];
     shaders?: Record<string, unknown>;
     config?: Record<string, unknown>;
     setup?(app: MotionApp, services?: unknown): void;

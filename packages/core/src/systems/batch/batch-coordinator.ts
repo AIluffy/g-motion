@@ -2,7 +2,7 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge/types';
 import type {
   BatchEntity,
   BatchKeyframe,

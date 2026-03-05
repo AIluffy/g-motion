@@ -1,3 +1,4 @@
+/** @deprecated 请从 @g-motion/webgpu 导入 */
 /**
  * CRC32 checksum calculation
  *

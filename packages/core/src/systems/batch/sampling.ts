@@ -20,8 +20,8 @@ import {
   setForcedWorkgroupSize,
   type RawKeyframeGenerationOptions,
   type RawKeyframeValueEvaluator,
-} from '@g-motion/webgpu/internal';
-import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge';
+import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '../../gpu-bridge/types';
 import { SchedulingConstants } from '../../constants';
 import type { SystemContext, SystemDef } from '../../runtime/plugin';
 import { getArchetypeBufferCache } from './archetype-buffer-cache';

@@ -1,3 +1,4 @@
+/** @deprecated 请从 @g-motion/webgpu 导入 WebGPUConstants */
 export const WebGPUConstants = {
   WORKGROUP: {
     SIZE_DEFAULT: 128,

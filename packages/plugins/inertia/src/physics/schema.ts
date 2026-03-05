@@ -1,4 +1,4 @@
-import type { ComponentDef } from '@g-motion/core';
+import type { ComponentDef } from '@g-motion/protocol';
 
 /**
  * InertiaComponent schema for plugin registration
@@ -26,4 +26,4 @@ export const InertiaComponent: ComponentDef = {
   schema: InertiaComponentSchema,
 };
 
-export type { InertiaOptions } from '@g-motion/core';
+export type { InertiaOptions } from '@g-motion/shared/types';

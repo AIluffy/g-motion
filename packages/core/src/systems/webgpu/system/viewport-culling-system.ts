@@ -3,13 +3,13 @@ import type {
   PendingReadback,
   WebGPUEngine,
   WebGPUFrameEncoder,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge/types';
 import {
   runViewportCullingCompactionPass,
   runViewportCullingCompactionPassAsync,
   setPendingReadbackCount,
   tryReleasePooledOutputBufferFromTag,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge';
 import type { World } from '../../../runtime/world';
 import type { ComputeBatchProcessor } from '../../batch';
 

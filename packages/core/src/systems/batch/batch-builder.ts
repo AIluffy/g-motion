@@ -13,7 +13,7 @@ import type { PreprocessedKeyframes, TimelineComponentData } from '@g-motion/sha
 import type {
   RawKeyframeGenerationOptions,
   RawKeyframeValueEvaluator,
-} from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge/types';
 import { canReuseBatch, canReusePreprocessed, computeBatchVersionHash } from './batch-cache';
 import { serializeKeyframes } from './keyframe-serializer';
 import { packEntityStates } from './state-packer';

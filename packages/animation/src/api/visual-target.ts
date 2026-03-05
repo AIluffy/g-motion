@@ -1,4 +1,5 @@
-import { GPU_CAPABLE_PROPERTIES, resolveDomElements } from '@g-motion/shared';
+import { GPU_CAPABLE_PROPERTIES } from '@g-motion/shared/transform';
+import { resolveDomElements } from '@g-motion/shared/dom';
 import { TargetType } from './mark';
 
 export type VisualTargetKind = 'dom' | 'object' | 'primitive';

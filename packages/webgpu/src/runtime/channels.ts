@@ -1,4 +1,5 @@
-import { STANDARD_GPU_CHANNEL_PROPERTIES, panic } from '@g-motion/shared';
+import { panic } from '@g-motion/shared';
+import { STANDARD_GPU_CHANNEL_PROPERTIES } from '@g-motion/shared/transform';
 import { OUTPUT_FORMAT } from '../shaders/output-format-shader';
 
 const STANDARD_TRANSFORM_PROPERTIES = STANDARD_GPU_CHANNEL_PROPERTIES;

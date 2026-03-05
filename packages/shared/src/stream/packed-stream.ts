@@ -1,3 +1,4 @@
+/** @deprecated 请从 @g-motion/webgpu 导入 */
 import { crc32 } from './crc32';
 
 const MAGIC = 0x504b4453;

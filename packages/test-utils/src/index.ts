@@ -230,3 +230,20 @@ export function createSpy<T extends (...args: unknown[]) => unknown>(impl?: T): 
 
   return spy as unknown as SpyFunction<T>;
 }
+
+export async function getKeyframeSearchShaderModeForTests(): Promise<string | null> {
+  try {
+    const mod = await import('@g-motion/webgpu/testing');
+    const mode = mod.__getKeyframeSearchShaderModeForTests();
+    return mode === null ? null : String(mode);
+  } catch {
+    return null;
+  }
+}
+
+/** @deprecated use getKeyframeSearchShaderModeForTests */
+export async function __getKeyframeSearchShaderModeForTests(): Promise<boolean | null> {
+  const mode = await getKeyframeSearchShaderModeForTests();
+  if (mode === null) return null;
+  return mode === 'true';
+}

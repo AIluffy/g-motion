@@ -1,9 +1,9 @@
-import type { ChannelMapping, GPUResultPacket } from '@g-motion/webgpu/internal';
+import type { ChannelMapping, GPUResultPacket } from '../../../gpu-bridge/types';
 import {
   isMatrix2DTransformChannels,
   isMatrix3DTransformChannels,
   unmarkPhysicsGPUEntity,
-} from '@g-motion/webgpu/internal';
+} from '../../../gpu-bridge';
 import { MotionStatus } from '../../../components/state';
 import type { World } from '../../../runtime/world';
 import {

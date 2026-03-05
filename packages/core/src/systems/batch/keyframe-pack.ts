@@ -1,5 +1,5 @@
 import { getEasingId } from '@g-motion/shared';
-import { EASING_MODE } from '@g-motion/webgpu';
+import { EASING_MODE } from '../../gpu-bridge';
 import { MIN_GPU_KEYFRAME_DURATION } from './constants';
 
 type EasingMode = (typeof EASING_MODE)[keyof typeof EASING_MODE];

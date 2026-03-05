@@ -7,6 +7,41 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./ecs": {
+      "types": "./dist/ecs.d.ts",
+      "import": "./dist/ecs.js",
+      "require": "./dist/ecs.cjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js",
+      "require": "./dist/runtime.cjs"
+    },
+    "./systems": {
+      "types": "./dist/systems.d.ts",
+      "import": "./dist/systems.js",
+      "require": "./dist/systems.cjs"
+    },
+    "./components": {
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js",
+      "require": "./dist/components.cjs"
+    },
+    "./scheduler": {
+      "types": "./dist/scheduler.d.ts",
+      "import": "./dist/scheduler.js",
+      "require": "./dist/scheduler.cjs"
+    },
+    "./batch": {
+      "types": "./dist/batch.d.ts",
+      "import": "./dist/batch.js",
+      "require": "./dist/batch.cjs"
+    },
+    "./webgpu-systems": {
+      "types": "./dist/webgpu-systems.d.ts",
+      "import": "./dist/webgpu-systems.js",
+      "require": "./dist/webgpu-systems.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -38,6 +73,31 @@
   "peerDependenciesMeta": {
     "@g-motion/webgpu": {
       "optional": true
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "ecs": [
+        "dist/ecs.d.ts"
+      ],
+      "runtime": [
+        "dist/runtime.d.ts"
+      ],
+      "systems": [
+        "dist/systems.d.ts"
+      ],
+      "components": [
+        "dist/components.d.ts"
+      ],
+      "scheduler": [
+        "dist/scheduler.d.ts"
+      ],
+      "batch": [
+        "dist/batch.d.ts"
+      ],
+      "webgpu-systems": [
+        "dist/webgpu-systems.d.ts"
+      ]
     }
   }
 }

@@ -3,8 +3,8 @@ import type {
   ArchetypeBatchDescriptor,
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
-} from '@g-motion/webgpu/internal';
-import { selectWorkgroupSize } from '@g-motion/webgpu/internal';
+} from '../../gpu-bridge/types';
+import { selectWorkgroupSize } from '../../gpu-bridge';
 import type { BatchStatistics } from './batch-statistics';
 import type { EntityIdLeasePool } from './entity-id-lease-pool';
 

@@ -1,6 +1,7 @@
 import type { MotionApp, MotionPlugin, TargetResolver } from '@g-motion/protocol';
 import { registerTargetResolver } from '@g-motion/protocol';
-import { createDebugger, createDomTargetResolver } from '@g-motion/shared';
+import { createDebugger } from '@g-motion/shared';
+import { createDomTargetResolver } from '@g-motion/shared/dom';
 import { TransformComponent } from './components/transform';
 import { createDOMRenderer, DOMRendererConfig } from './render/renderer';
 
