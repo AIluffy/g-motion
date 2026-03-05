@@ -1,4 +1,4 @@
-import { WebGPUConstants } from '@g-motion/shared';
+import { WebGPUConstants } from '@g-motion/webgpu';
 import { createDebugger, getNowMs } from '@g-motion/shared';
 import type { GPUMetricsProvider, WebGPUEngine } from '../../../gpu-bridge/types';
 import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../../gpu-bridge';

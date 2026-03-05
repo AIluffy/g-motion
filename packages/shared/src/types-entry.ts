@@ -16,4 +16,3 @@ export type GpuCapableProperty =
   (typeof import('./transform/constants').GPU_CAPABLE_PROPERTIES)[number];
 export type StandardGpuChannelProperty =
   (typeof import('./transform/constants').STANDARD_GPU_CHANNEL_PROPERTIES)[number];
-export type WebGPUConstantsShape = typeof import('./constants/webgpu').WebGPUConstants;

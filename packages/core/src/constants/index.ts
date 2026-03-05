@@ -4,7 +4,7 @@
  * Centralizes magic numbers to improve code readability and maintainability
  */
 
-import { WebGPUConstants } from '@g-motion/shared';
+import { WebGPUConstants } from '@g-motion/webgpu';
 
 export const SchedulingConstants = {
   MAX_FRAME_TIME_MS: 100,
