@@ -1,5 +1,6 @@
 import type { ComponentDef } from './component';
 import type { RendererDef, SystemDef } from './system';
+import type { ShaderDef } from './shader';
 import type { FrameCallback, Priority } from './types';
 
 export interface EngineLike {
@@ -31,8 +32,8 @@ export interface MotionApp {
   registerSystem(system: SystemDef): void;
   registerRenderer(name: string, renderer: RendererDef): void;
   registerGpuEasing(wgslFn: string): string;
-  registerShader(shader: unknown): void;
-  getConfig(): unknown;
+  registerShader(shader: ShaderDef): void;
+  getConfig(): Record<string, unknown>;
   getRenderer(name: string): unknown;
 }
 

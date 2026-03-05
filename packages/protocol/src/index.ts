@@ -26,3 +26,4 @@ export type {
 
 
 export type { PlatformCapabilities, PlatformProvider } from './platform';
+export type { ShaderBindingDef, ShaderDef } from './shader';

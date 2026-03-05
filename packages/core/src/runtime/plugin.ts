@@ -4,6 +4,9 @@ import type {
   ComponentValue,
   RendererBatchContext,
   RendererDef,
+  MotionApp as MotionAppBase,
+  ShaderBindingDef,
+  ShaderDef,
   SystemContext as ProtocolSystemContext,
   SystemDef,
 } from '@g-motion/protocol';
@@ -11,6 +14,9 @@ import type {
 export type {
   SystemDef,
   RendererDef,
+  MotionApp as MotionAppBase,
+  ShaderBindingDef,
+  ShaderDef,
   RendererBatchContext,
   ComponentDef,
   ComponentType,
@@ -238,12 +244,7 @@ export interface SystemContext extends ProtocolSystemContext {
 }
 
 // Minimal interface to avoid circular dependency with App
-export interface MotionApp {
-  registerComponent(name: string, def: ComponentDef): void;
-  registerSystem(system: SystemDef): void;
-  registerRenderer(name: string, renderer: RendererDef): void;
-  registerGpuEasing(wgslFn: string): string;
-  registerShader(shader: ShaderDef): void;
+export interface MotionApp extends MotionAppBase {
   getConfig(): MotionAppConfig;
   getRenderer(name: string): RendererDef | undefined;
 }
@@ -253,15 +254,6 @@ export interface MotionApp {
  */
 export interface PluginComponentDef {
   schema: Record<string, 'float32' | 'float64' | 'int32' | 'string' | 'object'>;
-}
-
-/**
- * GPU Shader binding definition
- */
-export interface ShaderBindingDef {
-  name: string;
-  type: 'storage' | 'uniform' | 'sampler' | 'texture';
-  access?: 'read' | 'write' | 'read_write';
 }
 
 /**
@@ -291,15 +283,7 @@ export interface PluginManifest {
   setup?(app: MotionApp, services?: EngineServices): void;
 }
 
-/**
- * Shader registration options
- */
-export interface ShaderDef {
-  name: string;
-  code: string;
-  entryPoint?: string;
-  bindings?: ShaderBindingDef[];
-}
+export type { ShaderBindingDef, ShaderDef } from '@g-motion/protocol';
 
 export type { MotionPlugin } from '@g-motion/protocol';
 export {
