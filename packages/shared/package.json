@@ -37,5 +37,8 @@
     "@types/node": "workspace:*",
     "typescript": "workspace:*",
     "vitest": "workspace:*"
+  },
+  "dependencies": {
+    "@g-motion/protocol": "workspace:*"
   }
 }

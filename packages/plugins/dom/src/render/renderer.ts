@@ -1,4 +1,4 @@
-import type { SystemDef, SystemContext, RendererDef } from '@g-motion/core';
+import type { SystemDef, SystemContext, RendererDef } from '@g-motion/protocol';
 import {
   TRANSFORM_TYPED_KEYS,
   buildTransformTypedBuffers,
@@ -339,7 +339,7 @@ export const DOMRenderSystem: SystemDef = {
   name: 'DOMRenderSystem',
   order: 35,
   update(_dt: number, ctx?: SystemContext) {
-    const world = ctx?.services.world;
+    const world = ctx?.services.world as any;
     if (!world) return;
     const renderer = createDOMRenderer();
 

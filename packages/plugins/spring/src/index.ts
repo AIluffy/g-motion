@@ -42,7 +42,7 @@ registerPlugin(springPlugin);
 // Re-export all exports from sub-modules
 export { SpringComponentSchema } from './physics/schema';
 export { analyzeSpringTracks, buildSpringComponent } from './physics/tracks';
-export type { SpringOptions } from '@g-motion/core';
+export type { SpringOptions } from '@g-motion/shared/types';
 
 // Re-export shader code for external use
 export { default as SPRING_GPU_SHADER } from './shaders/spring.wgsl?raw';

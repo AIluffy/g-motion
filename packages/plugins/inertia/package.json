@@ -29,7 +29,6 @@
     "@types/node": "workspace:*",
     "jsdom": "^27.2.0",
     "typescript": "workspace:*",
-    "vitest": "workspace:*",
-    "@g-motion/core": "workspace:*"
+    "vitest": "workspace:*"
   }
 }

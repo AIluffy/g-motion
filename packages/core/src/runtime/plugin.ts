@@ -1,42 +1,21 @@
-import type { ComponentDef, ComponentValue, TransformTypedBuffers } from '@g-motion/shared';
-
-export type {
+import type {
   ComponentDef,
   ComponentType,
   ComponentValue,
-  TransformTypedBuffers,
-} from '@g-motion/shared';
+  RendererBatchContext,
+  RendererDef,
+  SystemContext as ProtocolSystemContext,
+  SystemDef,
+} from '@g-motion/protocol';
 
-export interface SystemDef {
-  name: string;
-  order?: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  update(dt: number, ctx?: SystemContext): void;
-}
-
-export interface RendererBatchContext {
-  world: import('./world').World;
-  archetypeId: string;
-  entityIds: number[];
-  targets: unknown[];
-  componentBuffers: Map<string, Array<ComponentValue | undefined>>;
-  transformTypedBuffers: TransformTypedBuffers;
-}
-
-export interface RendererDef {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  update(entity: number, target: any, components: any): void;
-  preFrame?(): void;
-  postFrame?(): void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  updateWithAccessor?(
-    entity: number,
-    arget: any,
-    getComponent: (name: string) => any,
-    getTransformTyped?: () => any,
-  ): void;
-  updateBatch?(ctx: RendererBatchContext): void;
-}
+export type {
+  SystemDef,
+  RendererDef,
+  RendererBatchContext,
+  ComponentDef,
+  ComponentType,
+  ComponentValue,
+} from '@g-motion/protocol';
 
 /**
  * Configuration options for Motion animation engine.
@@ -243,7 +222,7 @@ export interface EngineServices {
   appContext: import('./context').AppContext;
 }
 
-export interface SystemContext {
+export interface SystemContext extends ProtocolSystemContext {
   services: EngineServices;
   dt: number;
   nowMs: number;
