@@ -8,4 +8,4 @@ export type {
   Keyframe,
   Track,
   TimelineData,
-} from '@g-motion/shared';
+} from '@g-motion/protocol';

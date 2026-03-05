@@ -1,5 +1,5 @@
 import { createDebugger } from '@g-motion/shared';
-import type { ComputeProvider } from '@g-motion/shared';
+import type { ComputeProvider } from '@g-motion/protocol';
 import { App, appWorld, app as globalApp, registerBuiltInRenderers } from './app';
 import { getAppContext } from './context';
 import type { EngineServices, MotionApp, MotionAppConfig, MotionPlugin } from './plugin';

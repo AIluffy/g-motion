@@ -1,10 +1,3 @@
-/**
- * @deprecated Please import physics types from @g-motion/plugin-spring or @g-motion/plugin-inertia.
- */
-
-/**
- * @deprecated Please import from @g-motion/plugin-spring.
- */
 export interface SpringOptions {
   stiffness?: number;
   damping?: number;
@@ -14,17 +7,12 @@ export interface SpringOptions {
   initialVelocity?: number;
 }
 
-/**
- * @deprecated Please import from @g-motion/plugin-inertia.
- */
 export interface InertiaOptions {
   velocity?: number | 'auto' | (() => number);
   velocitySource?: (track: string, ctx: { target: unknown }) => number;
-
   min?: number;
   max?: number;
   bounds?: { min?: number; max?: number };
-
   clamp?: boolean;
   deceleration?: number;
   resistance?: number;
@@ -34,9 +22,6 @@ export interface InertiaOptions {
   restDelta?: number;
 }
 
-/**
- * @deprecated Please import from @g-motion/plugin-spring.
- */
 export interface SpringComponentData {
   stiffness?: number;
   damping?: number;
@@ -46,9 +31,6 @@ export interface SpringComponentData {
   velocities?: Map<string, number>;
 }
 
-/**
- * @deprecated Please import from @g-motion/plugin-inertia.
- */
 export interface InertiaComponentData {
   timeConstant?: number;
   min?: number;

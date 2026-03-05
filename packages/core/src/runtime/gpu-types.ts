@@ -1,4 +1,4 @@
-import type { PreprocessedKeyframes, WorkgroupBatchDescriptor } from '@g-motion/shared';
+import type { PreprocessedKeyframes, WorkgroupBatchDescriptor } from '@g-motion/protocol';
 
 export interface RawKeyframeGenerationOptions {
   timeInterval: number;

@@ -11,7 +11,7 @@
  *   [12] bounceD       [13] bounceM        [14] type(0/1)    [15] reserved
  */
 
-import type { InertiaComponentData, SpringComponentData } from '@g-motion/shared';
+import type { InertiaComponentData, SpringComponentData } from '@g-motion/protocol';
 
 export function writeSpringSlot(
   buf: Float32Array,

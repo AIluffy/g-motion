@@ -19,7 +19,7 @@ import type {
   TimelineComponentData,
   TimelineData,
   Track,
-} from '@g-motion/shared';
+} from '@g-motion/protocol';
 import { MotionStatus } from '../../components/state';
 import { PHYSICS_STATE_STRIDE } from '../../runtime/gpu-access';
 import type { ArchetypeTypedBuffer } from '../../ecs/archetype';
