@@ -23,3 +23,6 @@ export * from './animation';
 
 // GPU 批处理类型 (含弃用标记)
 export * from './gpu-batch';
+
+// 计算能力抽象
+export * from './compute';

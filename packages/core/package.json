@@ -16,7 +16,6 @@
   ],
   "dependencies": {
     "@g-motion/shared": "workspace:*",
-    "@g-motion/webgpu": "workspace:*",
     "@g-motion/protocol": "workspace:*"
   },
   "scripts": {
@@ -32,5 +31,13 @@
     "@webgpu/types": "^0.1.67",
     "typescript": "workspace:*",
     "vitest": "workspace:*"
+  },
+  "peerDependencies": {
+    "@g-motion/webgpu": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@g-motion/webgpu": {
+      "optional": true
+    }
   }
 }

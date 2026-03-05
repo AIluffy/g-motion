@@ -239,7 +239,7 @@ export interface EngineServices {
   app: MotionApp;
   config: NormalizedMotionAppConfig;
   batchProcessor: import('../systems/batch').ComputeBatchProcessor;
-  metrics: import('@g-motion/webgpu').GPUMetricsProvider;
+  metrics: { clear: () => void };
   appContext: import('./context').AppContext;
 }
 
