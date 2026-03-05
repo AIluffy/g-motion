@@ -1,17 +1,11 @@
-import type { SystemDef, SystemContext, RendererDef } from '@g-motion/protocol';
-import {
-  TRANSFORM_TYPED_KEYS,
-  buildTransformTypedBuffers,
-  createDebugger,
-  resolveDomElements,
-} from '@g-motion/shared';
+import type { RendererDef } from '@g-motion/protocol';
+import { TRANSFORM_TYPED_KEYS, createDebugger, resolveDomElements } from '@g-motion/shared';
 import { DomStyleBatcher, initializeElementForGPU } from './style-batcher';
 import {
   buildTransformString,
   excludedStyleKeys,
   resolveTransformValues,
   TransformTyped,
-  TransformTypedBuffers,
 } from './transform';
 
 const debug = createDebugger('DOMRenderer');
@@ -138,47 +132,6 @@ function resolveCachedElement(target: any): HTMLElement | null {
   return null;
 }
 
-function buildTransformTypedBuffersForArchetype(archetype: any): TransformTypedBuffers {
-  return buildTransformTypedBuffers(
-    (component, field) => (archetype as any).getTypedBuffer?.(component, field),
-    transformTypedKeys,
-  );
-}
-
-function applyDomRenderFromArchetype(
-  renderer: RendererDef,
-  archetype: any,
-  entityIndex: number,
-  transformTypedBuffers: TransformTypedBuffers,
-  hasAnyTransformTyped: boolean,
-): void {
-  const renderBuffer = archetype.getBuffer('Render');
-  if (!renderBuffer) return;
-
-  const render = renderBuffer[entityIndex] as {
-    rendererId: string;
-    target: unknown;
-  };
-  if (render.rendererId !== 'dom') return;
-
-  const components: Record<string, any> = {};
-  for (const name of archetype.componentNames) {
-    const buffer = archetype.getBuffer(name);
-    if (buffer) {
-      components[name] = buffer[entityIndex];
-    }
-  }
-
-  if (hasAnyTransformTyped) {
-    components.TransformTyped = {
-      index: entityIndex,
-      buffers: transformTypedBuffers,
-    };
-  }
-
-  renderer.update(archetype.getEntityId(entityIndex), render.target, components);
-}
-
 export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
   const finalConfig: Required<DOMRendererConfig> = {
     ...defaultConfig,
@@ -282,20 +235,17 @@ export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
       apply(target, getComponent, getTransformTyped);
     },
     updateBatch(ctx) {
-      const world = (ctx as any).world;
-      let archetype: any = undefined;
-      if (world && typeof world.getArchetypes === 'function') {
-        for (const a of world.getArchetypes() as any) {
-          if (a && a.id === (ctx as any).archetypeId) {
+      const world = ctx.world;
+      let archetype = undefined;
+      if (world) {
+        for (const a of world.getArchetypes()) {
+          if (a && a.id === ctx.archetypeId) {
             archetype = a;
             break;
           }
         }
       }
-      const indices =
-        archetype && typeof archetype.getInternalEntityIndices === 'function'
-          ? (archetype as any).getInternalEntityIndices()
-          : undefined;
+      const indices = archetype?.getInternalEntityIndices?.();
       let currentIndex = -1;
       const getComponent = (name: string) => {
         const buffer = ctx.componentBuffers.get(name);
@@ -333,39 +283,3 @@ export function createDOMRenderer(config: DOMRendererConfig = {}): RendererDef {
     },
   };
 }
-
-// Legacy system export for backward compatibility (deprecated)
-export const DOMRenderSystem: SystemDef = {
-  name: 'DOMRenderSystem',
-  order: 35,
-  update(_dt: number, ctx?: SystemContext) {
-    const world = ctx?.services.world as any;
-    if (!world) return;
-    const renderer = createDOMRenderer();
-
-    for (const archetype of world.getArchetypes()) {
-      const renderBuffer = archetype.getBuffer('Render');
-      if (!renderBuffer) continue;
-
-      const transformTypedBuffers = buildTransformTypedBuffersForArchetype(archetype);
-
-      let hasAnyTransformTyped = false;
-      for (const k in transformTypedBuffers) {
-        if (transformTypedBuffers[k]) {
-          hasAnyTransformTyped = true;
-          break;
-        }
-      }
-
-      for (let i = 0; i < archetype.entityCount; i++) {
-        applyDomRenderFromArchetype(
-          renderer,
-          archetype,
-          i,
-          transformTypedBuffers,
-          hasAnyTransformTyped,
-        );
-      }
-    }
-  },
-};

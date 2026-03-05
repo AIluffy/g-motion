@@ -1,7 +1,21 @@
+export interface ArchetypeView {
+  id?: string;
+  entityCount: number;
+  componentNames: readonly string[];
+  getEntityId(index: number): number;
+  getBuffer(name: string): unknown;
+  getComponentBuffer?(name: string): unknown;
+  getInternalEntityIndices?(): Map<number, number>;
+}
+
+export interface WorldView {
+  getArchetypes(): Iterable<ArchetypeView>;
+}
+
 export interface SystemContext {
   nowMs?: number;
   services: {
-    world: unknown;
+    world: WorldView | undefined;
     scheduler?: unknown;
     app?: unknown;
     config?: unknown;
@@ -18,7 +32,7 @@ export interface SystemDef {
 }
 
 export interface RendererBatchContext {
-  world: unknown;
+  world: WorldView | undefined;
   archetypeId: string;
   entityIds: number[];
   targets: unknown[];
