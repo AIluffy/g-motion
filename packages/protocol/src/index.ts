@@ -12,7 +12,14 @@ export type {
 
 export type { Disposable, FrameCallback, Priority } from './types';
 
-export type { SystemDef, SystemContext, RendererDef, RendererBatchContext } from './system';
+export type {
+  ArchetypeView,
+  RendererBatchContext,
+  RendererDef,
+  SystemContext,
+  SystemDef,
+  WorldView,
+} from './system';
 export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';
 export type {
   GPUBridge,
@@ -28,7 +35,6 @@ export type {
   GPUResultEntry,
   GPUMetrics,
 } from './gpu-bridge';
-
 
 export type { PlatformCapabilities, PlatformProvider } from './platform';
 export type { ShaderBindingDef, ShaderDef } from './shader';

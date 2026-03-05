@@ -146,6 +146,3 @@ renderer.postFrame?.();
 - 新增行为变更需补充 tests/ 下的 Vitest 用例
 - 渲染逻辑更新需要保持批处理与零冗余 DOM 写入
 
-## 兼容说明
-
-- DOMRenderSystem 为兼容导出，推荐使用 createDOMRenderer 与插件注册方式
