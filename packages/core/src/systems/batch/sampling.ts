@@ -13,14 +13,8 @@
  */
 
 import { getNowMs } from '@g-motion/shared';
-import {
-  consumeForcedGPUStateSyncEntityIdsSet,
-  getGPUChannelMappingRegistry,
-  isPhysicsGPUEntity,
-  setForcedWorkgroupSize,
-  type RawKeyframeGenerationOptions,
-  type RawKeyframeValueEvaluator,
-} from '../../gpu-bridge';
+import { getGPUModuleSync } from '../../gpu-bridge';
+import type { RawKeyframeGenerationOptions, RawKeyframeValueEvaluator } from '../../gpu-bridge/types';
 import type { ArchetypeBatchDescriptor, PhysicsBatchDescriptor } from '../../gpu-bridge/types';
 import { SchedulingConstants } from '../../constants';
 import type { SystemContext, SystemDef } from '../../runtime/plugin';
@@ -51,10 +45,13 @@ export const BatchSamplingSystem: SystemDef = {
     const appContext = ctx?.services.appContext;
     if (!world || !processor || !appContext) return;
 
+    const gpu = getGPUModuleSync();
+    if (!gpu) return;
+
     const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
     const config = world.config;
     const forcedWorkgroupSize = config.webgpu?.forceWorkgroupSize;
-    setForcedWorkgroupSize(typeof forcedWorkgroupSize === 'number' ? forcedWorkgroupSize : null);
+    gpu.setForcedWorkgroupSize?.(typeof forcedWorkgroupSize === 'number' ? forcedWorkgroupSize : null);
     const timelineFlatEnabled = config.keyframe?.timelineFlat === true;
     const staticReuseEnabled = config.batchSamplingStaticReuse === true;
     const seekInvalidation = consumeBatchSamplingSeekInvalidation();
@@ -79,7 +76,7 @@ export const BatchSamplingSystem: SystemDef = {
         ? kf.startValue + (kf.endValue - kf.startValue) * ((t - kf.startTime) / d)
         : kf.endValue;
     };
-    const forcedSync = consumeForcedGPUStateSyncEntityIdsSet();
+    const forcedSync = gpu.consumeForcedGPUStateSyncEntityIdsSet?.() ?? new Set<number>();
     if (!staticReuseEnabled || seekInvalidation) processor.clearArchetypeBatches();
 
     // Archetype work-slicing
@@ -105,7 +102,7 @@ export const BatchSamplingSystem: SystemDef = {
     }
 
     let totalEntities = 0;
-    const channelRegistry = getGPUChannelMappingRegistry();
+    const channelRegistry = gpu.getGPUChannelMappingRegistry();
 
     for (const archetype of toProcess) {
       const bufs = resolveArchetypeBuffers(archetype);
@@ -218,7 +215,7 @@ export const BatchSamplingSystem: SystemDef = {
         physicsEntityCount,
         (idx) => archetype.getEntityId(idx),
         forcedSync,
-        isPhysicsGPUEntity,
+        (entityId) => gpu.isPhysicsGPUEntity?.(entityId) ?? false,
         physEids,
       );
       const lsMap = getPhysicsLayoutSigByArchetype();

@@ -1,9 +1,5 @@
 import type { ChannelMapping, GPUResultPacket } from '../../../gpu-bridge/types';
-import {
-  isMatrix2DTransformChannels,
-  isMatrix3DTransformChannels,
-  unmarkPhysicsGPUEntity,
-} from '../../../gpu-bridge';
+import { getGPUModuleSync } from '../../../gpu-bridge';
 import { MotionStatus } from '../../../components/state';
 import type { World } from '../../../runtime/world';
 import {
@@ -31,6 +27,8 @@ export function applyGPUResultPacket(params: {
   finished?: Uint32Array;
 }): void {
   const { world, packet, channelsResolved, stride, primitiveCode, finished } = params;
+  const gpu = getGPUModuleSync();
+  if (!gpu) return;
   const { entityIds, values } = packet;
   const valuesLen = values.length;
   const valuesU32 =
@@ -47,8 +45,8 @@ export function applyGPUResultPacket(params: {
     ? stableArchetype.getTypedBuffer('Render', 'rendererCode')
     : undefined;
 
-  const isMatrix2DChannels = isMatrix2DTransformChannels(channelsResolved);
-  const isMatrix3DChannels = isMatrix3DTransformChannels(channelsResolved);
+  const isMatrix2DChannels = gpu.isMatrix2DTransformChannels(channelsResolved);
+  const isMatrix3DChannels = gpu.isMatrix3DTransformChannels(channelsResolved);
   const packetHasNonPrimitiveProp = channelsResolved.some((c) => c.property !== '__primitive');
   const matrix2dChannelIndices = isMatrix2DChannels
     ? channelsResolved.map((c) => c.index)
@@ -148,7 +146,7 @@ export function applyGPUResultPacket(params: {
             }
           }
 
-          unmarkPhysicsGPUEntity(id);
+          gpu.unmarkPhysicsGPUEntity?.(id);
           return;
         }
       }
@@ -160,7 +158,7 @@ export function applyGPUResultPacket(params: {
           typedStatus[index] = MotionStatus.Finished as unknown as number;
         }
       }
-      unmarkPhysicsGPUEntity(id);
+      gpu.unmarkPhysicsGPUEntity?.(id);
     };
     if (
       (rendererCode === primitiveCode || render.rendererId === 'primitive' || stride === 1) &&

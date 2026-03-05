@@ -4,12 +4,7 @@ import type {
   WebGPUEngine,
   WebGPUFrameEncoder,
 } from '../../../gpu-bridge/types';
-import {
-  runViewportCullingCompactionPass,
-  runViewportCullingCompactionPassAsync,
-  setPendingReadbackCount,
-  tryReleasePooledOutputBufferFromTag,
-} from '../../../gpu-bridge';
+import { getGPUModuleSync } from '../../../gpu-bridge';
 import type { World } from '../../../runtime/world';
 import type { ComputeBatchProcessor } from '../../batch';
 
@@ -57,6 +52,17 @@ export async function maybeRunViewportCulling(params: {
   frame?: WebGPUFrameEncoder;
   submit?: (commandBuffer: GPUCommandBuffer, afterSubmit?: () => void) => void;
 }): Promise<ViewportCullingResult> {
+  const gpu = getGPUModuleSync();
+  if (!gpu) {
+    return {
+      kind: "continue",
+      outputBuffer: params.outputBuffer,
+      entityCount: params.entityCount,
+      entityIdsForReadback: params.entityIdsForReadback,
+      leaseId: params.leaseId,
+    };
+  }
+
   const {
     engine,
     device,
@@ -104,7 +110,7 @@ export async function maybeRunViewportCulling(params: {
   }
 
   if (asyncEnabled && readbackManager) {
-    const pending = await runViewportCullingCompactionPassAsync(
+    const pending = await gpu.runViewportCullingCompactionPassAsync(
       device,
       queue,
       world,
@@ -176,12 +182,12 @@ export async function maybeRunViewportCulling(params: {
         cullingTag,
         release,
       );
-      setPendingReadbackCount(readbackManager.getPendingCount());
+      gpu.setPendingReadbackCount?.(readbackManager.getPendingCount());
       return { kind: 'enqueued' };
     }
   }
 
-  const cullRes = await runViewportCullingCompactionPass(
+  const cullRes = await gpu.runViewportCullingCompactionPass(
     device,
     queue,
     world,
@@ -194,7 +200,7 @@ export async function maybeRunViewportCulling(params: {
   let nextOutputBuffer = outputBuffer;
   if (cullRes.outputBuffer !== outputBuffer) {
     if (sourceOutputBufferTag) {
-      tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
+      gpu.tryReleasePooledOutputBufferFromTag?.(sourceOutputBufferTag);
     } else {
       outputBuffer.destroy();
     }

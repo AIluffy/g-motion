@@ -1,12 +1,9 @@
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import { getCustomEasingVersion, getCustomGpuEasings } from '@g-motion/shared';
-import { getOutputFormatBufferPoolStats } from '../../../gpu-bridge';
+import { getGPUModuleSync } from '../../../gpu-bridge';
 import type { GPUMetricsProvider, WebGPUInitResult } from '../../../gpu-bridge/types';
 import type { WebGPUEngine } from '../../../gpu-bridge/types';
-import {
-  ensureWebGPUInitialized as ensureWebGPUInitializedCore,
-  ensureWebGPUPipelines as ensureWebGPUPipelinesCore,
-} from '../../../gpu-bridge';
+
 
 const buildInitDeps = (metricsProvider: GPUMetricsProvider) => ({
   metricsProvider,
@@ -20,7 +17,13 @@ export async function ensureWebGPUInitialized(params: {
 }): Promise<WebGPUInitResult> {
   const { engine, metricsProvider } = params;
   const deps = buildInitDeps(metricsProvider);
-  return ensureWebGPUInitializedCore({ engine, deps });
+  const gpu = getGPUModuleSync();
+  if (!gpu) {
+    throw new Error(
+      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
+    );
+  }
+  return gpu.ensureWebGPUInitialized({ engine, deps });
 }
 
 export async function ensureWebGPUPipelines(params: {
@@ -30,7 +33,13 @@ export async function ensureWebGPUPipelines(params: {
 }): Promise<void> {
   const { engine, device, metricsProvider } = params;
   const deps = buildInitDeps(metricsProvider);
-  await ensureWebGPUPipelinesCore({ engine, device, deps });
+  const gpu = getGPUModuleSync();
+  if (!gpu) {
+    throw new Error(
+      "WebGPU module not loaded. Call preloadWebGPUModule() during initialization.",
+    );
+  }
+  await gpu.ensureWebGPUPipelines({ engine, device, deps });
 }
 
 export function maybeSampleOutputFormatPoolStats(params: {
@@ -49,6 +58,6 @@ export function maybeSampleOutputFormatPoolStats(params: {
   if (!shouldSample) return;
 
   metricsProvider.updateStatus({
-    outputFormatPoolStats: getOutputFormatBufferPoolStats(device),
+    outputFormatPoolStats: getGPUModuleSync()?.getOutputFormatBufferPoolStats?.(device) ?? null,
   });
 }

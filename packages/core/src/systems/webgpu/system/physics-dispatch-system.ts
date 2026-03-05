@@ -4,13 +4,7 @@ import type {
   WebGPUEngine,
   WebGPUFrameEncoder,
 } from '../../../gpu-bridge/types';
-import {
-  dispatchPhysicsBatch,
-  getPersistentGPUBufferManager,
-  markPhysicsGPUEntity,
-  PHYSICS_STATE_STRIDE,
-  setPendingReadbackCount,
-} from '../../../gpu-bridge';
+import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../../gpu-bridge';
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow } from '../physics-validation';
@@ -39,6 +33,9 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   const { engine, device, processor, config, batch, dtMs, dtSec, maxVelocity, frame, submit } =
     params;
 
+  const gpu = getGPUModuleSync();
+  if (!gpu) return;
+
   const sp = engine.stagingPool;
   const readbackManager = engine.readbackManager;
   const queue = device.queue;
@@ -57,11 +54,11 @@ export async function dispatchPhysicsBatchForArchetype(params: {
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i] as number;
     if (typeof id === 'number' && Number.isFinite(id)) {
-      markPhysicsGPUEntity(id);
+      gpu.markPhysicsGPUEntity?.(id);
     }
   }
 
-  const persistentBufferManager = getPersistentGPUBufferManager(device);
+  const persistentBufferManager = gpu.getPersistentGPUBufferManager(device);
 
   engine.physicsParams[0] = dtMs;
   engine.physicsParams[1] = dtSec;
@@ -123,7 +120,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
     label: `physics-finished-${baseArchetypeId}`,
   });
 
-  await dispatchPhysicsBatch({
+  await gpu.dispatchPhysicsBatch({
     device,
     queue,
     timestampManager: engine.timestampManager,
@@ -190,7 +187,7 @@ export async function dispatchPhysicsBatchForArchetype(params: {
       { kind: 'physics' as const },
       release,
     );
-    setPendingReadbackCount(readbackManager.getPendingCount());
+    gpu.setPendingReadbackCount?.(readbackManager.getPendingCount());
   }
 
   const afterSubmit = () => {

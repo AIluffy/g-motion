@@ -6,14 +6,8 @@
  */
 
 import type { SystemContext, SystemDef } from '../../../runtime/plugin';
-import { drainGPUResultsInto } from '../../../gpu-bridge';
 import type { GPUResultPacket } from '../../../gpu-bridge/types';
-import {
-  getGPUChannelMappingRegistry,
-  isMatrix2DTransformChannels,
-  isMatrix3DTransformChannels,
-  isStandardTransformChannels,
-} from '../../../gpu-bridge';
+import { getGPUModuleSync } from '../../../gpu-bridge';
 import type { ChannelMapping } from '../../../gpu-bridge/types';
 import { createDebugger, isDev } from '@g-motion/shared';
 import { getRendererCode } from '../../../render/renderer-code';
@@ -28,9 +22,16 @@ export const GPUResultApplySystem: SystemDef = {
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
     if (!world) return;
-    const packets = drainGPUResultsInto(s_gpuResultPacketsScratch);
-    if (!packets.length) return;
-    const channelRegistry = getGPUChannelMappingRegistry();
+    const gpu = getGPUModuleSync();
+    if (!gpu) return;
+
+    s_gpuResultPacketsScratch.length = 0;
+    gpu.drainGPUResultsInto?.(s_gpuResultPacketsScratch);
+    if (!s_gpuResultPacketsScratch.length) return;
+
+    const packets = s_gpuResultPacketsScratch;
+
+    const channelRegistry = gpu.getGPUChannelMappingRegistry();
     const primitiveCode = getRendererCode('primitive');
 
     for (const p of packets) {
@@ -69,9 +70,9 @@ export const GPUResultApplySystem: SystemDef = {
       if (channelsResolved && channelsResolved.length) {
         const isPrimitiveChannels =
           channelsResolved.length === 1 && channelsResolved[0].property === '__primitive';
-        const isStandardTransform = isStandardTransformChannels(channelsResolved);
-        const isMatrix2D = isMatrix2DTransformChannels(channelsResolved);
-        const isMatrix3D = isMatrix3DTransformChannels(channelsResolved);
+        const isStandardTransform = gpu.isStandardTransformChannels(channelsResolved);
+        const isMatrix2D = gpu.isMatrix2DTransformChannels(channelsResolved);
+        const isMatrix3D = gpu.isMatrix3DTransformChannels(channelsResolved);
 
         if (isPrimitiveChannels && stride !== 1) {
           warn('GPU result packet has primitive channel mapping but stride is not 1.', {

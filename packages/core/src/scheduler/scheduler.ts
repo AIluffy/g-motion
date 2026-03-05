@@ -1,9 +1,5 @@
 import { getNowMs } from '@g-motion/shared';
-import {
-  getGPUResultQueueLength,
-  getPendingReadbackCount,
-  setGPUResultWakeup,
-} from '../gpu-bridge';
+import { getGPUModuleSync } from '../gpu-bridge';
 import { WebGPUConstants } from '../constants';
 import type { EngineServices, SystemDef } from '../runtime/plugin';
 import { SchedulerLoop } from './loop';
@@ -34,7 +30,9 @@ export class SystemScheduler {
       });
     },
     shouldContinue: (now: number, keepAliveUntil: number) => {
-      const hasPendingGPUWork = getPendingReadbackCount() > 0 || getGPUResultQueueLength() > 0;
+      const gpu = getGPUModuleSync();
+      const hasPendingGPUWork =
+        (gpu?.getPendingReadbackCount?.() ?? 0) > 0 || (gpu?.getGPUResultQueueLength?.() ?? 0) > 0;
       return this.activeEntityCount > 0 || hasPendingGPUWork || now < keepAliveUntil;
     },
   });
@@ -45,12 +43,12 @@ export class SystemScheduler {
 
   setServices(services: EngineServices): void {
     this.services = services;
-    setGPUResultWakeup(this.wakeForGPUResults);
+    getGPUModuleSync()?.setGPUResultWakeup?.(this.wakeForGPUResults);
   }
 
   clearServices(): void {
     this.services = undefined;
-    setGPUResultWakeup(undefined);
+    getGPUModuleSync()?.setGPUResultWakeup?.(undefined);
   }
 
   private getWorld() {

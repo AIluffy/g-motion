@@ -1,13 +1,7 @@
 import { WebGPUConstants } from '@g-motion/shared';
 import { createDebugger, getNowMs } from '@g-motion/shared';
 import type { GPUMetricsProvider, WebGPUEngine } from '../../../gpu-bridge/types';
-import {
-  enqueueGPUResults,
-  PHYSICS_STATE_STRIDE,
-  processOutputBuffer,
-  setPendingReadbackCount,
-  tryReleasePooledOutputBufferFromTag,
-} from '../../../gpu-bridge';
+import { getGPUModuleSync, PHYSICS_STATE_STRIDE } from '../../../gpu-bridge';
 import type { NormalizedMotionAppConfig } from '../../../runtime/plugin';
 import type { ComputeBatchProcessor } from '../../batch';
 import { physicsValidationShadow, stepPhysicsShadow } from '../physics-validation';
@@ -26,6 +20,9 @@ export function processCompletedReadbacks(params: {
   debugIOEnabled: boolean;
 }): void {
   const { engine, device, metricsProvider, processor, config, debugIOEnabled } = params;
+
+  const gpu = getGPUModuleSync();
+  if (!gpu) return;
 
   const readbackManager = engine.readbackManager;
   const sp = engine.stagingPool;
@@ -75,7 +72,7 @@ export function processCompletedReadbacks(params: {
           try {
             cullingTag.outputBuffer?.destroy?.();
           } catch {}
-          tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
+          gpu.tryReleasePooledOutputBufferFromTag?.(sourceOutputBufferTag);
           if (typeof res.leaseId === 'number') {
             processor.releaseEntityIds(res.leaseId);
           }
@@ -89,7 +86,7 @@ export function processCompletedReadbacks(params: {
 
         Promise.resolve()
           .then(async () => {
-            await processOutputBuffer(
+            await gpu.processOutputBuffer(
               device,
               queue,
               sp,
@@ -120,7 +117,7 @@ export function processCompletedReadbacks(params: {
             }
           })
           .finally(() => {
-            tryReleasePooledOutputBufferFromTag(sourceOutputBufferTag);
+            gpu.tryReleasePooledOutputBufferFromTag?.(sourceOutputBufferTag);
             if (!released) {
               try {
                 res.stagingBuffer.destroy();
@@ -149,7 +146,7 @@ export function processCompletedReadbacks(params: {
         } catch {}
         if (!released) {
           sp.markAvailable(res.stagingBuffer);
-          tryReleasePooledOutputBufferFromTag(res.tag);
+          gpu.tryReleasePooledOutputBufferFromTag?.(res.tag);
         }
         if (typeof res.leaseId === 'number') {
           processor.releaseEntityIds(res.leaseId);
@@ -209,7 +206,7 @@ export function processCompletedReadbacks(params: {
       }
 
       if (values && values.length) {
-        enqueueGPUResults({
+        gpu.enqueueGPUResults?.({
           archetypeId: res.archetypeId,
           entityIds: res.entityIds,
           values,
@@ -238,7 +235,7 @@ export function processCompletedReadbacks(params: {
       } catch {}
 
       if (!released) {
-        tryReleasePooledOutputBufferFromTag(res.tag);
+        gpu.tryReleasePooledOutputBufferFromTag?.(res.tag);
         sp.markAvailable(res.stagingBuffer);
       }
 
@@ -247,7 +244,7 @@ export function processCompletedReadbacks(params: {
       }
     }
     const pending = readbackManager.getPendingCount();
-    setPendingReadbackCount(pending);
+    gpu.setPendingReadbackCount?.(pending);
     try {
       metricsProvider.updateStatus({
         queueDepth: pending,
@@ -257,7 +254,7 @@ export function processCompletedReadbacks(params: {
   });
 
   const pending = readbackManager.getPendingCount();
-  setPendingReadbackCount(pending);
+  gpu.setPendingReadbackCount?.(pending);
   try {
     metricsProvider.updateStatus({
       queueDepth: pending,

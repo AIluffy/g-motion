@@ -4,7 +4,7 @@ import type {
   GPUBatchDescriptor,
   PhysicsBatchDescriptor,
 } from '../../gpu-bridge/types';
-import { selectWorkgroupSize } from '../../gpu-bridge';
+import { getGPUModuleSync } from '../../gpu-bridge';
 import type { BatchStatistics } from './batch-statistics';
 import type { EntityIdLeasePool } from './entity-id-lease-pool';
 
@@ -158,7 +158,7 @@ export class GPUBatchDispatcher {
   }
 
   selectWorkgroup(archetypeId: string, entityCount: number): number {
-    return selectWorkgroupSize(archetypeId, entityCount);
+    return getGPUModuleSync()?.selectWorkgroupSize?.(archetypeId, entityCount) ?? 64;
   }
 
   clear(): void {
