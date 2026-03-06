@@ -2,6 +2,23 @@ import { MotionStatus } from '../components/state';
 import type { SystemContext, SystemDef } from '../runtime/plugin';
 import { getNowMs } from '@g-motion/shared';
 
+/**
+ * TimeSystem — 计算实体的动画时间。
+ *
+ * @description
+ * 根据墙钟时间（ctx.nowMs / performance.now）、实体的 startTime、delay、pausedAt、playbackRate
+ * 计算出 MotionState.currentTime 并写回状态。
+ * 该系统只处理关键帧时间线实体，遇到包含 Spring 或 Inertia 的物理实体会跳过。
+ *
+ * @phase preUpdate
+ * @order 0
+ *
+ * @reads MotionState.startTime, MotionState.delay, MotionState.pausedAt, MotionState.playbackRate, MotionState.status
+ * @writes MotionState.currentTime
+ *
+ * @dependsOn （无前置依赖）
+ * @dependendBy TimelineSystem (order 4) — 消费 currentTime 并推进 iteration / status
+ */
 export const TimeSystem: SystemDef = {
   name: 'TimeSystem',
   order: 0,

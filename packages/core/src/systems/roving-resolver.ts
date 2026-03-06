@@ -44,6 +44,23 @@ export function distributeDurations(lengths: number[], totalDuration: number): n
 
 // Roving resolver: assigns times to keyframes lacking explicit times using arc-length + smoothing.
 // Operates per track; uses value delta magnitude as segment length surrogate.
+/**
+ * RovingResolverSystem — 解析 roving 关键帧并回填 keyframe 时间。
+ *
+ * @description
+ * 对未显式给出 time 的关键帧按段长分配时间，并进行平滑处理；
+ * 处理完成后更新 Timeline.tracks，同时将 rovingApplied 标记到当前 version，
+ * 避免重复计算。
+ *
+ * @phase postUpdate
+ * @order 12
+ *
+ * @reads Timeline.tracks, Timeline.version, Timeline.rovingApplied
+ * @writes Timeline.tracks, Timeline.rovingApplied
+ *
+ * @dependsOn Timeline 数据已加载（无硬编码前置系统）
+ * @dependendBy BatchSamplingSystem (order 5, 下一帧) / RenderSystem (order 30, 下一帧) — 使用更新后的轨道时间
+ */
 export const RovingResolverSystem: SystemDef = {
   name: 'RovingResolverSystem',
   order: 12,

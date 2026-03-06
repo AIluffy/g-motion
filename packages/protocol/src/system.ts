@@ -12,17 +12,31 @@ export interface WorldView {
   getArchetypes(): Iterable<ArchetypeView>;
 }
 
-export interface SystemContext {
+export type SchedulerView = object;
+
+export type AppView = object;
+
+export type ConfigView = object;
+
+export type BatchProcessorView = object;
+
+export type MetricsView = object;
+
+export type AppContextView = object;
+
+export interface DefaultServices {
+  world: WorldView | undefined;
+  scheduler?: SchedulerView;
+  app?: AppView;
+  config?: ConfigView;
+  batchProcessor?: BatchProcessorView;
+  metrics?: MetricsView;
+  appContext?: AppContextView;
+}
+
+export interface SystemContext<TServices = DefaultServices> {
   nowMs?: number;
-  services: {
-    world: WorldView | undefined;
-    scheduler?: unknown;
-    app?: unknown;
-    config?: unknown;
-    batchProcessor?: unknown;
-    metrics?: unknown;
-    appContext?: unknown;
-  };
+  services: TServices;
 }
 
 export type SystemPhase = 'preUpdate' | 'update' | 'physics' | 'postUpdate' | 'render';

@@ -16,6 +16,7 @@ export type {
   ArchetypeView,
   RendererBatchContext,
   RendererDef,
+  DefaultServices,
   SystemContext,
   SystemDef,
   SystemPhase,

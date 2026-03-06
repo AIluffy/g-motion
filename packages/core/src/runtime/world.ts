@@ -7,6 +7,18 @@ import type { MotionAppConfig, NormalizedMotionAppConfig } from './plugin';
 import { normalizeConfig } from './plugin';
 import { ArchetypeManager, type MotionStatusCoordinator } from '../ecs/archetypes';
 import { SystemCoordinator } from './status';
+import {
+  PluginRegistry,
+  getGlobalFallbackPluginRegistry,
+} from './plugin-registry';
+import {
+  PlatformRegistry,
+  getGlobalFallbackPlatformRegistry,
+} from './platform-registry';
+import {
+  TargetResolverRegistry,
+  getGlobalFallbackTargetResolverRegistry,
+} from './target-resolver-registry';
 
 /**
  * Component data type
@@ -24,6 +36,9 @@ export class World {
   readonly registry = new ComponentRegistry();
   readonly entityManager = new EntityManager();
   readonly scheduler = new SystemScheduler();
+  readonly pluginRegistry = new PluginRegistry();
+  readonly platformRegistry = new PlatformRegistry();
+  readonly targetResolverRegistry = new TargetResolverRegistry();
   private _config: NormalizedMotionAppConfig;
   private systemCoordinator: SystemCoordinator;
   private archetypeManager: ArchetypeManager;
@@ -36,6 +51,10 @@ export class World {
     this.entityManager.setOffset(namespaceOffset);
 
     this._config = normalizeConfig(config ?? {});
+
+    this.pluginRegistry.cloneFrom(getGlobalFallbackPluginRegistry());
+    this.platformRegistry.copyFrom(getGlobalFallbackPlatformRegistry());
+    this.targetResolverRegistry.copyFrom(getGlobalFallbackTargetResolverRegistry());
 
     let systems: SystemCoordinator | undefined;
     const motion: MotionStatusCoordinator = {

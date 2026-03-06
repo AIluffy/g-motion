@@ -317,6 +317,23 @@ function updateArchetype(
   );
 }
 
+/**
+ * RenderSystem — 将当前 ECS 状态投递到渲染器。
+ *
+ * @description
+ * 按 archetype 收集 Render 与 Transform 数据，按 renderer 分组后调用 renderer.update/
+ * updateBatch，并在成功渲染后推进 Render.renderedVersion。
+ * 该系统位于渲染阶段末端，负责把前序系统写入的状态体现在目标对象上。
+ *
+ * @phase render
+ * @order 30
+ *
+ * @reads Render.version, Render.renderedVersion, Render.target, Render.props, Render.rendererId, Render.rendererCode, Transform.*
+ * @writes Render.renderedVersion
+ *
+ * @dependsOn TimelineSystem / BatchSamplingSystem / RovingResolverSystem 等前置状态更新系统
+ * @dependendBy 外部宿主渲染目标（DOM/Canvas/WebGL 对象）— 直接消费本系统触发的 renderer 更新
+ */
 export const RenderSystem: SystemDef = {
   name: 'RenderSystem',
   order: RENDER_SYSTEM_ORDER,
