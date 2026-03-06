@@ -3,12 +3,21 @@ import type { MotionValue } from '../motion-value';
 export type AnimationTarget = Element | string | Record<string, unknown>;
 export type Easing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' | ((value: number) => number);
 
-export interface KeyframeInput {
+export interface Keyframe {
   time: number;
   value: number;
   easing?: Easing;
   hold?: boolean;
 }
+
+export interface KeyframeShorthand {
+  t: number;
+  v: number;
+  e?: Easing;
+  hold?: boolean;
+}
+
+export type KeyframeInput = Keyframe | KeyframeShorthand;
 
 export interface FromToInput {
   from: number;
@@ -43,6 +52,8 @@ export type TimelineLayerConfig = {
   target: AnimationTarget;
   duration?: number;
   startTime?: number;
+  visible?: boolean;
+  locked?: boolean;
 } & Record<string, unknown>;
 
 export type TimelineConfig = {
@@ -54,6 +65,59 @@ export type TimelineConfig = {
   workArea?: [number, number];
 } & Record<string, unknown>;
 
+export interface AnimationLayerSnapshot {
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  startTime: number;
+  duration: number;
+}
+
+export interface AnimationTrackSnapshot {
+  layer: string;
+  property: string;
+  keyframes: Keyframe[];
+  currentValue: number;
+  isMotionValue: boolean;
+}
+
+export interface AnimationStateSnapshot {
+  duration: number;
+  currentTime: number;
+  progress: number;
+  isPlaying: boolean;
+  markers: Record<string, number>;
+  workArea: [number, number];
+  selectedLayer: string | null;
+  layers: AnimationLayerSnapshot[];
+  tracks: AnimationTrackSnapshot[];
+}
+
+export interface AnimationStateStore {
+  getSnapshot(): AnimationStateSnapshot;
+  subscribe(listener: () => void): () => void;
+}
+
+export interface TrackController {
+  getCurve(): Keyframe[];
+  setCurve(keyframes: KeyframeInput[]): void;
+  insertKeyframe(keyframe: KeyframeInput): void;
+  removeKeyframe(time: number): void;
+}
+
+export interface LayerController {
+  show(): void;
+  hide(): void;
+  lock(): void;
+  unlock(): void;
+  readonly visible: boolean;
+  readonly locked: boolean;
+  readonly startTime: number;
+  readonly duration: number;
+  move(delta: number): void;
+  track(property: string): TrackController;
+}
+
 export interface TimelineController {
   play(): void;
   pause(): void;
@@ -61,6 +125,8 @@ export interface TimelineController {
   seek(time: number): void;
   seekToMarker(name: string): void;
   reverse(): void;
+  layer(name: string): LayerController;
+  bindState(): AnimationStateStore;
   timeValue(): MotionValue;
   progressValue(): MotionValue;
   readonly duration: number;

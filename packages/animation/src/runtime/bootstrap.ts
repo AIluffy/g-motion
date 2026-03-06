@@ -76,6 +76,20 @@ export function flushAnimationRuntimeFrame(nowMs = getNowMs()): void {
   RenderSystem.update(0, ctx);
 }
 
+export function flushAnimationRenderFrame(nowMs = getNowMs()): void {
+  const runtime = ensureAnimationRuntime();
+  const services = {
+    ...runtime.engine.services,
+    world: runtime.world,
+  };
+  const ctx = {
+    services,
+    nowMs,
+  };
+
+  RenderSystem.update(0, ctx);
+}
+
 export function resetAnimationRuntimeForTests(): void {
   bootstrap?.engine.dispose();
   bootstrap = undefined;
