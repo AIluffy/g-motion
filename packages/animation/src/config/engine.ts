@@ -51,12 +51,12 @@ class EngineConfig {
       throw new Error(`[Motion Engine] Invalid sampling mode: ${mode}`);
     }
     const world = this.getWorld();
-    (world.config as any).samplingMode = mode;
+    world.config.samplingMode = mode;
   }
 
   getSamplingMode(): 'time' | 'frame' {
     const world = this.getWorld();
-    return ((world.config as any).samplingMode ?? 'time') as any;
+    return world.config.samplingMode;
   }
 
   setSamplingFps(fps: number): void {
@@ -64,13 +64,13 @@ class EngineConfig {
       throw new Error(`[Motion Engine] samplingFps must be a positive number, got: ${fps}`);
     }
     const world = this.getWorld();
-    (world.config as any).samplingFps = fps;
-    (world.config as any).samplingMode = (world.config as any).samplingMode ?? 'frame';
+    world.config.samplingFps = fps;
+    world.config.samplingMode = world.config.samplingMode ?? 'frame';
   }
 
   getSamplingFps(): number {
     const world = this.getWorld();
-    const config = world.config as any;
+    const config = world.config;
     return Number(config.samplingFps ?? config.targetFps ?? 60);
   }
 
@@ -79,12 +79,12 @@ class EngineConfig {
       throw new Error(`[Motion Engine] metricsSamplingRate must be positive, got: ${rate}`);
     }
     const world = this.getWorld();
-    (world.config as any).metricsSamplingRate = Math.floor(rate);
+    world.config.metricsSamplingRate = Math.floor(rate);
   }
 
   getMetricsSamplingRate(): number {
     const world = this.getWorld();
-    return Number((world.config as any).metricsSamplingRate ?? 1);
+    return Number(world.config.metricsSamplingRate ?? 1);
   }
 
   setWorkSlicing(options: {
@@ -93,8 +93,8 @@ class EngineConfig {
     batchSamplingArchetypesPerFrame?: number;
   }): void {
     const world = this.getWorld();
-    const current = (world.config as any).workSlicing || {};
-    (world.config as any).workSlicing = {
+    const current = world.config.workSlicing || {};
+    world.config.workSlicing = {
       ...current,
       ...options,
     };
@@ -106,7 +106,7 @@ class EngineConfig {
     batchSamplingArchetypesPerFrame?: number;
   } {
     const world = this.getWorld();
-    return ((world.config as any).workSlicing || {}) as any;
+    return world.config.workSlicing || {};
   }
 
   /**

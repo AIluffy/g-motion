@@ -110,6 +110,13 @@ export interface MotionAppConfig extends Record<string, unknown> {
 }
 
 export interface NormalizedMotionAppConfig extends MotionAppConfig {
+  globalSpeed: number;
+  targetFps: number;
+  frameDuration: number;
+  samplingMode: 'time' | 'frame';
+  samplingFps: number;
+  metricsSamplingRate: number;
+  workSlicing: NonNullable<MotionAppConfig['workSlicing']>;
   keyframe?: MotionAppConfig['keyframe'];
   debug?: MotionAppConfig['debug'];
   webgpu?: MotionAppConfig['webgpu'];
@@ -207,8 +214,39 @@ export function normalizeConfig(config: MotionAppConfig = {}): NormalizedMotionA
     webgpu.outputBufferReuse = source.webgpuOutputBufferReuse;
   }
 
+  const targetFps =
+    typeof source.targetFps === 'number' && Number.isFinite(source.targetFps) && source.targetFps > 0
+      ? source.targetFps
+      : 60;
+  const frameDuration =
+    typeof source.frameDuration === 'number' && Number.isFinite(source.frameDuration)
+      ? source.frameDuration
+      : 1000 / targetFps;
+  const samplingMode: 'time' | 'frame' = source.samplingMode === 'frame' ? 'frame' : 'time';
+  const samplingFps =
+    typeof source.samplingFps === 'number' && Number.isFinite(source.samplingFps) && source.samplingFps > 0
+      ? source.samplingFps
+      : targetFps;
+  const metricsSamplingRate =
+    typeof source.metricsSamplingRate === 'number' && Number.isFinite(source.metricsSamplingRate)
+      ? source.metricsSamplingRate
+      : 1;
+  const workSlicing: NonNullable<MotionAppConfig['workSlicing']> = {
+    ...(source.workSlicing ?? {}),
+  };
+
   return {
     ...source,
+    globalSpeed:
+      typeof source.globalSpeed === 'number' && Number.isFinite(source.globalSpeed)
+        ? source.globalSpeed
+        : 1,
+    targetFps,
+    frameDuration,
+    samplingMode,
+    samplingFps,
+    metricsSamplingRate,
+    workSlicing,
     keyframe: Object.keys(keyframe).length > 0 ? keyframe : undefined,
     debug: Object.keys(debug).length > 0 ? debug : undefined,
     webgpu: Object.keys(webgpu).length > 0 ? webgpu : undefined,
