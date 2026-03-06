@@ -47,6 +47,9 @@ export function distributeDurations(lengths: number[], totalDuration: number): n
 export const RovingResolverSystem: SystemDef = {
   name: 'RovingResolverSystem',
   order: 12,
+  phase: 'postUpdate',
+  reads: ['Timeline.tracks', 'Timeline.version', 'Timeline.rovingApplied'],
+  writes: ['Timeline.tracks', 'Timeline.rovingApplied'],
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
     if (!world) {

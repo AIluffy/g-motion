@@ -25,9 +25,14 @@ export interface SystemContext {
   };
 }
 
+export type SystemPhase = 'preUpdate' | 'update' | 'physics' | 'postUpdate' | 'render';
+
 export interface SystemDef {
   name: string;
   order?: number;
+  phase?: SystemPhase;
+  reads?: readonly string[];
+  writes?: readonly string[];
   update(dt: number, ctx?: SystemContext): void;
 }
 

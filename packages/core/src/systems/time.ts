@@ -5,6 +5,15 @@ import { getNowMs } from '@g-motion/shared';
 export const TimeSystem: SystemDef = {
   name: 'TimeSystem',
   order: 0,
+  phase: 'preUpdate',
+  reads: [
+    'MotionState.startTime',
+    'MotionState.delay',
+    'MotionState.pausedAt',
+    'MotionState.playbackRate',
+    'MotionState.status',
+  ],
+  writes: ['MotionState.currentTime'],
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
 
@@ -14,11 +23,12 @@ export const TimeSystem: SystemDef = {
 
     const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
 
-    for (const archetype of world.getArchetypes()) {
+    const archetypes = world.query(['MotionState']);
+    for (const archetype of archetypes) {
       const stateBuffer = archetype.getBuffer('MotionState');
       const timelineBuffer = archetype.getBuffer('Timeline');
       if (!stateBuffer || !timelineBuffer) continue;
-      if (archetype.getBuffer('Spring') || archetype.getBuffer('Inertia')) continue;
+      if (archetype.componentNames.includes('Spring') || archetype.componentNames.includes('Inertia')) continue;
 
       const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
       const typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');

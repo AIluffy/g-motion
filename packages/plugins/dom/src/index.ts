@@ -21,16 +21,7 @@ export const createDOMPlugin = (options: DOMPluginOptions = {}): MotionPlugin =>
   version: '0.0.0',
   manifest: {
     setup(appInstance: MotionApp) {
-      try {
-        appInstance.registerComponent('Transform', TransformComponent);
-      } catch (err) {
-        if (
-          !(err instanceof Error) ||
-          !err.message.includes("Component 'Transform' is already registered")
-        ) {
-          throw err;
-        }
-      }
+      appInstance.registerComponent('Transform', TransformComponent);
       debugLog('Transform component registered');
 
       try {

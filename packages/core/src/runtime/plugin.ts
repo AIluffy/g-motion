@@ -9,6 +9,7 @@ import type {
 
 export type {
   SystemDef,
+  SystemPhase,
   RendererDef,
   MotionApp as MotionAppBase,
   ShaderBindingDef,

@@ -5,10 +5,13 @@ import type {
   NormalizedMotionAppConfig,
   SystemContext,
   SystemDef,
+  SystemPhase,
 } from '../runtime/plugin';
 import { FrameSampler } from '../utils';
 
 const warn = createDebugger('SchedulerProcessor', 'warn');
+
+const PHASE_ORDER: readonly SystemPhase[] = ['preUpdate', 'update', 'physics', 'postUpdate', 'render'];
 
 export class SchedulerProcessor {
   private engineFrame = 0;
@@ -65,40 +68,55 @@ export class SchedulerProcessor {
       },
     };
 
-    const frameStart = getNowMs();
-    for (const system of systems) {
-      const systemStart = getNowMs();
-      try {
-        const result = system.update(dtMs, ctx) as unknown;
-        if (result && typeof (result as Promise<void>).catch === 'function') {
-          (result as Promise<void>).catch((e) => {
-            if (isFatalError(e)) {
-              services.scheduler.stop();
-              queueMicrotask(() => {
-                throw e;
-              });
-              return;
-            }
+    const byPhase = new Map<SystemPhase, SystemDef[]>();
+    for (const phase of PHASE_ORDER) {
+      byPhase.set(phase, []);
+    }
 
+    for (const system of systems) {
+      const phase = system.phase ?? 'update';
+      byPhase.get(phase)?.push(system);
+    }
+
+    const frameStart = getNowMs();
+    for (const phase of PHASE_ORDER) {
+      const phaseSystems = byPhase.get(phase);
+      if (!phaseSystems || phaseSystems.length === 0) continue;
+
+      for (const system of phaseSystems) {
+        const systemStart = getNowMs();
+        try {
+          const result = system.update(dtMs, ctx) as unknown;
+          if (result && typeof (result as Promise<void>).catch === 'function') {
+            (result as Promise<void>).catch((e) => {
+              if (isFatalError(e)) {
+                services.scheduler.stop();
+                queueMicrotask(() => {
+                  throw e;
+                });
+                return;
+              }
+
+              reportSystemUpdateFailed(system.name, e);
+            });
+          }
+        } catch (e) {
+          if (isFatalError(e)) {
+            services.scheduler.stop();
+            queueMicrotask(() => {
+              throw e;
+            });
+          } else {
             reportSystemUpdateFailed(system.name, e);
-          });
-        }
-      } catch (e) {
-        if (isFatalError(e)) {
-          services.scheduler.stop();
-          queueMicrotask(() => {
-            throw e;
-          });
-        } else {
-          reportSystemUpdateFailed(system.name, e);
-        }
-      } finally {
-        const systemDuration = getNowMs() - systemStart;
-        this.metricsCounter++;
-        const shouldSample =
-          samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
-        if (shouldSample) {
-          services.metrics.recordSystemTiming?.(system.name, systemDuration);
+          }
+        } finally {
+          const systemDuration = getNowMs() - systemStart;
+          this.metricsCounter++;
+          const shouldSample =
+            samplingRate <= 1 || this.metricsCounter % Math.max(1, Math.floor(samplingRate)) === 0;
+          if (shouldSample) {
+            services.metrics.recordSystemTiming?.(system.name, systemDuration);
+          }
         }
       }
     }

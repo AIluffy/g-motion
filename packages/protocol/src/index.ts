@@ -18,6 +18,7 @@ export type {
   RendererDef,
   SystemContext,
   SystemDef,
+  SystemPhase,
   WorldView,
 } from './system';
 export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';

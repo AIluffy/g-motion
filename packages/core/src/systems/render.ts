@@ -320,6 +320,17 @@ function updateArchetype(
 export const RenderSystem: SystemDef = {
   name: 'RenderSystem',
   order: RENDER_SYSTEM_ORDER,
+  phase: 'render',
+  reads: [
+    'Render.version',
+    'Render.renderedVersion',
+    'Render.target',
+    'Render.props',
+    'Render.rendererId',
+    'Render.rendererCode',
+    'Transform',
+  ],
+  writes: ['Render.renderedVersion'],
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
     const app = ctx?.services.app;

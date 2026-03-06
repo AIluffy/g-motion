@@ -10,6 +10,15 @@ function mod(n: number, d: number): number {
 export const TimelineSystem: SystemDef = {
   name: 'TimelineSystem',
   order: 4,
+  phase: 'update',
+  reads: [
+    'MotionState.currentTime',
+    'MotionState.status',
+    'Timeline.duration',
+    'Timeline.loop',
+    'Timeline.repeat',
+  ],
+  writes: ['MotionState.currentTime', 'MotionState.status', 'MotionState.iteration'],
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
     if (!world) {
