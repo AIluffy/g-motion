@@ -49,6 +49,12 @@ export interface ArchetypeInternal {
 export class Archetype implements ArchetypeInternal {
   private buffers = new Map<string, Array<ComponentValue | undefined>>();
   private typedBuffers = new Map<string, ArchetypeTypedBuffer>();
+  private typedFieldsByComponent = new Map<string, Map<string, ArchetypeTypedBuffer>>();
+  private missingTypedFieldWarnings = new Set<string>();
+  private setFieldCacheComponent = '';
+  private setFieldCacheField = '';
+  private setFieldCacheBuffer: Array<ComponentValue | undefined> | undefined;
+  private setFieldCacheTypedBuffer: ArchetypeTypedBuffer | undefined;
   private capacity: number = ARCHETYPE_DEFAULTS.INITIAL_CAPACITY;
   private count = 0;
   private entityIndices = new Map<number, number>(); // Entity ID -> Index
@@ -101,6 +107,7 @@ export class Archetype implements ArchetypeInternal {
 
   resize(newCapacity: number): void {
     this.capacity = newCapacity;
+    this.resetSetFieldCache();
 
     // Resize structured buffers (object arrays)
     for (const [name, buffer] of this.buffers) {
@@ -124,7 +131,53 @@ export class Archetype implements ArchetypeInternal {
   }
 
   getTypedBuffer(componentName: string, prop: string): ArchetypeTypedBuffer | undefined {
-    return this.typedBuffers.get(this.makeTypedKey(componentName, prop));
+    return this.typedFieldsByComponent.get(componentName)?.get(prop);
+  }
+
+  /**
+   * 原子化设置某实体某组件某字段的数值，同时同步 TypedBuffer 和 ObjectBuffer。
+   * 仅适用于数值类型字段（float32/float64/int32）。
+   */
+  setField(componentName: string, fieldName: string, index: number, value: number): void {
+    let buffer = this.setFieldCacheBuffer;
+    let typedBuffer = this.setFieldCacheTypedBuffer;
+
+    if (this.setFieldCacheComponent !== componentName || this.setFieldCacheField !== fieldName) {
+      buffer = this.buffers.get(componentName);
+      if (!buffer) return;
+      typedBuffer = this.typedFieldsByComponent.get(componentName)?.get(fieldName);
+
+      this.setFieldCacheComponent = componentName;
+      this.setFieldCacheField = fieldName;
+      this.setFieldCacheBuffer = buffer;
+      this.setFieldCacheTypedBuffer = typedBuffer;
+    }
+
+    const component = buffer[index];
+    if (component && typeof component === 'object') {
+      (component as Record<string, unknown>)[fieldName] = value;
+    }
+
+    if (typedBuffer) {
+      typedBuffer[index] = value;
+      return;
+    }
+
+    const warningKey = this.makeTypedKey(componentName, fieldName);
+    if (this.missingTypedFieldWarnings.has(warningKey)) return;
+    this.missingTypedFieldWarnings.add(warningKey);
+    console.warn(
+      'TypedBuffer not found for ' + componentName + '.' + fieldName + '; wrote ObjectBuffer only.',
+    );
+  }
+
+  /**
+   * 批量设置同一实体同一组件的多个字段。
+   */
+  setFields(componentName: string, index: number, fields: Record<string, number>): void {
+    for (const [fieldName, value] of Object.entries(fields)) {
+      this.setField(componentName, fieldName, index, value);
+    }
   }
 
   get entityCount(): number {
@@ -166,6 +219,13 @@ export class Archetype implements ArchetypeInternal {
         const arr = typedBufferFactory.create(type, cap);
         if (!arr) continue;
         this.typedBuffers.set(key, arr);
+
+        let typedFields = this.typedFieldsByComponent.get(compName);
+        if (!typedFields) {
+          typedFields = new Map<string, ArchetypeTypedBuffer>();
+          this.typedFieldsByComponent.set(compName, typedFields);
+        }
+        typedFields.set(prop, arr);
       }
     }
   }
@@ -176,6 +236,13 @@ export class Archetype implements ArchetypeInternal {
 
   private makeTypedKey(componentName: string, prop: string): string {
     return `${componentName}.${prop}`;
+  }
+
+  private resetSetFieldCache(): void {
+    this.setFieldCacheComponent = '';
+    this.setFieldCacheField = '';
+    this.setFieldCacheBuffer = undefined;
+    this.setFieldCacheTypedBuffer = undefined;
   }
 
   private allocateTyped(ref: ArchetypeTypedBuffer, cap: number): ArchetypeTypedBuffer {

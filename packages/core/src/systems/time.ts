@@ -23,7 +23,6 @@ export const TimeSystem: SystemDef = {
       const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
       const typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');
       const typedDelay = archetype.getTypedBuffer('MotionState', 'delay');
-      const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
       const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
       const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
 
@@ -73,8 +72,7 @@ export const TimeSystem: SystemDef = {
           timelineTime = playbackRateNum < 0 ? duration - distanceTime : distanceTime;
         }
 
-        state.currentTime = timelineTime;
-        if (typedCurrentTime) typedCurrentTime[i] = timelineTime;
+        archetype.setField('MotionState', 'currentTime', i, timelineTime);
       }
     }
   },
