@@ -6,6 +6,9 @@ export const WorldProvider = {
   setDefault(world: World) {
     defaultWorld = world;
   },
+  tryUseWorld(): World | undefined {
+    return defaultWorld;
+  },
   useWorld(): World {
     if (!defaultWorld) {
       defaultWorld = new World();

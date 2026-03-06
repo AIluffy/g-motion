@@ -38,9 +38,29 @@ import {
   setArchetypeCursor,
 } from './utils';
 
+/**
+ * BatchSamplingSystem — 组织关键帧/物理批采样并准备 GPU 输入。
+ *
+ * @description
+ * 在每帧内筛选可采样实体，构建动画批与物理批描述，维护批缓存与版本信息，
+ * 并将采样所需数据提交给后续 WebGPU 计算链路。
+ * 系统主要写入外部 GPU 批处理缓冲，不直接修改 ECS 组件字段。
+ *
+ * @phase update
+ * @order 5
+ *
+ * @reads MotionState.currentTime, MotionState.status, Timeline.tracks, Timeline.duration
+ * @writes （外部 GPU batch buffer）
+ *
+ * @dependsOn TimelineSystem (order 4) — 提供稳定的 currentTime/status
+ * @dependendBy WebGPU 计算系统（如 WebGPUComputeSystem）— 消费批描述执行 GPU 计算
+ */
 export const BatchSamplingSystem: SystemDef = {
   name: 'BatchSamplingSystem',
   order: 5,
+  phase: 'update',
+  reads: ['MotionState.currentTime', 'MotionState.status', 'Timeline.tracks', 'Timeline.duration'],
+  writes: [],
 
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;

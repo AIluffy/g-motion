@@ -2,9 +2,35 @@ import { MotionStatus } from '../components/state';
 import type { SystemContext, SystemDef } from '../runtime/plugin';
 import { getNowMs } from '@g-motion/shared';
 
+/**
+ * TimeSystem — 计算实体的动画时间。
+ *
+ * @description
+ * 根据墙钟时间（ctx.nowMs / performance.now）、实体的 startTime、delay、pausedAt、playbackRate
+ * 计算出 MotionState.currentTime 并写回状态。
+ * 该系统只处理关键帧时间线实体，遇到包含 Spring 或 Inertia 的物理实体会跳过。
+ *
+ * @phase preUpdate
+ * @order 0
+ *
+ * @reads MotionState.startTime, MotionState.delay, MotionState.pausedAt, MotionState.playbackRate, MotionState.status
+ * @writes MotionState.currentTime
+ *
+ * @dependsOn （无前置依赖）
+ * @dependendBy TimelineSystem (order 4) — 消费 currentTime 并推进 iteration / status
+ */
 export const TimeSystem: SystemDef = {
   name: 'TimeSystem',
   order: 0,
+  phase: 'preUpdate',
+  reads: [
+    'MotionState.startTime',
+    'MotionState.delay',
+    'MotionState.pausedAt',
+    'MotionState.playbackRate',
+    'MotionState.status',
+  ],
+  writes: ['MotionState.currentTime'],
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
 
@@ -14,11 +40,12 @@ export const TimeSystem: SystemDef = {
 
     const nowMs = typeof ctx?.nowMs === 'number' ? ctx.nowMs : getNowMs();
 
-    for (const archetype of world.getArchetypes()) {
+    const archetypes = world.query(['MotionState']);
+    for (const archetype of archetypes) {
       const stateBuffer = archetype.getBuffer('MotionState');
       const timelineBuffer = archetype.getBuffer('Timeline');
       if (!stateBuffer || !timelineBuffer) continue;
-      if (archetype.getBuffer('Spring') || archetype.getBuffer('Inertia')) continue;
+      if (archetype.componentNames.includes('Spring') || archetype.componentNames.includes('Inertia')) continue;
 
       const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
       const typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');

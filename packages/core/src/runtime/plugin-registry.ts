@@ -1,26 +1,63 @@
 import type { MotionPlugin } from './plugin';
+import type { World } from './world';
+import { WorldProvider } from './world-provider';
 
-const pluginRegistry: MotionPlugin[] = [];
-const pluginNames = new Set<string>();
+export class PluginRegistry {
+  private readonly plugins: MotionPlugin[] = [];
+  private readonly pluginNames = new Set<string>();
 
-export function registerPlugin(plugin: MotionPlugin): boolean {
-  if (pluginNames.has(plugin.name)) {
-    return false;
+  register(plugin: MotionPlugin): boolean {
+    if (this.pluginNames.has(plugin.name)) {
+      return false;
+    }
+    this.plugins.push(plugin);
+    this.pluginNames.add(plugin.name);
+    return true;
   }
-  pluginRegistry.push(plugin);
-  pluginNames.add(plugin.name);
-  return true;
+
+  isRegistered(pluginName: string): boolean {
+    return this.pluginNames.has(pluginName);
+  }
+
+  getAll(): readonly MotionPlugin[] {
+    return this.plugins;
+  }
+
+  clear(): void {
+    this.plugins.length = 0;
+    this.pluginNames.clear();
+  }
+
+  cloneFrom(source: PluginRegistry): void {
+    for (const plugin of source.getAll()) {
+      this.register(plugin);
+    }
+  }
 }
 
-export function getRegisteredPlugins(): readonly MotionPlugin[] {
-  return pluginRegistry;
+const globalFallbackRegistry = new PluginRegistry();
+
+function resolveRegistry(world?: World): PluginRegistry {
+  const target = world ?? WorldProvider.tryUseWorld();
+  return target?.pluginRegistry ?? globalFallbackRegistry;
 }
 
-export function clearPluginRegistry(): void {
-  pluginRegistry.length = 0;
-  pluginNames.clear();
+export function getGlobalFallbackPluginRegistry(): PluginRegistry {
+  return globalFallbackRegistry;
 }
 
-export function isPluginRegistered(pluginName: string): boolean {
-  return pluginNames.has(pluginName);
+export function registerPlugin(plugin: MotionPlugin, world?: World): boolean {
+  return resolveRegistry(world).register(plugin);
+}
+
+export function getRegisteredPlugins(world?: World): readonly MotionPlugin[] {
+  return resolveRegistry(world).getAll();
+}
+
+export function clearPluginRegistry(world?: World): void {
+  resolveRegistry(world).clear();
+}
+
+export function isPluginRegistered(pluginName: string, world?: World): boolean {
+  return resolveRegistry(world).isRegistered(pluginName);
 }
