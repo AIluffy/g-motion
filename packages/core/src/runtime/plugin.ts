@@ -265,8 +265,8 @@ export interface EngineServices {
 
 export interface SystemContext extends ProtocolSystemContext<EngineServices> {
   services: EngineServices;
-  dt: number;
-  nowMs: number;
+  dt?: number;
+  nowMs?: number;
   sampling?: {
     engineFrame: number;
     timeMs: number;

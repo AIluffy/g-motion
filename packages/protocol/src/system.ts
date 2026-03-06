@@ -12,29 +12,17 @@ export interface WorldView {
   getArchetypes(): Iterable<ArchetypeView>;
 }
 
-export interface SchedulerView {
-  [key: string]: unknown;
-}
+export type SchedulerView = object;
 
-export interface AppView {
-  [key: string]: unknown;
-}
+export type AppView = object;
 
-export interface ConfigView {
-  [key: string]: unknown;
-}
+export type ConfigView = object;
 
-export interface BatchProcessorView {
-  [key: string]: unknown;
-}
+export type BatchProcessorView = object;
 
-export interface MetricsView {
-  [key: string]: unknown;
-}
+export type MetricsView = object;
 
-export interface AppContextView {
-  [key: string]: unknown;
-}
+export type AppContextView = object;
 
 export interface DefaultServices {
   world: WorldView | undefined;
