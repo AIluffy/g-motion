@@ -49,11 +49,14 @@ function populateComponentScratchBuffers(
   componentBuffersScratch.length = componentCount;
 }
 
-function markGroupRenderedVersion(renderBuffer: Array<unknown>, indices: Int32Array): void {
+function markGroupRenderedVersion(archetype: Archetype, indices: Int32Array): void {
+  const renderBuffer = archetype.getBuffer('Render');
+  if (!renderBuffer) return;
+
   for (let i = 0; i < indices.length; i++) {
     const index = indices[i]!;
     const r = renderBuffer[index] as { version?: number; renderedVersion?: number };
-    r.renderedVersion = r.version ?? 0;
+    archetype.setField('Render', 'renderedVersion', index, r.version ?? 0);
   }
 }
 
@@ -93,7 +96,7 @@ function collectActiveGroups(
           archetypeId: archetype.id,
         });
       }
-      render.renderedVersion = version;
+      archetype.setField('Render', 'renderedVersion', i, version);
       continue;
     }
 
@@ -117,7 +120,7 @@ function processGroupBatch(
   archetypeId: string,
   componentBufferMap: Map<string, Array<ComponentValue | undefined>>,
   transformTypedBuffers: TransformTypedBuffers,
-  renderBuffer: Array<unknown>,
+  archetype: Archetype,
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
 ): void {
   try {
@@ -136,10 +139,10 @@ function processGroupBatch(
     renderer.preFrame?.();
     renderer.updateBatch!.call(renderer, ctxBatch);
     renderer.postFrame?.();
-    markGroupRenderedVersion(renderBuffer, activeData.indices);
+    markGroupRenderedVersion(archetype, activeData.indices);
   } catch (e) {
     handleGroupUpdateError(groupKey, archetypeId, e);
-    markGroupRenderedVersion(renderBuffer, activeData.indices);
+    markGroupRenderedVersion(archetype, activeData.indices);
   }
 }
 
@@ -149,7 +152,7 @@ function processGroupFast(
   componentBufferMap: Map<string, Array<ComponentValue | undefined>>,
   hasAnyTransformTyped: boolean,
   transformTypedBuffers: TransformTypedBuffers,
-  renderBuffer: Array<unknown>,
+  archetype: Archetype,
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
   archetypeId: string,
 ): void {
@@ -173,13 +176,15 @@ function processGroupFast(
         getComponent,
         getTransformTyped,
       );
-      const r = renderBuffer[currentIndex] as { version?: number; renderedVersion?: number };
-      r.renderedVersion = r.version ?? 0;
+      const render = archetype.getBuffer('Render')?.[currentIndex] as
+        | { version?: number; renderedVersion?: number }
+        | undefined;
+      archetype.setField('Render', 'renderedVersion', currentIndex, render?.version ?? 0);
     }
     renderer.postFrame?.();
   } catch (e) {
     handleGroupUpdateError(groupKey, archetypeId, e);
-    markGroupRenderedVersion(renderBuffer, activeData.indices);
+    markGroupRenderedVersion(archetype, activeData.indices);
   }
 }
 
@@ -188,7 +193,7 @@ function processGroupDefault(
   renderer: NonNullable<ReturnType<NonNullable<SystemContext['services']['app']>['getRenderer']>>,
   hasAnyTransformTyped: boolean,
   transformTypedBuffers: TransformTypedBuffers,
-  renderBuffer: Array<unknown>,
+  archetype: Archetype,
   activeData: ReturnType<typeof rendererGroupCache.getActiveData>,
   componentsScratch: Record<string, ComponentsScratchValue>,
   archetypeId: string,
@@ -209,13 +214,15 @@ function processGroupDefault(
         delete componentsScratch.TransformTyped;
       }
       renderer.update(activeData.entityIds[j]!, activeData.targets[j]!, componentsScratch);
-      const r = renderBuffer[index] as { version?: number; renderedVersion?: number };
-      r.renderedVersion = r.version ?? 0;
+      const render = archetype.getBuffer('Render')?.[index] as
+        | { version?: number; renderedVersion?: number }
+        | undefined;
+      archetype.setField('Render', 'renderedVersion', index, render?.version ?? 0);
     }
     renderer.postFrame?.();
   } catch (e) {
     handleGroupUpdateError(groupKey, archetypeId, e);
-    markGroupRenderedVersion(renderBuffer, activeData.indices);
+    markGroupRenderedVersion(archetype, activeData.indices);
   }
 }
 
@@ -225,7 +232,6 @@ function processActiveGroups(
   componentBufferMap: Map<string, Array<ComponentValue | undefined>>,
   transformTypedBuffers: TransformTypedBuffers,
   hasAnyTransformTyped: boolean,
-  renderBuffer: Array<unknown>,
   activeGroups: Map<string | number, ReturnType<typeof rendererGroupCache.getOrCreate>>,
   componentsScratch: Record<string, ComponentsScratchValue>,
 ): void {
@@ -244,7 +250,7 @@ function processActiveGroups(
         archetype.id,
         componentBufferMap,
         transformTypedBuffers,
-        renderBuffer,
+        archetype,
         activeData,
       );
       continue;
@@ -257,7 +263,7 @@ function processActiveGroups(
         componentBufferMap,
         hasAnyTransformTyped,
         transformTypedBuffers,
-        renderBuffer,
+        archetype,
         activeData,
         archetype.id,
       );
@@ -269,7 +275,7 @@ function processActiveGroups(
       renderer,
       hasAnyTransformTyped,
       transformTypedBuffers,
-      renderBuffer,
+      archetype,
       activeData,
       componentsScratch,
       archetype.id,
@@ -306,7 +312,6 @@ function updateArchetype(
     componentBufferMap,
     transformTypedBuffers,
     hasAnyTransformTyped,
-    renderBuffer,
     activeGroups,
     componentsScratch,
   );

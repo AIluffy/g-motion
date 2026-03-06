@@ -70,11 +70,7 @@ export const RovingResolverSystem: SystemDef = {
         }
         const tracks = timeline.tracks;
         if (!tracks || tracks.size === 0) {
-          if (typedApplied) {
-            typedApplied[i] = ver;
-          } else {
-            timeline.rovingApplied = ver;
-          }
+          archetype.setField('Timeline', 'rovingApplied', i, ver);
           continue;
         }
         let durationDirty = false;
@@ -112,7 +108,7 @@ export const RovingResolverSystem: SystemDef = {
 
           // Keep timeline duration aligned with last mark
           const prevDuration = Number.isFinite(timeline.duration ?? NaN) ? timeline.duration! : 0;
-          timeline.duration = Math.max(prevDuration, cursor);
+          archetype.setField('Timeline', 'duration', i, Math.max(prevDuration, cursor));
           durationDirty = true;
         }
 
@@ -127,11 +123,7 @@ export const RovingResolverSystem: SystemDef = {
         }
 
         // mark roving applied equals to current version
-        if (typedApplied) {
-          typedApplied[i] = ver;
-        } else {
-          timeline.rovingApplied = ver;
-        }
+        archetype.setField('Timeline', 'rovingApplied', i, ver);
       }
     }
   },
