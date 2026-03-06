@@ -9,6 +9,7 @@ import type {
 
 export type {
   SystemDef,
+  SystemPhase,
   RendererDef,
   MotionApp as MotionAppBase,
   ShaderBindingDef,
@@ -224,7 +225,7 @@ export interface EngineServices {
   appContext: import('./context').AppContext;
 }
 
-export interface SystemContext extends ProtocolSystemContext {
+export interface SystemContext extends ProtocolSystemContext<EngineServices> {
   services: EngineServices;
   dt: number;
   nowMs: number;

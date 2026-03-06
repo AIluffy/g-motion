@@ -16,8 +16,10 @@ export type {
   ArchetypeView,
   RendererBatchContext,
   RendererDef,
+  DefaultServices,
   SystemContext,
   SystemDef,
+  SystemPhase,
   WorldView,
 } from './system';
 export type { ComponentDef, ComponentType, ComponentValue, BatchContext } from './component';

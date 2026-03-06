@@ -136,6 +136,9 @@ class BurstManager {
 
 export class ArchetypeManager {
   private archetypes = new Map<string, Archetype>();
+  private componentIndex = new Map<string, Set<Archetype>>();
+  private queryCache = new Map<string, readonly Archetype[]>();
+  private queryCacheDirty = true;
   private entityArchetypes = new Map<number, Archetype>();
   private burstManager: BurstManager;
 
@@ -149,6 +152,9 @@ export class ArchetypeManager {
 
   reset(): void {
     this.archetypes.clear();
+    this.componentIndex.clear();
+    this.queryCache.clear();
+    this.queryCacheDirty = true;
     this.entityArchetypes.clear();
     this.burstManager = new BurstManager(this.entityManager, this.entityArchetypes);
   }
@@ -168,8 +174,54 @@ export class ArchetypeManager {
       }
       arch = new Archetype(archetypeId, defs);
       this.archetypes.set(archetypeId, arch);
+      this.indexArchetype(arch);
+      this.queryCacheDirty = true;
     }
     return arch;
+  }
+
+  query(requiredComponents: readonly string[]): readonly Archetype[] {
+    const cacheKey = requiredComponents.slice().sort().join('|');
+
+    if (this.queryCacheDirty) {
+      this.queryCache.clear();
+      this.queryCacheDirty = false;
+    }
+
+    const cached = this.queryCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    if (requiredComponents.length === 0) {
+      const all = Array.from(this.archetypes.values());
+      this.queryCache.set(cacheKey, all);
+      return all;
+    }
+
+    let result: Set<Archetype> | undefined;
+    for (const name of requiredComponents) {
+      const archetypesWithComponent = this.componentIndex.get(name);
+      if (!archetypesWithComponent || archetypesWithComponent.size === 0) {
+        this.queryCache.set(cacheKey, []);
+        return [];
+      }
+
+      if (!result) {
+        result = new Set(archetypesWithComponent);
+        continue;
+      }
+
+      for (const archetype of Array.from(result)) {
+        if (!archetypesWithComponent.has(archetype)) {
+          result.delete(archetype);
+        }
+      }
+    }
+
+    const matched = result ? Array.from(result) : [];
+    this.queryCache.set(cacheKey, matched);
+    return matched;
   }
 
   getEntityArchetype(id: number): Archetype | undefined {
@@ -257,6 +309,17 @@ export class ArchetypeManager {
       return `${sortedNames.join('|')}::${render.rendererId}`;
     }
     return undefined;
+  }
+
+  private indexArchetype(archetype: Archetype): void {
+    for (const name of archetype.componentNames) {
+      let set = this.componentIndex.get(name);
+      if (!set) {
+        set = new Set<Archetype>();
+        this.componentIndex.set(name, set);
+      }
+      set.add(archetype);
+    }
   }
 
   private getMotionStatus(motionState: ComponentValue | undefined): number | undefined {

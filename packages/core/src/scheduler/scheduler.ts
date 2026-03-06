@@ -1,4 +1,4 @@
-import { getNowMs } from '@g-motion/shared';
+import { getNowMs, isDev } from '@g-motion/shared';
 import { getGPUModuleSync } from '../runtime/gpu-access';
 import { WebGPUConstants } from '../constants';
 import type { EngineServices, SystemDef } from '../runtime/plugin';
@@ -82,8 +82,37 @@ export class SystemScheduler {
 
   add(system: SystemDef): void {
     if (this.systems.some((s) => s.name === system.name)) return;
+
+    if (isDev()) {
+      this.validateNoWriteConflicts(system);
+    }
+
     this.systems.push(system);
     this.systems.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  private validateNoWriteConflicts(newSystem: SystemDef): void {
+    const phase = newSystem.phase ?? 'update';
+    const order = newSystem.order ?? 0;
+    const writes = new Set(newSystem.writes ?? []);
+    if (writes.size === 0) return;
+
+    for (const existing of this.systems) {
+      if ((existing.phase ?? 'update') !== phase) continue;
+      if ((existing.order ?? 0) !== order) continue;
+      if (existing.name === newSystem.name) continue;
+
+      for (const w of existing.writes ?? []) {
+        if (writes.has(w)) {
+          console.warn(
+            `[g-motion] System "${newSystem.name}" and "${existing.name}" ` +
+              `both write to "${w}" at phase="${phase}" order=${order}. ` +
+              `This may cause non-deterministic behavior. ` +
+              `Consider assigning different order values.`,
+          );
+        }
+      }
+    }
   }
 
   start(): void {

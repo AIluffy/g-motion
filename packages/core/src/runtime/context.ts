@@ -1,6 +1,7 @@
+import type { SystemContext as ProtocolSystemContext } from '@g-motion/protocol';
 import { BatchContext } from '@g-motion/shared';
 import { createDebugger } from '@g-motion/shared';
-import type { ShaderDef } from './plugin';
+import type { EngineServices, ShaderDef } from './plugin';
 import { ComputeBatchProcessor } from '../systems/batch';
 
 const warn = createDebugger('AppContext', 'warn');
@@ -135,3 +136,5 @@ export function getAppContext(): AppContext {
  * Get the global error handler
  */
 // Error handling is intentionally minimal; no global error handler provided.
+
+export type CoreSystemContext = ProtocolSystemContext<EngineServices>;

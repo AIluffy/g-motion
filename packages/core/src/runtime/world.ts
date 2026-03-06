@@ -106,6 +106,10 @@ export class World {
     return this.archetypeManager.getArchetypes();
   }
 
+  query(requiredComponents: readonly string[]): readonly Archetype[] {
+    return this.archetypeManager.query(requiredComponents);
+  }
+
   createEntity(components: ComponentData): number {
     return this.archetypeManager.createEntity(components);
   }
