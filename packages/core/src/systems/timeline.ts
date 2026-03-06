@@ -22,7 +22,6 @@ export const TimelineSystem: SystemDef = {
       const timelineBuffer = archetype.getBuffer('Timeline');
       const typedStatus = archetype.getTypedBuffer('MotionState', 'status');
       const typedCurrentTime = archetype.getTypedBuffer('MotionState', 'currentTime');
-      const typedIteration = archetype.getTypedBuffer('MotionState', 'iteration');
       const typedPlaybackRate = archetype.getTypedBuffer('MotionState', 'playbackRate');
       const typedStartTime = archetype.getTypedBuffer('MotionState', 'startTime');
       const typedPausedAt = archetype.getTypedBuffer('MotionState', 'pausedAt');
@@ -61,10 +60,8 @@ export const TimelineSystem: SystemDef = {
 
         const duration = timeline.duration ?? 0;
         if (!(Number.isFinite(duration) && duration > 0)) {
-          state.currentTime = 0;
-          state.iteration = 0;
-          if (typedCurrentTime) typedCurrentTime[i] = 0;
-          if (typedIteration) typedIteration[i] = 0;
+          archetype.setField('MotionState', 'currentTime', i, 0);
+          archetype.setField('MotionState', 'iteration', i, 0);
           world.setMotionStatusAt(archetype, i, MotionStatus.Finished);
           continue;
         }
@@ -82,8 +79,7 @@ export const TimelineSystem: SystemDef = {
         const deltaStart = effectiveNow - Number(startTime ?? 0) - Number(delay ?? 0);
 
         if (deltaStart < 0) {
-          state.iteration = 0;
-          if (typedIteration) typedIteration[i] = 0;
+          archetype.setField('MotionState', 'iteration', i, 0);
           continue;
         }
 
@@ -114,10 +110,8 @@ export const TimelineSystem: SystemDef = {
               ? duration
               : duration - wrappedDistance;
 
-        state.currentTime = timelineTime;
-        state.iteration = iteration;
-        if (typedCurrentTime) typedCurrentTime[i] = timelineTime;
-        if (typedIteration) typedIteration[i] = iteration;
+        archetype.setField('MotionState', 'currentTime', i, timelineTime);
+        archetype.setField('MotionState', 'iteration', i, iteration);
 
         if (status === MotionStatus.Running && finished) {
           world.setMotionStatusAt(archetype, i, MotionStatus.Finished);
