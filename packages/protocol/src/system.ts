@@ -47,7 +47,7 @@ export interface SystemDef {
   phase?: SystemPhase;
   reads?: readonly string[];
   writes?: readonly string[];
-  update(dt: number, ctx?: SystemContext): void;
+  update(dt: number, ctx?: SystemContext): void | Promise<void>;
 }
 
 export interface RendererBatchContext {
