@@ -5,10 +5,12 @@ import type {
   MotionPlugin as ProtocolMotionPlugin,
   SystemContext as ProtocolSystemContext,
   SystemDef,
+  SystemPhase,
 } from '@g-motion/protocol';
 
 export type {
   SystemDef,
+  SystemPhase,
   RendererDef,
   MotionApp as MotionAppBase,
   ShaderBindingDef,

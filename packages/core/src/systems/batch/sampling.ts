@@ -41,6 +41,9 @@ import {
 export const BatchSamplingSystem: SystemDef = {
   name: 'BatchSamplingSystem',
   order: 5,
+  phase: 'update',
+  reads: ['MotionState.currentTime', 'MotionState.status', 'Timeline.tracks', 'Timeline.duration'],
+  writes: [],
 
   update(_dt: number, ctx?: SystemContext) {
     const world = ctx?.services.world;
