@@ -16,6 +16,7 @@
   ],
   "dependencies": {
     "@g-motion/core": "workspace:*",
+    "@g-motion/plugin-dom": "workspace:*",
     "@g-motion/values": "workspace:*",
     "@g-motion/shared": "workspace:*"
   },

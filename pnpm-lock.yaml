@@ -57,6 +57,9 @@ importers:
       '@g-motion/core':
         specifier: workspace:*
         version: link:../core
+      '@g-motion/plugin-dom':
+        specifier: workspace:*
+        version: link:../plugins/dom
       '@g-motion/plugin-inertia':
         specifier: workspace:*
         version: link:../plugins/inertia
