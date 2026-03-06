@@ -293,7 +293,7 @@ export function getEngineForWorld(world: World): MotionEngine {
   engineByWorld.set(world, engine);
 
   // Auto-apply registered plugins (for auto-discovery)
-  const registeredPlugins = getRegisteredPlugins();
+  const registeredPlugins = getRegisteredPlugins(world);
   for (const plugin of registeredPlugins) {
     engine.use(plugin);
   }
