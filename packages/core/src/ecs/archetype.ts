@@ -153,6 +153,8 @@ export class Archetype implements ArchetypeInternal {
       this.setFieldCacheTypedBuffer = typedBuffer;
     }
 
+    if (!buffer) return;
+
     const component = buffer[index];
     if (component && typeof component === 'object') {
       (component as Record<string, unknown>)[fieldName] = value;
