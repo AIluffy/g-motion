@@ -7,6 +7,23 @@ function mod(n: number, d: number): number {
   return r < 0 ? r + d : r;
 }
 
+/**
+ * TimelineSystem — 按 duration/repeat/loop 规则推进时间线状态。
+ *
+ * @description
+ * 基于 MotionState.currentTime 与 Timeline 的循环配置（duration、repeat、loop）
+ * 计算包装后的 timelineTime 与 iteration，并在到达结束条件时更新 MotionState.status。
+ * 仅处理关键帧时间线实体，包含 Spring/Inertia 的物理实体由其他系统处理。
+ *
+ * @phase update
+ * @order 4
+ *
+ * @reads MotionState.currentTime, MotionState.status, Timeline.duration, Timeline.loop, Timeline.repeat
+ * @writes MotionState.currentTime, MotionState.status, MotionState.iteration
+ *
+ * @dependsOn TimeSystem (order 0) — 提供 currentTime 初值
+ * @dependendBy BatchSamplingSystem (order 5) — 读取 currentTime/status 用于 GPU 采样过滤
+ */
 export const TimelineSystem: SystemDef = {
   name: 'TimelineSystem',
   order: 4,
