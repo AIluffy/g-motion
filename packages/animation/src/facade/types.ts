@@ -29,6 +29,18 @@ export interface FromToInput {
 export type ChannelInput = number | number[] | MotionValue | KeyframeInput[] | FromToInput;
 export type MotionProps = Record<string, ChannelInput>;
 
+export type ComposeConfig = {
+  target?: AnimationTarget;
+  duration?: number;
+} & Record<string, unknown>;
+
+export interface Composition {
+  readonly kind: 'composition';
+  readonly duration: number;
+  readonly target?: AnimationTarget;
+  readonly props: Readonly<MotionProps>;
+}
+
 export interface MotionOptions {
   duration?: number;
   delay?: number;
@@ -47,7 +59,7 @@ export interface MotionController {
   value(key: string): MotionValue | undefined;
 }
 
-export type TimelineLayerConfig = {
+export type TimelineLayerInputConfig = {
   name: string;
   target: AnimationTarget;
   duration?: number;
@@ -55,6 +67,18 @@ export type TimelineLayerConfig = {
   visible?: boolean;
   locked?: boolean;
 } & Record<string, unknown>;
+
+export type TimelineCompositionLayerConfig = {
+  name: string;
+  composition: Composition;
+  target?: AnimationTarget;
+  duration?: number;
+  startTime?: number;
+  visible?: boolean;
+  locked?: boolean;
+};
+
+export type TimelineLayerConfig = TimelineLayerInputConfig | TimelineCompositionLayerConfig;
 
 export type TimelineConfig = {
   autoplay?: boolean;

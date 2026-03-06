@@ -4,6 +4,8 @@ export type {
   AnimationStateStore,
   AnimationTarget,
   ChannelInput,
+  ComposeConfig,
+  Composition,
   Easing,
   FromToInput,
   Keyframe,
@@ -20,5 +22,6 @@ export type {
 export type { MotionValue, MotionValueRangeConfig, SpringConfig } from './motion-value';
 export { spring, transform, value, velocity } from './motion-value';
 export { keyframe } from './keyframe';
+export { compose } from './compose';
 export { motion } from './motion';
 export { timeline } from './timeline';

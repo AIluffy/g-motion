@@ -2,12 +2,15 @@ import type { MotionValue } from '../motion-value';
 import type {
   AnimationTarget,
   ChannelInput,
+  Composition,
   Easing,
   FromToInput,
   Keyframe,
   KeyframeInput,
   MotionProps,
   TimelineConfig,
+  TimelineCompositionLayerConfig,
+  TimelineLayerInputConfig,
   TimelineLayerConfig,
 } from '../facade/types';
 
@@ -23,6 +26,15 @@ const TIMELINE_RESERVED_KEYS = new Set([
 ]);
 const LAYER_RESERVED_KEYS = new Set([
   'name',
+  'target',
+  'duration',
+  'startTime',
+  'visible',
+  'locked',
+]);
+const COMPOSITION_LAYER_RESERVED_KEYS = new Set([
+  'name',
+  'composition',
   'target',
   'duration',
   'startTime',
@@ -88,6 +100,18 @@ export interface TimelineAuthoringModel {
 
 export function isMotionValue(input: ChannelInput): input is MotionValue {
   return typeof input === 'object' && input !== null && 'get' in input && 'set' in input;
+}
+
+function isComposition(input: unknown): input is Composition {
+  return (
+    typeof input === 'object' && input !== null && 'kind' in input && input.kind === 'composition'
+  );
+}
+
+function isCompositionLayerConfig(
+  input: TimelineLayerConfig,
+): input is TimelineCompositionLayerConfig {
+  return 'composition' in input && isComposition(input.composition);
 }
 
 export function isFromToInput(input: ChannelInput): input is FromToInput {
@@ -394,7 +418,7 @@ export function toLayerProps(input: Record<string, unknown>, reserved: Set<strin
 
 function createLayerModel(
   config:
-    | TimelineLayerConfig
+    | TimelineLayerInputConfig
     | (Record<string, unknown> & { target: AnimationTarget; name: string }),
   props: MotionProps,
   defaultDuration: number,
@@ -447,18 +471,49 @@ export function calculateTimelineDuration(model: TimelineAuthoringModel): number
   return Math.max(model.explicitDuration ?? 0, layerDuration);
 }
 
+function expandCompositionLayer(layer: TimelineCompositionLayerConfig): TimelineLayerInputConfig {
+  const extraProps = toLayerProps(layer, COMPOSITION_LAYER_RESERVED_KEYS);
+  if (Object.keys(extraProps).length > 0) {
+    throw new Error(`Composition layer "${layer.name}" cannot define animated props`);
+  }
+
+  const target = layer.target ?? layer.composition.target;
+  if (target === undefined) {
+    throw new Error(`Composition layer "${layer.name}" requires a target`);
+  }
+
+  return {
+    name: layer.name,
+    target,
+    duration: layer.duration,
+    startTime: layer.startTime,
+    visible: layer.visible,
+    locked: layer.locked,
+    ...layer.composition.props,
+  };
+}
+
+function createLayerModelFromConfig(
+  layer: TimelineLayerConfig,
+  defaultDuration: number,
+): LayerModel {
+  const input = isCompositionLayerConfig(layer) ? expandCompositionLayer(layer) : layer;
+  const resolvedDefaultDuration =
+    typeof layer.duration === 'number'
+      ? layer.duration
+      : isCompositionLayerConfig(layer)
+        ? layer.composition.duration
+        : defaultDuration;
+
+  return createLayerModel(input, toLayerProps(input, LAYER_RESERVED_KEYS), resolvedDefaultDuration);
+}
+
 export function createTimelineAuthoringModel(config: TimelineConfig): TimelineAuthoringModel {
   const defaultDuration =
     typeof config.duration === 'number' && config.duration > 0 ? config.duration : DEFAULT_DURATION;
 
   const layers =
-    config.layers?.map((layer) =>
-      createLayerModel(
-        layer,
-        toLayerProps(layer, LAYER_RESERVED_KEYS),
-        layer.duration ?? defaultDuration,
-      ),
-    ) ??
+    config.layers?.map((layer) => createLayerModelFromConfig(layer, defaultDuration)) ??
     (config.target
       ? [
           createLayerModel(

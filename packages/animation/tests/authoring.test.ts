@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { keyframe, timeline, value } from '../src';
+import { compose, keyframe, timeline, value } from '../src';
 import { resetAnimationRuntimeForTests } from '../src/runtime/bootstrap';
 
 afterEach(() => {
@@ -77,5 +77,71 @@ describe('timeline authoring model', () => {
         x: [{ v: 10 } as never],
       }),
     ).toThrowError(/Invalid keyframe/);
+  });
+
+  it('expands reusable composition layers with target override and duration override', () => {
+    const cardEnter = compose({
+      target: { x: 999, opacity: 999 },
+      x: [
+        { time: 0, value: 100 },
+        { time: 500, value: 0 },
+      ],
+      opacity: [
+        { time: 0, value: 0 },
+        { time: 300, value: 1 },
+      ],
+    });
+    const card1 = { x: 0, opacity: 0 };
+    const card2 = { x: 0, opacity: 0 };
+
+    const ctrl = timeline({
+      autoplay: false,
+      layers: [
+        { name: 'card1', target: card1, composition: cardEnter },
+        {
+          name: 'card2',
+          target: card2,
+          composition: cardEnter,
+          startTime: 200,
+          duration: 700,
+        },
+      ],
+    });
+
+    expect(ctrl.duration).toBe(900);
+
+    ctrl.seek(250);
+
+    expect(card1.x).toBeCloseTo(50, 5);
+    expect(card1.opacity).toBeCloseTo(5 / 6, 5);
+    expect(card2.x).toBeCloseTo(90, 5);
+    expect(card2.opacity).toBeCloseTo(1 / 6, 5);
+  });
+
+  it('rejects composition layers without a resolved target or with extra animated props', () => {
+    const enter = compose({
+      x: [{ time: 0, value: 0 }],
+    });
+
+    expect(() =>
+      timeline({
+        autoplay: false,
+        layers: [{ name: 'missing-target', composition: enter }],
+      }),
+    ).toThrowError('Composition layer "missing-target" requires a target');
+
+    expect(() =>
+      timeline({
+        autoplay: false,
+        layers: [
+          {
+            name: 'invalid',
+            target: { x: 0 },
+            composition: enter,
+            x: [{ time: 0, value: 1 }],
+          },
+        ],
+      }),
+    ).toThrowError('Composition layer "invalid" cannot define animated props');
   });
 });
