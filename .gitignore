@@ -72,3 +72,4 @@ tsconfig.tsbuildinfo
 .next/
 dist/
 reference/
+.worktrees/
